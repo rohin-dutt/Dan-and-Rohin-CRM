@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
@@ -51,6 +52,13 @@ function NavLinks({ mobile = false }: { mobile?: boolean }) {
 }
 
 export default function Sidebar() {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  }
+
   return (
     <>
       <header className="border-b border-zinc-200 bg-white px-4 py-4 md:hidden">
@@ -72,6 +80,13 @@ export default function Sidebar() {
         </div>
 
         <NavLinks />
+
+        <button
+          onClick={handleLogout}
+          className="mt-auto rounded-md px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white text-left"
+        >
+          Log out
+        </button>
       </aside>
     </>
   );
