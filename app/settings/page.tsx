@@ -1,6 +1,17 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
 import AppLayout from "@/components/AppLayout";
+import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  }
   return (
     <AppLayout>
       <div className="max-w-2xl">
@@ -64,11 +75,9 @@ export default function SettingsPage() {
           <h2 className="mb-4 text-base font-semibold text-zinc-900">
             Account
           </h2>
-          <p className="mb-4 text-sm leading-6 text-zinc-600">
-            Authentication will be added in a later phase.
-          </p>
           <button
             type="button"
+            onClick={handleLogout}
             className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
           >
             Log out
