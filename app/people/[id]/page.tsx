@@ -1,40 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import AppLayout from "@/components/AppLayout";
 import {
   getInteractionsForPerson,
   getPersonById,
   people,
 } from "@/lib/fake-data";
-
-function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950">
-      <div className="mx-auto flex w-full max-w-6xl gap-8 px-6 py-8">
-        <aside className="hidden w-56 shrink-0 md:block">
-          <Link href="/" className="text-lg font-semibold">
-            Personal CRM
-          </Link>
-          <nav className="mt-8 space-y-2 text-sm">
-            <Link
-              href="/dashboard"
-              className="block rounded-md px-3 py-2 text-zinc-600 hover:bg-white hover:text-zinc-950"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/people"
-              className="block rounded-md bg-zinc-900 px-3 py-2 font-medium text-white"
-            >
-              People
-            </Link>
-          </nav>
-        </aside>
-        <main className="min-w-0 flex-1">{children}</main>
-      </div>
-    </div>
-  );
-}
 
 export async function generateStaticParams() {
   return people.map((person) => ({
