@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/lib/supabase";
-import type { Person, Interaction } from "@/types/index";
+import type { Person, Interaction, Tag } from "@/types/index";
 
 export default function PersonDetailPage() {
   const params = useParams<{ id: string }>();
@@ -17,6 +17,7 @@ export default function PersonDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [interactionsLoading, setInteractionsLoading] = useState(true);
+  const [personTags, setPersonTags] = useState<Tag[]>([]);
 
   useEffect(() => {
     async function fetchPerson() {
@@ -45,8 +46,21 @@ export default function PersonDetailPage() {
       setInteractionsLoading(false);
     }
 
+    async function fetchTags() {
+      const { data } = await supabase
+        .from("person_tags")
+        .select("tags(id, name, color)")
+        .eq("person_id", params.id);
+
+      if (data) {
+        const rows = data as unknown as { tags: Tag[] }[];
+        setPersonTags(rows.flatMap((row) => row.tags));
+      }
+    }
+
     fetchPerson();
     fetchInteractions();
+    fetchTags();
   }, [params.id]);
 
   async function handleDelete() {
@@ -113,6 +127,20 @@ export default function PersonDetailPage() {
           <p className="mt-2 text-lg text-zinc-600">
             {[person.role, person.company].filter(Boolean).join(" at ")}
           </p>
+        )}
+
+        {personTags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {personTags.map((tag) => (
+              <span
+                key={tag.id}
+                className="rounded-full px-3 py-1 text-xs font-medium text-white"
+                style={{ backgroundColor: tag.color }}
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
         )}
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
@@ -246,7 +274,9 @@ export default function PersonDetailPage() {
                 {interaction.follow_up_needed && (
                   <p className="mt-3 text-sm font-medium text-amber-600">
                     Follow-up needed
-                    {interaction.follow_up_date ? ` by ${interaction.follow_up_date}` : ""}
+                    {interaction.follow_up_date
+                      ? ` by ${interaction.follow_up_date}`
+                      : ""}
                   </p>
                 )}
               </div>
