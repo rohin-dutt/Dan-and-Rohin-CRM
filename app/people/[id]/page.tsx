@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/lib/supabase";
-import type { Person } from "@/types/index";
+import type { Person, Interaction } from "@/types/index";
 
 export default function PersonDetailPage() {
   const params = useParams<{ id: string }>();
@@ -15,6 +15,8 @@ export default function PersonDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [interactionsLoading, setInteractionsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchPerson() {
@@ -32,7 +34,19 @@ export default function PersonDetailPage() {
       setLoading(false);
     }
 
+    async function fetchInteractions() {
+      const { data } = await supabase
+        .from("interactions")
+        .select("*")
+        .eq("person_id", params.id)
+        .order("date", { ascending: false });
+
+      setInteractions(data ?? []);
+      setInteractionsLoading(false);
+    }
+
     fetchPerson();
+    fetchInteractions();
   }, [params.id]);
 
   async function handleDelete() {
@@ -189,11 +203,55 @@ export default function PersonDetailPage() {
       </div>
 
       <section className="mt-8">
-        <h2 className="text-xl font-semibold">Interaction Timeline</h2>
-        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm text-zinc-500">
-            Interaction history coming in Phase 5.
-          </p>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Interaction Timeline</h2>
+          <Link
+            href={`/people/${person.id}/interactions/new`}
+            className="inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+          >
+            Log Interaction
+          </Link>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {interactionsLoading ? (
+            <p className="text-sm text-zinc-500">Loading interactions...</p>
+          ) : interactions.length === 0 ? (
+            <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
+              <p className="text-sm text-zinc-500">No interactions logged yet.</p>
+              <Link
+                href={`/people/${person.id}/interactions/new`}
+                className="mt-3 inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+              >
+                Log your first interaction
+              </Link>
+            </div>
+          ) : (
+            interactions.map((interaction) => (
+              <div
+                key={interaction.id}
+                className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+                    {interaction.type}
+                  </span>
+                  <span className="text-sm text-zinc-500">{interaction.date}</span>
+                </div>
+                {interaction.notes && (
+                  <p className="mt-3 text-sm leading-6 text-zinc-700">
+                    {interaction.notes}
+                  </p>
+                )}
+                {interaction.follow_up_needed && (
+                  <p className="mt-3 text-sm font-medium text-amber-600">
+                    Follow-up needed
+                    {interaction.follow_up_date ? ` by ${interaction.follow_up_date}` : ""}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </section>
     </AppLayout>
