@@ -1,120 +1,199 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
-import {
-  getInteractionsForPerson,
-  getPersonById,
-  people,
-} from "@/lib/fake-data";
+import { supabase } from "@/lib/supabase";
+import type { Person } from "@/types/index";
 
-export async function generateStaticParams() {
-  return people.map((person) => ({
-    id: person.id,
-  }));
-}
+export default function PersonDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const [person, setPerson] = useState<Person | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-export default async function PersonDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const person = getPersonById(id);
+  useEffect(() => {
+    async function fetchPerson() {
+      const { data } = await supabase
+        .from("people")
+        .select("*")
+        .eq("id", params.id)
+        .single();
 
-  if (!person) {
-    notFound();
+      if (!data) {
+        setNotFound(true);
+      } else {
+        setPerson(data);
+      }
+      setLoading(false);
+    }
+
+    fetchPerson();
+  }, [params.id]);
+
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to delete this person?")) return;
+    setDeleting(true);
+    await supabase.from("people").delete().eq("id", params.id);
+    router.push("/people");
   }
 
-  const personInteractions = getInteractionsForPerson(person.id);
+  if (loading) {
+    return (
+      <AppLayout>
+        <p className="text-sm text-zinc-500">Loading...</p>
+      </AppLayout>
+    );
+  }
+
+  if (notFound || !person) {
+    return (
+      <AppLayout>
+        <Link href="/people" className="text-sm font-medium text-zinc-600">
+          ← Back to people
+        </Link>
+        <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-zinc-600">Person not found.</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
-      <Link href="/people" className="text-sm font-medium text-zinc-600">
-        Back to people
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/people" className="text-sm font-medium text-zinc-600">
+          ← Back to people
+        </Link>
+        <div className="flex gap-3">
+          <Link
+            href={`/people/${person.id}/edit`}
+            className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+          >
+            Edit
+          </Link>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex h-9 items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
+          >
+            {deleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          {person.relationshipType}
-        </p>
+        {person.relationship_type && (
+          <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+            {person.relationship_type}
+          </p>
+        )}
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           {person.name}
         </h1>
-        <p className="mt-2 text-lg text-zinc-600">
-          {person.role} at {person.company}
-        </p>
+        {(person.role || person.company) && (
+          <p className="mt-2 text-lg text-zinc-600">
+            {[person.role, person.company].filter(Boolean).join(" at ")}
+          </p>
+        )}
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Relationship Strength
-            </p>
-            <p className="mt-2 font-semibold">{person.relationshipStrength}</p>
-          </div>
-          <div className="rounded-lg bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Preferred Contact
-            </p>
-            <p className="mt-2 font-semibold">
-              {person.preferredContactMethod}
-            </p>
-          </div>
-          <div className="rounded-lg bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Location
-            </p>
-            <p className="mt-2 font-semibold">{person.location}</p>
-          </div>
+          {person.email && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Email
+              </p>
+              <p className="mt-2 font-semibold">{person.email}</p>
+            </div>
+          )}
+          {person.phone && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Phone
+              </p>
+              <p className="mt-2 font-semibold">{person.phone}</p>
+            </div>
+          )}
+          {person.location && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Location
+              </p>
+              <p className="mt-2 font-semibold">{person.location}</p>
+            </div>
+          )}
+          {person.birthday && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Birthday
+              </p>
+              <p className="mt-2 font-semibold">{person.birthday}</p>
+            </div>
+          )}
+          {person.relationship_strength && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Relationship Strength
+              </p>
+              <p className="mt-2 font-semibold">{person.relationship_strength}</p>
+            </div>
+          )}
+          {person.preferred_contact_method && (
+            <div className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Preferred Contact
+              </p>
+              <p className="mt-2 font-semibold">{person.preferred_contact_method}</p>
+            </div>
+          )}
           <div className="rounded-lg bg-zinc-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Contact Rhythm
             </p>
             <p className="mt-2 font-semibold">
-              Every {person.contactFrequencyDays} days
+              Every {person.contact_frequency_days} days
             </p>
           </div>
           <div className="rounded-lg bg-zinc-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Last Contacted
             </p>
-            <p className="mt-2 font-semibold">{person.lastContacted}</p>
-          </div>
-          <div className="rounded-lg bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              How Met
-            </p>
-            <p className="mt-2 text-sm leading-6 text-zinc-700">
-              {person.howMet}
+            <p className="mt-2 font-semibold">
+              {person.last_contacted_at ?? "Never"}
             </p>
           </div>
+          {person.how_met && (
+            <div className="rounded-lg bg-zinc-50 p-4 md:col-span-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                How Met
+              </p>
+              <p className="mt-2 text-sm leading-6 text-zinc-700">
+                {person.how_met}
+              </p>
+            </div>
+          )}
         </div>
 
-        <section className="mt-8">
-          <h2 className="text-xl font-semibold">Notes</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-700">
-            {person.notes}
-          </p>
-        </section>
+        {person.notes && (
+          <section className="mt-8">
+            <h2 className="text-xl font-semibold">Notes</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-700">
+              {person.notes}
+            </p>
+          </section>
+        )}
       </div>
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Interaction Timeline</h2>
-        <div className="mt-4 space-y-3">
-          {personInteractions.map((interaction) => (
-            <article
-              key={interaction.id}
-              className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
-            >
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <h3 className="font-semibold">{interaction.type}</h3>
-                <p className="text-sm text-zinc-500">{interaction.date}</p>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-zinc-700">
-                {interaction.notes}
-              </p>
-            </article>
-          ))}
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm text-zinc-500">
+            Interaction history coming in Phase 5.
+          </p>
         </div>
       </section>
     </AppLayout>
