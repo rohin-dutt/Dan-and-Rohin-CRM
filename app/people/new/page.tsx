@@ -1,16 +1,135 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/lib/supabase";
+import type { Tag } from "@/types/index";
+
+const PRESET_TAGS = [
+  { name: "Family",        color: "#2563EB" },
+  { name: "Friend",        color: "#16A34A" },
+  { name: "Close Friend",  color: "#7C3AED" },
+  { name: "Colleague",     color: "#D97706" },
+  { name: "Mentor",        color: "#0891B2" },
+  { name: "Recruiter",     color: "#DB2777" },
+  { name: "University",    color: "#6366F1" },
+  { name: "Work",          color: "#EA580C" },
+  { name: "High Priority", color: "#DC2626" },
+  { name: "Reconnect",     color: "#059669" },
+];
+
+const CUSTOM_TAG_COLORS = [
+  "#2563EB", "#16A34A", "#7C3AED", "#D97706",
+  "#DC2626", "#DB2777", "#0891B2", "#EA580C",
+];
 
 export default function NewPersonPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [newTagName, setNewTagName] = useState("");
+  const [addingTag, setAddingTag] = useState(false);
+
+  useEffect(() => {
+    async function fetchTags() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("tags")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("name");
+
+      if (data) setAllTags(data);
+    }
+
+    fetchTags();
+  }, []);
+
+  function isPresetSelected(name: string): boolean {
+    const tag = allTags.find((t) => t.name === name);
+    return tag ? selectedTagIds.includes(tag.id) : false;
+  }
+
+  function toggleTagId(id: string) {
+    setSelectedTagIds((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    );
+  }
+
+  async function handleTogglePreset(name: string, color: string) {
+    const existing = allTags.find((t) => t.name === name);
+
+    if (existing) {
+      toggleTagId(existing.id);
+      return;
+    }
+
+    // Tag doesn't exist yet — create it then select it
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error: tagError } = await supabase
+      .from("tags")
+      .insert({ user_id: user.id, name, color })
+      .select()
+      .single();
+
+    if (data && !tagError) {
+      setAllTags((prev) => [...prev, data]);
+      setSelectedTagIds((prev) => [...prev, data.id]);
+    }
+  }
+
+  async function handleAddCustomTag() {
+    const name = newTagName.trim();
+    if (!name) return;
+    setAddingTag(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setAddingTag(false);
+      return;
+    }
+
+    // Reuse existing tag with same name if it exists
+    const existing = allTags.find((t) => t.name === name);
+    if (existing) {
+      if (!selectedTagIds.includes(existing.id)) {
+        setSelectedTagIds((prev) => [...prev, existing.id]);
+      }
+      setNewTagName("");
+      setAddingTag(false);
+      return;
+    }
+
+    const color = CUSTOM_TAG_COLORS[allTags.length % CUSTOM_TAG_COLORS.length];
+    const { data, error: tagError } = await supabase
+      .from("tags")
+      .insert({ user_id: user.id, name, color })
+      .select()
+      .single();
+
+    if (data && !tagError) {
+      setAllTags((prev) => [...prev, data]);
+      setSelectedTagIds((prev) => [...prev, data.id]);
+      setNewTagName("");
+    }
+
+    setAddingTag(false);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,7 +149,8 @@ export default function NewPersonPage() {
       return;
     }
 
-    const contactFrequency = Number(formData.get("contact_frequency_days")) || 30;
+    const contactFrequency =
+      Number(formData.get("contact_frequency_days")) || 30;
 
     const { data, error: insertError } = await supabase
       .from("people")
@@ -44,9 +164,12 @@ export default function NewPersonPage() {
         location: (formData.get("location") as string) || null,
         birthday: (formData.get("birthday") as string) || null,
         how_met: (formData.get("how_met") as string) || null,
-        relationship_type: (formData.get("relationship_type") as string) || null,
-        relationship_strength: (formData.get("relationship_strength") as string) || null,
-        preferred_contact_method: (formData.get("preferred_contact_method") as string) || null,
+        relationship_type:
+          (formData.get("relationship_type") as string) || null,
+        relationship_strength:
+          (formData.get("relationship_strength") as string) || null,
+        preferred_contact_method:
+          (formData.get("preferred_contact_method") as string) || null,
         contact_frequency_days: contactFrequency,
         notes: (formData.get("notes") as string) || null,
       })
@@ -59,8 +182,19 @@ export default function NewPersonPage() {
       return;
     }
 
+    if (selectedTagIds.length > 0) {
+      await supabase.from("person_tags").insert(
+        selectedTagIds.map((tag_id) => ({ person_id: data.id, tag_id }))
+      );
+    }
+
     router.push(`/people/${data.id}`);
   }
+
+  // Custom tags the user has added that aren't in the preset list
+  const customTags = allTags.filter(
+    (t) => !PRESET_TAGS.some((p) => p.name === t.name)
+  );
 
   return (
     <AppLayout>
@@ -84,7 +218,10 @@ export default function NewPersonPage() {
           <h2 className="mb-5 text-base font-semibold">Basic info</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label htmlFor="name" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="name"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -96,7 +233,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="email"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Email
               </label>
               <input
@@ -107,7 +247,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="phone" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="phone"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Phone
               </label>
               <input
@@ -118,7 +261,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="company" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="company"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Company
               </label>
               <input
@@ -129,7 +275,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="role" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="role"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Role
               </label>
               <input
@@ -140,7 +289,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="location" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="location"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Location
               </label>
               <input
@@ -151,7 +303,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="birthday" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="birthday"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Birthday
               </label>
               <input
@@ -168,7 +323,10 @@ export default function NewPersonPage() {
           <h2 className="mb-5 text-base font-semibold">Relationship</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label htmlFor="how_met" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="how_met"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 How you met
               </label>
               <input
@@ -179,7 +337,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="relationship_type" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="relationship_type"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Relationship type
               </label>
               <input
@@ -191,7 +352,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="relationship_strength" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="relationship_strength"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Relationship strength
               </label>
               <select
@@ -207,7 +371,10 @@ export default function NewPersonPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="preferred_contact_method" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="preferred_contact_method"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Preferred contact method
               </label>
               <input
@@ -219,7 +386,10 @@ export default function NewPersonPage() {
               />
             </div>
             <div>
-              <label htmlFor="contact_frequency_days" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label
+                htmlFor="contact_frequency_days"
+                className="mb-1 block text-sm font-medium text-zinc-700"
+              >
                 Contact every (days)
               </label>
               <input
@@ -231,6 +401,83 @@ export default function NewPersonPage() {
                 className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-5 text-base font-semibold">Tags</h2>
+
+          {/* Preset tags */}
+          <div className="mb-5 grid grid-cols-2 gap-2">
+            {PRESET_TAGS.map(({ name, color }) => (
+              <label
+                key={name}
+                className="flex cursor-pointer items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={isPresetSelected(name)}
+                  onChange={() => handleTogglePreset(name, color)}
+                  className="rounded border-zinc-300"
+                />
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-medium text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  {name}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {/* Custom tags the user already created */}
+          {customTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {customTags.map((tag) => (
+                <label
+                  key={tag.id}
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTagIds.includes(tag.id)}
+                    onChange={() => toggleTagId(tag.id)}
+                    className="rounded border-zinc-300"
+                  />
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-medium text-white"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    {tag.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {/* Add a custom tag */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddCustomTag();
+                }
+              }}
+              placeholder="Add custom tag..."
+              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustomTag}
+              disabled={addingTag || !newTagName.trim()}
+              className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50"
+            >
+              {addingTag ? "Adding..." : "Add"}
+            </button>
           </div>
         </div>
 
