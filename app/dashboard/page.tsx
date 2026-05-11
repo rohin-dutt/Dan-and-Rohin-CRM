@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -193,9 +194,33 @@ function StatCard({
   );
 }
 
+function FirstRunEmptyState() {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
+      <h2 className="text-xl font-semibold text-zinc-900">
+        Add your first contact to get started.
+      </h2>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-600">
+        Once you add someone, this dashboard will show who is overdue, who is
+        coming up soon, and who you contacted recently.
+      </p>
+      <Link
+        href="/people/new"
+        className={cn(
+          buttonVariants({ size: "sm" }),
+          "mt-5 bg-zinc-900 text-white hover:bg-zinc-700",
+        )}
+      >
+        Add contact
+      </Link>
+    </div>
+  );
+}
+
 // --- Page ---
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -204,7 +229,11 @@ export default function DashboardPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        router.push("/auth/login");
+        return;
+      }
 
       const { data } = await supabase
         .from("people")
@@ -216,7 +245,7 @@ export default function DashboardPage() {
     }
 
     fetchPeople();
-  }, []);
+  }, [router]);
 
   const { overdue, dueThisWeek, recentlyContacted, neglected } = categorizePeople(people);
 
@@ -233,6 +262,8 @@ export default function DashboardPage() {
 
       {loading ? (
         <p className="text-sm text-zinc-500">Loading...</p>
+      ) : people.length === 0 ? (
+        <FirstRunEmptyState />
       ) : (
         <>
           {/* Summary stats */}

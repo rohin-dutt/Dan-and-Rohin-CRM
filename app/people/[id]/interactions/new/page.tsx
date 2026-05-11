@@ -42,6 +42,30 @@ export default function NewInteractionPage() {
       ? (formData.get("follow_up_date") as string) || null
       : null;
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("You must be logged in.");
+      setSaving(false);
+      router.push("/auth/login");
+      return;
+    }
+
+    const { data: person, error: personError } = await supabase
+      .from("people")
+      .select("id")
+      .eq("id", params.id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (personError || !person) {
+      setError("Person not found or you do not have access.");
+      setSaving(false);
+      return;
+    }
+
     const { error: insertError } = await supabase
       .from("interactions")
       .insert({
@@ -59,10 +83,21 @@ export default function NewInteractionPage() {
       return;
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("people")
       .update({ last_contacted_at: date })
-      .eq("id", params.id);
+      .eq("id", params.id)
+      .eq("user_id", user.id)
+      .select("id")
+      .single();
+
+    if (updateError) {
+      setError(
+        `Interaction was saved, but last contacted date could not be updated: ${updateError.message}`
+      );
+      setSaving(false);
+      return;
+    }
 
     router.push(`/people/${params.id}`);
   }

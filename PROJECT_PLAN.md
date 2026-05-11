@@ -1,29 +1,40 @@
 # Project Plan
 
-## Phase 0 — Setup
+## Current Status
 
-Set up the Next.js app, shadcn/ui, local development, and GitHub repo.
+The app now has the core personal CRM implementation: Supabase auth, protected routes, database-backed people, tags, interactions, settings, dashboard status, and JSON export.
 
-## Phase 1 — App Shell
+## Phase 0 - Setup
 
-Create the basic layout, navigation, and placeholder pages.
+Complete. The Next.js app, shadcn/ui, local development setup, and baseline docs are in place.
 
-## Phase 2 — Supabase Setup
+## Phase 1 - App Shell
 
-Create the database schema and connect the app to Supabase.
+Complete. The app has a public homepage, authenticated layout, sidebar navigation, mobile navigation, dashboard, people, person detail, and settings screens.
 
-## Phase 3 — Authentication
+## Phase 2 - Supabase Setup
 
-Add signup, login, logout, and protected pages.
+Complete in code. Reproducible SQL migrations live in `supabase/migrations` and define tables, constraints, indexes, cascades, RLS, and ownership policies.
 
-## Phase 4 — People CRUD
+## Phase 3 - Authentication
 
-Add, view, edit, delete, and search contacts.
+Complete. Email/password signup, login, logout, callback handling, and protected route redirects are implemented.
 
-## Phase 5 — Interaction Logging
+## Phase 4 - People CRUD
 
-Log calls, texts, emails, meetings, and notes.
+Complete. Users can create, view, edit, tag, and delete their own people. Mutation failures now surface user-visible errors before redirecting.
 
-## Phase 6 — Reminder Dashboard
+## Phase 5 - Interaction Logging
 
-Show who is overdue, due soon, and recently contacted.
+Complete. Users can log interactions for their own people, and successful logs update dashboard-facing `last_contacted_at` data.
+
+## Phase 6 - Reminder Dashboard
+
+Complete for in-app status. The dashboard groups people by overdue, due this week, recently contacted, and neglected states.
+
+## Next Work
+
+- Apply migrations to the live Supabase project and test with a fresh database.
+- Add automated coverage for client auth redirects and write-failure states.
+- Decide whether to calculate last-contacted status from interactions instead of storing duplicate data on people.
+- Build actual reminder delivery if email reminders are required.

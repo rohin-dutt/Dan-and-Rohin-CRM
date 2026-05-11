@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ function isOverdue(person: Person): boolean {
 }
 
 export default function PeoplePage() {
+  const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [personTags, setPersonTags] = useState<PersonTag[]>([]);
@@ -28,7 +30,11 @@ export default function PeoplePage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        router.push("/auth/login");
+        return;
+      }
 
       const [peopleRes, tagsRes] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", user.id).order("name"),
@@ -52,7 +58,7 @@ export default function PeoplePage() {
     }
 
     fetchData();
-  }, []);
+  }, [router]);
 
   function getFiltered(): Person[] {
     let result = people;

@@ -15,58 +15,95 @@ export default function PersonDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [interactionsLoading, setInteractionsLoading] = useState(true);
   const [personTags, setPersonTags] = useState<Tag[]>([]);
 
   useEffect(() => {
-    async function fetchPerson() {
-      const { data } = await supabase
+    async function fetchData() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        setInteractionsLoading(false);
+        router.push("/auth/login");
+        return;
+      }
+
+      const { data: personData } = await supabase
         .from("people")
         .select("*")
         .eq("id", params.id)
+        .eq("user_id", user.id)
         .single();
 
-      if (!data) {
+      if (!personData) {
         setNotFound(true);
-      } else {
-        setPerson(data);
+        setLoading(false);
+        setInteractionsLoading(false);
+        return;
       }
+
+      setPerson(personData);
       setLoading(false);
-    }
 
-    async function fetchInteractions() {
-      const { data } = await supabase
-        .from("interactions")
-        .select("*")
-        .eq("person_id", params.id)
-        .order("date", { ascending: false });
+      const [interactionsRes, tagsRes] = await Promise.all([
+        supabase
+          .from("interactions")
+          .select("*")
+          .eq("person_id", params.id)
+          .order("date", { ascending: false }),
+        supabase
+          .from("person_tags")
+          .select("tags(id, name, color)")
+          .eq("person_id", params.id),
+      ]);
 
-      setInteractions(data ?? []);
+      setInteractions(interactionsRes.data ?? []);
       setInteractionsLoading(false);
-    }
 
-    async function fetchTags() {
-      const { data } = await supabase
-        .from("person_tags")
-        .select("tags(id, name, color)")
-        .eq("person_id", params.id);
-
-      if (data) {
-        const rows = data as unknown as { tags: Tag[] }[];
+      if (tagsRes.data) {
+        const rows = tagsRes.data as unknown as { tags: Tag[] }[];
         setPersonTags(rows.flatMap((row) => row.tags));
       }
     }
 
-    fetchPerson();
-    fetchInteractions();
-    fetchTags();
-  }, [params.id]);
+    fetchData();
+  }, [params.id, router]);
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this person?")) return;
     setDeleting(true);
-    await supabase.from("people").delete().eq("id", params.id);
+    setDeleteError(null);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setDeleteError("You must be logged in.");
+      setDeleting(false);
+      router.push("/auth/login");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("people")
+      .delete()
+      .eq("id", params.id)
+      .eq("user_id", user.id)
+      .select("id")
+      .single();
+
+    if (error) {
+      setDeleteError(error.message ?? "Failed to delete person.");
+      setDeleting(false);
+      return;
+    }
+
     router.push("/people");
   }
 
@@ -113,6 +150,12 @@ export default function PersonDetailPage() {
           </button>
         </div>
       </div>
+
+      {deleteError && (
+        <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
+          {deleteError}
+        </div>
+      )}
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
         {person.relationship_type && (

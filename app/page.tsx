@@ -6,80 +6,62 @@ export default function Home() {
       <section className="mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <p className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
-            Login placeholder
+            Personal CRM
           </p>
           <h1 className="max-w-2xl text-5xl font-semibold tracking-tight">
-            Personal CRM
+            Stay intentional with the relationships that matter.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-600">
-            A simple place to remember who matters, when you last connected,
-            and what to follow up on next.
+            Personal CRM helps you track contacts, last contact dates,
+            interaction notes, and follow-ups so important relationships do not
+            drift out of view.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/dashboard"
+              href="/auth/signup"
               className="inline-flex h-11 items-center justify-center rounded-md bg-zinc-900 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
             >
-              Preview Dashboard
+              Sign up
             </Link>
             <Link
-              href="/people"
+              href="/auth/login"
               className="inline-flex h-11 items-center justify-center rounded-md border border-zinc-300 bg-white px-5 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-100"
             >
-              Browse People
+              Sign in
             </Link>
           </div>
         </div>
 
         <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Sign in</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-600">
-            Authentication starts in a later phase. Use the preview links to
-            explore the Phase 1 shell with fake data.
-          </p>
-
-          <div className="mt-6 space-y-4">
+          <h2 className="text-xl font-semibold">What you can track</h2>
+          <div className="mt-6 space-y-5">
             <div>
-              <label
-                htmlFor="email"
-                className="mb-1 block text-sm font-medium text-zinc-700"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                disabled
-                className="w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-500"
-              />
+              <p className="text-sm font-medium text-zinc-900">
+                Relationship history
+              </p>
+              <p className="mt-1 text-sm leading-6 text-zinc-600">
+                Keep a private record of who someone is, how you know them, and
+                the context that matters before your next conversation.
+              </p>
             </div>
             <div>
-              <label
-                htmlFor="password"
-                className="mb-1 block text-sm font-medium text-zinc-700"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Not wired up yet"
-                disabled
-                className="w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-500"
-              />
+              <p className="text-sm font-medium text-zinc-900">
+                Last contact dates
+              </p>
+              <p className="mt-1 text-sm leading-6 text-zinc-600">
+                See when you last reached out and which relationships are due
+                for attention.
+              </p>
             </div>
-            <button
-              type="button"
-              disabled
-              className="h-11 w-full rounded-md bg-zinc-300 px-4 text-sm font-medium text-zinc-600"
-            >
-              Sign in disabled for Phase 1
-            </button>
-            <p className="text-xs leading-5 text-zinc-500">
-              No auth, database, API routes, or data mutations are implemented
-              yet.
-            </p>
+            <div>
+              <p className="text-sm font-medium text-zinc-900">
+                Follow-up reminders
+              </p>
+              <p className="mt-1 text-sm leading-6 text-zinc-600">
+                Log interactions and capture next steps so follow-ups are easy
+                to find when you need them.
+              </p>
+            </div>
           </div>
         </div>
       </section>

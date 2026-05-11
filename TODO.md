@@ -1,26 +1,26 @@
 # TODO
 
-## Phase 0
+## Completed
 
-- [x] Install Node.js
 - [x] Create Next.js app
-- [x] Add shadcn/ui
-- [x] Confirm .env.local is ignored by git
-- [x] Create project docs
-- [x] Test app locally
-- [ ] Push to GitHub
-- [ ] Confirm collaborator can run the app
+- [x] Add shadcn/ui and shared app layout
+- [x] Add protected navigation and mobile navigation
+- [x] Add Supabase browser/server clients
+- [x] Add signup, login, logout, auth callback, and route protection
+- [x] Add people list, detail, create, edit, and delete flows
+- [x] Add tags and person/tag assignment flows
+- [x] Add interaction logging and dashboard status sections
+- [x] Add settings page
+- [x] Add JSON export API route
+- [x] Add reproducible Supabase migrations with RLS policies
+- [x] Handle failed writes before redirecting from core mutation flows
+- [x] Redirect logged-out client loaders to `/auth/login`
 
-Note: Push/collaborator verification cannot be confirmed from the local workspace.
+## Remaining
 
-## Phase 1
-
-- [x] Create landing/login placeholder page
-- [x] Create shared authenticated app layout
-- [x] Create sidebar navigation
-- [x] Add mobile navigation for authenticated pages
-- [x] Create dashboard page with fake data
-- [x] Create people page with fake data
-- [x] Create person profile page with fake data
-- [x] Create settings page placeholder
-- [x] Keep Phase 1 hardcoded with no database/auth/API routes
+- [ ] Push the repository to GitHub
+- [ ] Confirm a fresh clone can run the app with documented setup steps
+- [ ] Apply migrations to the target Supabase project
+- [ ] Add automated tests for auth-guarded loaders and mutation error handling
+- [ ] Decide whether `last_contacted_at` should remain denormalized or be derived from interactions
+- [ ] Implement real reminder email delivery if reminders are meant to send messages

@@ -20,7 +20,11 @@ export default function SettingsPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        router.push("/auth/login");
+        return;
+      }
 
       const { data } = await supabase
         .from("settings")
@@ -48,7 +52,7 @@ export default function SettingsPage() {
     }
 
     loadSettings();
-  }, []);
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

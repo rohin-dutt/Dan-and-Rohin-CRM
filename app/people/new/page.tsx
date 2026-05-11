@@ -26,6 +26,15 @@ const CUSTOM_TAG_COLORS = [
   "#DC2626", "#DB2777", "#0891B2", "#EA580C",
 ];
 
+function getTrimmedFormValue(formData: FormData, key: string): string {
+  return ((formData.get(key) as string | null) ?? "").trim();
+}
+
+function getOptionalFormValue(formData: FormData, key: string): string | null {
+  const value = getTrimmedFormValue(formData, key);
+  return value === "" ? null : value;
+}
+
 export default function NewPersonPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +49,10 @@ export default function NewPersonPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
 
       const { data } = await supabase
         .from("tags")
@@ -52,7 +64,7 @@ export default function NewPersonPage() {
     }
 
     fetchTags();
-  }, []);
+  }, [router]);
 
   function isPresetSelected(name: string): boolean {
     const tag = allTags.find((t) => t.name === name);
@@ -77,7 +89,10 @@ export default function NewPersonPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
 
     const { data, error: tagError } = await supabase
       .from("tags")
@@ -101,6 +116,7 @@ export default function NewPersonPage() {
     } = await supabase.auth.getUser();
     if (!user) {
       setAddingTag(false);
+      router.push("/auth/login");
       return;
     }
 
@@ -146,32 +162,40 @@ export default function NewPersonPage() {
     if (!user) {
       setError("You must be logged in.");
       setSaving(false);
+      router.push("/auth/login");
       return;
     }
 
     const contactFrequency =
       Number(formData.get("contact_frequency_days")) || 30;
+    const name = getTrimmedFormValue(formData, "name");
+
+    if (!name) {
+      setError("Name is required.");
+      setSaving(false);
+      return;
+    }
 
     const { data, error: insertError } = await supabase
       .from("people")
       .insert({
         user_id: user.id,
-        name: formData.get("name") as string,
-        email: (formData.get("email") as string) || null,
-        phone: (formData.get("phone") as string) || null,
-        company: (formData.get("company") as string) || null,
-        role: (formData.get("role") as string) || null,
-        location: (formData.get("location") as string) || null,
-        birthday: (formData.get("birthday") as string) || null,
-        how_met: (formData.get("how_met") as string) || null,
+        name,
+        email: getOptionalFormValue(formData, "email"),
+        phone: getOptionalFormValue(formData, "phone"),
+        company: getOptionalFormValue(formData, "company"),
+        role: getOptionalFormValue(formData, "role"),
+        location: getOptionalFormValue(formData, "location"),
+        birthday: getOptionalFormValue(formData, "birthday"),
+        how_met: getOptionalFormValue(formData, "how_met"),
         relationship_type:
-          (formData.get("relationship_type") as string) || null,
+          getOptionalFormValue(formData, "relationship_type"),
         relationship_strength:
-          (formData.get("relationship_strength") as string) || null,
+          getOptionalFormValue(formData, "relationship_strength"),
         preferred_contact_method:
-          (formData.get("preferred_contact_method") as string) || null,
+          getOptionalFormValue(formData, "preferred_contact_method"),
         contact_frequency_days: contactFrequency,
-        notes: (formData.get("notes") as string) || null,
+        notes: getOptionalFormValue(formData, "notes"),
       })
       .select()
       .single();
@@ -183,9 +207,17 @@ export default function NewPersonPage() {
     }
 
     if (selectedTagIds.length > 0) {
-      await supabase.from("person_tags").insert(
+      const { error: personTagsError } = await supabase.from("person_tags").insert(
         selectedTagIds.map((tag_id) => ({ person_id: data.id, tag_id }))
       );
+
+      if (personTagsError) {
+        setError(
+          `Contact saved, but tags could not be saved: ${personTagsError.message}`
+        );
+        setSaving(false);
+        return;
+      }
     }
 
     router.push(`/people/${data.id}`);

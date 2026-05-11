@@ -26,6 +26,15 @@ const CUSTOM_TAG_COLORS = [
   "#DC2626", "#DB2777", "#0891B2", "#EA580C",
 ];
 
+function getTrimmedFormValue(formData: FormData, key: string): string {
+  return ((formData.get(key) as string | null) ?? "").trim();
+}
+
+function getOptionalFormValue(formData: FormData, key: string): string | null {
+  const value = getTrimmedFormValue(formData, key);
+  return value === "" ? null : value;
+}
+
 export default function EditPersonPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -43,28 +52,43 @@ export default function EditPersonPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        router.push("/auth/login");
+        return;
+      }
 
-      const [personRes, tagsRes, personTagsRes] = await Promise.all([
-        supabase.from("people").select("*").eq("id", params.id).single(),
-        supabase.from("tags").select("*").eq("user_id", user.id).order("name"),
+      const [personRes, tagsRes] = await Promise.all([
         supabase
-          .from("person_tags")
-          .select("tag_id")
-          .eq("person_id", params.id),
+          .from("people")
+          .select("*")
+          .eq("id", params.id)
+          .eq("user_id", user.id)
+          .single(),
+        supabase.from("tags").select("*").eq("user_id", user.id).order("name"),
       ]);
 
       if (personRes.data) setPerson(personRes.data);
       if (tagsRes.data) setAllTags(tagsRes.data);
-      if (personTagsRes.data) {
-        setSelectedTagIds(personTagsRes.data.map((row) => row.tag_id));
+
+      if (personRes.data) {
+        const { data: personTagsData, error: personTagsError } = await supabase
+          .from("person_tags")
+          .select("tag_id")
+          .eq("person_id", params.id);
+
+        if (personTagsError) {
+          setError(personTagsError.message);
+        } else if (personTagsData) {
+          setSelectedTagIds(personTagsData.map((row) => row.tag_id));
+        }
       }
 
       setLoading(false);
     }
 
     fetchData();
-  }, [params.id]);
+  }, [params.id, router]);
 
   function isPresetSelected(name: string): boolean {
     const tag = allTags.find((t) => t.name === name);
@@ -89,7 +113,10 @@ export default function EditPersonPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
 
     const { data, error: tagError } = await supabase
       .from("tags")
@@ -113,6 +140,7 @@ export default function EditPersonPage() {
     } = await supabase.auth.getUser();
     if (!user) {
       setAddingTag(false);
+      router.push("/auth/login");
       return;
     }
 
@@ -152,28 +180,49 @@ export default function EditPersonPage() {
     const formData = new FormData(form);
     const contactFrequency =
       Number(formData.get("contact_frequency_days")) || 30;
+    const name = getTrimmedFormValue(formData, "name");
+
+    if (!name) {
+      setError("Name is required.");
+      setSaving(false);
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setError("You must be logged in.");
+      setSaving(false);
+      router.push("/auth/login");
+      return;
+    }
 
     const { error: updateError } = await supabase
       .from("people")
       .update({
-        name: formData.get("name") as string,
-        email: (formData.get("email") as string) || null,
-        phone: (formData.get("phone") as string) || null,
-        company: (formData.get("company") as string) || null,
-        role: (formData.get("role") as string) || null,
-        location: (formData.get("location") as string) || null,
-        birthday: (formData.get("birthday") as string) || null,
-        how_met: (formData.get("how_met") as string) || null,
+        name,
+        email: getOptionalFormValue(formData, "email"),
+        phone: getOptionalFormValue(formData, "phone"),
+        company: getOptionalFormValue(formData, "company"),
+        role: getOptionalFormValue(formData, "role"),
+        location: getOptionalFormValue(formData, "location"),
+        birthday: getOptionalFormValue(formData, "birthday"),
+        how_met: getOptionalFormValue(formData, "how_met"),
         relationship_type:
-          (formData.get("relationship_type") as string) || null,
+          getOptionalFormValue(formData, "relationship_type"),
         relationship_strength:
-          (formData.get("relationship_strength") as string) || null,
+          getOptionalFormValue(formData, "relationship_strength"),
         preferred_contact_method:
-          (formData.get("preferred_contact_method") as string) || null,
+          getOptionalFormValue(formData, "preferred_contact_method"),
         contact_frequency_days: contactFrequency,
-        notes: (formData.get("notes") as string) || null,
+        notes: getOptionalFormValue(formData, "notes"),
       })
-      .eq("id", params.id);
+      .eq("id", params.id)
+      .eq("user_id", user.id)
+      .select("id")
+      .single();
 
     if (updateError) {
       setError(updateError.message ?? "Failed to save. Please try again.");
@@ -182,12 +231,27 @@ export default function EditPersonPage() {
     }
 
     // Replace person's tags: delete existing, then insert selected
-    await supabase.from("person_tags").delete().eq("person_id", params.id);
+    const { error: deleteTagsError } = await supabase
+      .from("person_tags")
+      .delete()
+      .eq("person_id", params.id);
+
+    if (deleteTagsError) {
+      setError(deleteTagsError.message ?? "Failed to update tags.");
+      setSaving(false);
+      return;
+    }
 
     if (selectedTagIds.length > 0) {
-      await supabase.from("person_tags").insert(
+      const { error: insertTagsError } = await supabase.from("person_tags").insert(
         selectedTagIds.map((tag_id) => ({ person_id: params.id, tag_id }))
       );
+
+      if (insertTagsError) {
+        setError(insertTagsError.message ?? "Failed to update tags.");
+        setSaving(false);
+        return;
+      }
     }
 
     router.push(`/people/${params.id}`);
