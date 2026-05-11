@@ -5,8 +5,40 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
+import {
+  getFollowUpState,
+  getNextDueDays,
+  pluralize,
+} from "@/lib/crm-rules";
+import { formatDate } from "@/lib/date-utils";
 import { supabase } from "@/lib/supabase";
-import type { Person, Interaction, Tag } from "@/types/index";
+import type { Interaction, Person, Tag } from "@/types/index";
+
+const INTERACTION_TYPES = [
+  "Text",
+  "Call",
+  "Coffee",
+  "Email",
+  "LinkedIn",
+  "In Person",
+  "Other",
+];
+
+function nextActionText(person: Person) {
+  const days = getNextDueDays(person);
+  if (days === null) return "Log the first interaction";
+  if (days < 0) return `Reach out now, overdue by ${pluralize(Math.abs(days), "day")}`;
+  if (days === 0) return "Reach out today";
+  return `Reach out in ${pluralize(days, "day")}`;
+}
+
+function normalizeInteraction(interaction: Interaction): Interaction {
+  return {
+    ...interaction,
+    follow_up_status: interaction.follow_up_status ?? "open",
+    follow_up_snoozed_until: interaction.follow_up_snoozed_until ?? null,
+  };
+}
 
 export default function PersonDetailPage() {
   const params = useParams<{ id: string }>();
@@ -14,17 +46,30 @@ export default function PersonDetailPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmDeletePerson, setConfirmDeletePerson] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [interactionsLoading, setInteractionsLoading] = useState(true);
   const [personTags, setPersonTags] = useState<Tag[]>([]);
+  const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null);
+  const [interactionError, setInteractionError] = useState<string | null>(null);
+  const [deletingInteractionId, setDeletingInteractionId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
+
+      if (userError) {
+        setPageError(userError.message);
+        setLoading(false);
+        setInteractionsLoading(false);
+        return;
+      }
 
       if (!user) {
         setLoading(false);
@@ -33,14 +78,14 @@ export default function PersonDetailPage() {
         return;
       }
 
-      const { data: personData } = await supabase
+      const { data: personData, error: personError } = await supabase
         .from("people")
         .select("*")
         .eq("id", params.id)
         .eq("user_id", user.id)
         .single();
 
-      if (!personData) {
+      if (personError || !personData) {
         setNotFound(true);
         setLoading(false);
         setInteractionsLoading(false);
@@ -62,20 +107,29 @@ export default function PersonDetailPage() {
           .eq("person_id", params.id),
       ]);
 
-      setInteractions(interactionsRes.data ?? []);
+      if (interactionsRes.error || tagsRes.error) {
+        setPageError(
+          interactionsRes.error?.message ??
+            tagsRes.error?.message ??
+            "Failed to load person details."
+        );
+        setInteractionsLoading(false);
+        return;
+      }
+
+      setInteractions((interactionsRes.data ?? []).map(normalizeInteraction));
       setInteractionsLoading(false);
 
-      if (tagsRes.data) {
-        const rows = tagsRes.data as unknown as { tags: Tag[] }[];
-        setPersonTags(rows.flatMap((row) => row.tags));
-      }
+      const rows = (tagsRes.data ?? []) as unknown as { tags: Tag[] | Tag }[];
+      setPersonTags(
+        rows.flatMap((row) => (Array.isArray(row.tags) ? row.tags : [row.tags]))
+      );
     }
 
     fetchData();
   }, [params.id, router]);
 
-  async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this person?")) return;
+  async function handleDeletePerson() {
     setDeleting(true);
     setDeleteError(null);
 
@@ -107,6 +161,147 @@ export default function PersonDetailPage() {
     router.push("/people");
   }
 
+  async function recalculateLastContacted() {
+    const { error } = await supabase.rpc("recalculate_person_last_contacted", {
+      p_person_id: params.id,
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  async function handleUpdateInteraction(
+    interaction: Interaction,
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+    setInteractionError(null);
+    const formData = new FormData(event.currentTarget);
+    const followUpNeeded = formData.get("follow_up_needed") === "on";
+
+    const { error } = await supabase
+      .from("interactions")
+      .update({
+        type: formData.get("type") as string,
+        date: formData.get("date") as string,
+        notes: ((formData.get("notes") as string | null) ?? "").trim() || null,
+        follow_up_needed: followUpNeeded,
+        follow_up_date: followUpNeeded
+          ? ((formData.get("follow_up_date") as string | null) ?? "") || null
+          : null,
+        follow_up_status: followUpNeeded
+          ? (formData.get("follow_up_status") as string)
+          : "done",
+        follow_up_snoozed_until:
+          ((formData.get("follow_up_snoozed_until") as string | null) ?? "") ||
+          null,
+      })
+      .eq("id", interaction.id)
+      .eq("person_id", params.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      setInteractionError(error.message);
+      return;
+    }
+
+    try {
+      await recalculateLastContacted();
+    } catch (err) {
+      setInteractionError(
+        err instanceof Error ? err.message : "Interaction saved, but last-contacted refresh failed."
+      );
+      return;
+    }
+
+    const { data: refreshedPerson } = await supabase
+      .from("people")
+      .select("*")
+      .eq("id", params.id)
+      .single();
+    if (refreshedPerson) setPerson(refreshedPerson);
+
+    const updated = normalizeInteraction({
+      ...interaction,
+      type: formData.get("type") as string,
+      date: formData.get("date") as string,
+      notes: ((formData.get("notes") as string | null) ?? "").trim() || null,
+      follow_up_needed: followUpNeeded,
+      follow_up_date: followUpNeeded
+        ? ((formData.get("follow_up_date") as string | null) ?? "") || null
+        : null,
+      follow_up_status: followUpNeeded
+        ? ((formData.get("follow_up_status") as Interaction["follow_up_status"]) ?? "open")
+        : "done",
+      follow_up_snoozed_until:
+        ((formData.get("follow_up_snoozed_until") as string | null) ?? "") || null,
+    });
+    setInteractions((prev) =>
+      prev.map((item) => (item.id === interaction.id ? updated : item))
+    );
+    setEditingInteractionId(null);
+  }
+
+  async function handleDeleteInteraction(interactionId: string) {
+    setInteractionError(null);
+    setDeletingInteractionId(interactionId);
+
+    const { error } = await supabase
+      .from("interactions")
+      .delete()
+      .eq("id", interactionId)
+      .eq("person_id", params.id);
+
+    if (error) {
+      setInteractionError(error.message);
+      setDeletingInteractionId(null);
+      return;
+    }
+
+    try {
+      await recalculateLastContacted();
+    } catch (err) {
+      setInteractionError(
+        err instanceof Error ? err.message : "Interaction deleted, but last-contacted refresh failed."
+      );
+    }
+
+    setInteractions((prev) => prev.filter((item) => item.id !== interactionId));
+    setDeletingInteractionId(null);
+  }
+
+  async function handleFollowUpStatus(
+    interaction: Interaction,
+    status: Interaction["follow_up_status"]
+  ) {
+    setInteractionError(null);
+    const patch =
+      status === "snoozed"
+        ? {
+            follow_up_status: status,
+            follow_up_snoozed_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+              .toISOString()
+              .slice(0, 10),
+          }
+        : { follow_up_status: status, follow_up_snoozed_until: null };
+
+    const { error } = await supabase
+      .from("interactions")
+      .update(patch)
+      .eq("id", interaction.id)
+      .eq("person_id", params.id);
+
+    if (error) {
+      setInteractionError(error.message);
+      return;
+    }
+
+    setInteractions((prev) =>
+      prev.map((item) =>
+        item.id === interaction.id ? normalizeInteraction({ ...item, ...patch }) : item
+      )
+    );
+  }
+
   if (loading) {
     return (
       <AppLayout>
@@ -119,7 +314,7 @@ export default function PersonDetailPage() {
     return (
       <AppLayout>
         <Link href="/people" className="text-sm font-medium text-zinc-600">
-          ← Back to people
+          Back to people
         </Link>
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
           <p className="text-zinc-600">Person not found.</p>
@@ -128,11 +323,19 @@ export default function PersonDetailPage() {
     );
   }
 
+  const latestInteraction = interactions[0];
+  const activeFollowUps = interactions.filter(
+    (interaction) =>
+      interaction.follow_up_needed &&
+      getFollowUpState(interaction) !== "done" &&
+      getFollowUpState(interaction) !== "snoozed"
+  );
+
   return (
     <AppLayout>
       <div className="flex items-center justify-between">
         <Link href="/people" className="text-sm font-medium text-zinc-600">
-          ← Back to people
+          Back to people
         </Link>
         <div className="flex gap-3">
           <Link
@@ -142,35 +345,65 @@ export default function PersonDetailPage() {
             Edit
           </Link>
           <button
-            onClick={handleDelete}
+            onClick={() => setConfirmDeletePerson(true)}
             disabled={deleting}
             className="inline-flex h-9 items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
           >
-            {deleting ? "Deleting..." : "Delete"}
+            Delete
           </button>
         </div>
       </div>
 
-      {deleteError && (
+      {(deleteError || pageError) && (
         <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-          {deleteError}
+          {deleteError ?? pageError}
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+      {confirmDeletePerson && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-900">
+            Delete {person.name} and all related interactions?
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleDeletePerson}
+              disabled={deleting}
+              className="inline-flex h-9 items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white"
+            >
+              {deleting ? "Deleting..." : "Delete person"}
+            </button>
+            <button
+              onClick={() => setConfirmDeletePerson(false)}
+              className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
         {person.relationship_type && (
           <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
             {person.relationship_type}
           </p>
         )}
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-          {person.name}
-        </h1>
-        {(person.role || person.company) && (
-          <p className="mt-2 text-lg text-zinc-600">
-            {[person.role, person.company].filter(Boolean).join(" at ")}
-          </p>
-        )}
+        <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">{person.name}</h1>
+            <p className="mt-2 text-lg text-zinc-600">
+              {[person.role, person.company].filter(Boolean).join(" at ") ||
+                "No role or company yet"}
+            </p>
+          </div>
+          <Link
+            href={`/people/${person.id}/interactions/new`}
+            className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+          >
+            Quick Log
+          </Link>
+        </div>
 
         {personTags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -186,92 +419,70 @@ export default function PersonDetailPage() {
           </div>
         )}
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {person.email && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Email
-              </p>
-              <p className="mt-2 font-semibold">{person.email}</p>
-            </div>
-          )}
-          {person.phone && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Phone
-              </p>
-              <p className="mt-2 font-semibold">{person.phone}</p>
-            </div>
-          )}
-          {person.location && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Location
-              </p>
-              <p className="mt-2 font-semibold">{person.location}</p>
-            </div>
-          )}
-          {person.birthday && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Birthday
-              </p>
-              <p className="mt-2 font-semibold">{person.birthday}</p>
-            </div>
-          )}
-          {person.relationship_strength && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Relationship Strength
-              </p>
-              <p className="mt-2 font-semibold">{person.relationship_strength}</p>
-            </div>
-          )}
-          {person.preferred_contact_method && (
-            <div className="rounded-lg bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Preferred Contact
-              </p>
-              <p className="mt-2 font-semibold">{person.preferred_contact_method}</p>
-            </div>
-          )}
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
           <div className="rounded-lg bg-zinc-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              Contact Rhythm
+              Next Action
+            </p>
+            <p className="mt-2 font-semibold">{nextActionText(person)}</p>
+          </div>
+          <div className="rounded-lg bg-zinc-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Last Interaction
             </p>
             <p className="mt-2 font-semibold">
-              Every {person.contact_frequency_days} days
+              {latestInteraction
+                ? `${latestInteraction.type} on ${formatDate(latestInteraction.date)}`
+                : "No interactions yet"}
+            </p>
+          </div>
+          <div className="rounded-lg bg-zinc-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Follow-ups
+            </p>
+            <p className="mt-2 font-semibold">
+              {activeFollowUps.length === 0
+                ? "None active"
+                : `${activeFollowUps.length} active`}
             </p>
           </div>
           <div className="rounded-lg bg-zinc-50 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Last Contacted
             </p>
-            <p className="mt-2 font-semibold">
-              {person.last_contacted_at ?? "Never"}
-            </p>
+            <p className="mt-2 font-semibold">{formatDate(person.last_contacted_at)}</p>
           </div>
-          {person.how_met && (
-            <div className="rounded-lg bg-zinc-50 p-4 md:col-span-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                How Met
-              </p>
-              <p className="mt-2 text-sm leading-6 text-zinc-700">
-                {person.how_met}
-              </p>
-            </div>
-          )}
         </div>
 
-        {person.notes && (
-          <section className="mt-8">
-            <h2 className="text-xl font-semibold">Notes</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-700">
-              {person.notes}
-            </p>
-          </section>
-        )}
-      </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {[
+            ["Email", person.email],
+            ["Phone", person.phone],
+            ["Location", person.location],
+            ["Birthday", formatDate(person.birthday)],
+            ["Relationship Strength", person.relationship_strength],
+            ["Preferred Contact", person.preferred_contact_method],
+            ["Contact Rhythm", `Every ${person.contact_frequency_days} days`],
+            ["How Met", person.how_met],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg bg-zinc-50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {label}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-zinc-700">
+                {value || `Add ${String(label).toLowerCase()} details.`}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <section className="mt-8">
+          <h2 className="text-xl font-semibold">Notes</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-700">
+            {person.notes || "Add context, conversation threads, or anything useful for the next reach-out."}
+          </p>
+        </section>
+      </section>
 
       <section className="mt-8">
         <div className="flex items-center justify-between">
@@ -284,12 +495,21 @@ export default function PersonDetailPage() {
           </Link>
         </div>
 
+        {interactionError && (
+          <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
+            {interactionError}
+          </div>
+        )}
+
         <div className="mt-4 space-y-3">
           {interactionsLoading ? (
             <p className="text-sm text-zinc-500">Loading interactions...</p>
           ) : interactions.length === 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-              <p className="text-sm text-zinc-500">No interactions logged yet.</p>
+              <h3 className="font-semibold text-zinc-900">No interactions logged yet.</h3>
+              <p className="mt-2 text-sm text-zinc-500">
+                Log the last call, message, or meeting so the dashboard can track cadence.
+              </p>
               <Link
                 href={`/people/${person.id}/interactions/new`}
                 className="mt-3 inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
@@ -303,24 +523,162 @@ export default function PersonDetailPage() {
                 key={interaction.id}
                 className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
-                    {interaction.type}
-                  </span>
-                  <span className="text-sm text-zinc-500">{interaction.date}</span>
-                </div>
-                {interaction.notes && (
-                  <p className="mt-3 text-sm leading-6 text-zinc-700">
-                    {interaction.notes}
-                  </p>
-                )}
-                {interaction.follow_up_needed && (
-                  <p className="mt-3 text-sm font-medium text-amber-600">
-                    Follow-up needed
-                    {interaction.follow_up_date
-                      ? ` by ${interaction.follow_up_date}`
-                      : ""}
-                  </p>
+                {editingInteractionId === interaction.id ? (
+                  <form
+                    onSubmit={(event) => handleUpdateInteraction(interaction, event)}
+                    className="space-y-4"
+                  >
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <select
+                        name="type"
+                        defaultValue={interaction.type}
+                        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                      >
+                        {INTERACTION_TYPES.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        name="date"
+                        type="date"
+                        required
+                        defaultValue={interaction.date}
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <textarea
+                      name="notes"
+                      rows={3}
+                      defaultValue={interaction.notes ?? ""}
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    />
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="flex items-center gap-2 text-sm text-zinc-700">
+                        <input
+                          name="follow_up_needed"
+                          type="checkbox"
+                          defaultChecked={interaction.follow_up_needed}
+                        />
+                        Follow-up
+                      </label>
+                      <input
+                        name="follow_up_date"
+                        type="date"
+                        defaultValue={interaction.follow_up_date ?? ""}
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      />
+                      <select
+                        name="follow_up_status"
+                        defaultValue={interaction.follow_up_status}
+                        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                      >
+                        <option value="open">Open</option>
+                        <option value="snoozed">Snoozed</option>
+                        <option value="done">Done</option>
+                      </select>
+                      <input
+                        name="follow_up_snoozed_until"
+                        type="date"
+                        defaultValue={interaction.follow_up_snoozed_until ?? ""}
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-sm md:col-span-3"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white">
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingInteractionId(null)}
+                        className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+                          {interaction.type}
+                        </span>
+                        <span className="ml-3 text-sm text-zinc-500">
+                          {formatDate(interaction.date)}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingInteractionId(interaction.id)}
+                          className="text-sm font-medium text-zinc-700 underline"
+                        >
+                          Edit
+                        </button>
+                        {deletingInteractionId === interaction.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInteraction(interaction.id)}
+                              className="text-sm font-medium text-red-700 underline"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingInteractionId(null)}
+                              className="text-sm font-medium text-zinc-700 underline"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDeletingInteractionId(interaction.id)}
+                            className="text-sm font-medium text-red-700 underline"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {interaction.notes && (
+                      <p className="mt-3 text-sm leading-6 text-zinc-700">
+                        {interaction.notes}
+                      </p>
+                    )}
+                    {interaction.follow_up_needed && (
+                      <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                        <p className="font-medium">
+                          Follow-up {getFollowUpState(interaction)} by{" "}
+                          {formatDate(interaction.follow_up_date)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => handleFollowUpStatus(interaction, "done")}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          >
+                            Mark done
+                          </button>
+                          <button
+                            onClick={() => handleFollowUpStatus(interaction, "snoozed")}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          >
+                            Snooze 7 days
+                          </button>
+                          <button
+                            onClick={() => handleFollowUpStatus(interaction, "open")}
+                            className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          >
+                            Reopen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))

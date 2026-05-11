@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+import { apiError } from "@/lib/api-errors";
+
 export async function GET() {
   const cookieStore = await cookies();
 
@@ -21,16 +23,28 @@ export async function GET() {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
+  if (userError) {
+    return apiError(userError.message, 401);
+  }
+
   if (!user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const [peopleRes, tagsRes] = await Promise.all([
     supabase.from("people").select("*").eq("user_id", user.id),
     supabase.from("tags").select("*").eq("user_id", user.id),
   ]);
+
+  if (peopleRes.error || tagsRes.error) {
+    return apiError(
+      peopleRes.error?.message ?? tagsRes.error?.message ?? "Export failed.",
+      500
+    );
+  }
 
   const people = peopleRes.data ?? [];
   const personIds = people.map((p) => p.id);
@@ -43,6 +57,14 @@ export async function GET() {
       supabase.from("interactions").select("*").in("person_id", personIds),
       supabase.from("person_tags").select("*").in("person_id", personIds),
     ]);
+    if (interactionsRes.error || personTagsRes.error) {
+      return apiError(
+        interactionsRes.error?.message ??
+          personTagsRes.error?.message ??
+          "Export failed.",
+        500
+      );
+    }
     interactions = interactionsRes.data ?? [];
     personTags = personTagsRes.data ?? [];
   }

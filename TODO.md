@@ -15,94 +15,61 @@
 - [x] Add reproducible Supabase migrations with RLS policies
 - [x] Handle failed writes before redirecting from core mutation flows
 - [x] Redirect logged-out client loaders to `/auth/login`
+- [x] Fix dashboard coverage with a Coming Up steady-state section
+- [x] Prevent historical interaction logs from overwriting newer `last_contacted_at`
+- [x] Add follow-up status, snooze, done, due, and overdue queue behavior
+- [x] Surface follow-ups on dashboard and person detail pages
+- [x] Add People search across name, company, role, email, notes, and tags
+- [x] Add helpful empty states and clear-filter actions
+- [x] Add browser unsaved-change protection for long add/edit/log forms
+- [x] Add edit and delete support for interactions
+- [x] Add person context to Log Interaction and Quick Log from People
+- [x] Replace raw date strings with shared date formatting utilities in main views
+- [x] Add birthday reminders to the dashboard
+- [x] Add tag rename, delete, merge, and recolor management in Settings
+- [x] Add in-flight tag creation guards
+- [x] Improve export API and client failure handling
+- [x] Keep `proxy.ts` aligned with Next 16 and let API routes return API-shaped auth errors
+- [x] Improve settings load/create failure handling
+- [x] Remove misleading email reminder controls until delivery exists
+- [x] Align auth pages with the app design system
+- [x] Replace browser `confirm()` delete flow with in-app confirmation UI
+- [x] Make contact detail action-oriented
+- [x] Show relationship status, follow-up urgency, and duplicate warnings on People cards
+- [x] Add exact duplicate contact detection by normalized name/email
+- [x] Add import and restore flows compatible with the existing export format
+- [x] Extract shared people form constants/helpers
+- [x] Extract shared date formatting utilities
+- [x] Add focused deterministic tests for dashboard categorization, historical last-contact behavior, and follow-up queues
 
 ## Remaining
 
-### P0 - Must Fix Before Expanding Features
+### External Authorization / Environment Work
 
-- [ ] Fix dashboard coverage so steady-state contacts do not disappear from all sections.
-  - Current issue: a contact last reached 8-89 days ago can be neither overdue, due this week, recently contacted, nor neglected.
-  - Options: add a "Coming Up" section, show all contacts sorted by urgency, or define neglected relative to each person's `contact_frequency_days`.
-- [ ] Prevent historical interaction logs from corrupting `last_contacted_at`.
-  - Only update `last_contacted_at` when the logged interaction date is newer than the current value.
-  - Revisit whether `last_contacted_at` should be denormalized or derived from the latest interaction.
-- [ ] Make multi-step writes atomic or recoverable.
-  - Person creation plus tag assignment should not partially save without clear recovery.
-  - Person edit tag replacement should not delete old tags before safely writing replacements.
-  - Interaction creation plus last-contact update should not leave dashboard data stale.
-- [ ] Add search to the People page.
-  - Search name, company, role, and eventually tags/notes.
-  - Include a helpful empty state and a clear-filter action.
-- [ ] Build a real follow-up queue.
-  - Surface follow-ups from interactions.
-  - Support due, overdue, done, and snoozed states.
-  - Make follow-ups visible from the dashboard and person detail pages.
-- [ ] Add unsaved-change protection for long forms.
-  - Warn before navigating away from dirty add/edit/log forms.
-  - Preserve draft values after failed saves.
-
-### P1 - Important Product and Workflow Improvements
-
-- [ ] Add real reminder delivery or remove/rename the email reminder setting until it works.
-  - A weekly digest of overdue and due-soon contacts is the highest-impact first version.
-- [ ] Add ability to edit and delete interactions.
-  - Users need to correct wrong dates, types, notes, and follow-up flags.
-- [ ] Add person context to the Log Interaction page.
-  - Show the person's name in the heading and back link.
-  - This is especially important when using Quick Log from the dashboard.
-- [ ] Add Quick Log from the People list.
-  - Users should not need to open person detail just to log a simple interaction.
-- [ ] Use formatted dates everywhere.
-  - Replace raw database strings in people cards, person detail, birthdays, and interaction timeline.
-  - Extract a shared date formatter instead of duplicating helpers.
-- [ ] Improve export reliability.
-  - Check Supabase query errors in `/api/export`.
-  - Do not return an empty export on database failure.
-  - Show client-side export failure messages.
-- [ ] Tighten proxy/API auth behavior.
-  - `proxy.ts` is the correct Next 16 route-protection convention.
-  - API routes should return API-shaped errors instead of redirecting to login pages when appropriate.
-- [ ] Improve settings load failure handling.
-  - If the settings row select and create both fail, show a recoverable error instead of rendering a form that cannot save.
-- [ ] Add birthday reminders as a dashboard section.
-  - Birthday is collected but currently unused.
-- [ ] Add tag management.
-  - Rename, delete, merge, and recolor tags from settings.
-
-### P2 - UX Polish and Maintainability
-
-- [ ] Align auth pages with the app design system.
-  - Replace blue/gray styling with the zinc/black app palette.
-- [ ] Replace browser `confirm()` delete flow with an in-app confirmation UI.
-  - Consider undo or soft-delete before permanent deletion.
-- [ ] Add better empty states.
-  - People empty state should explain the first useful action.
-  - Filtered empty state should offer "Clear filters."
-  - Person detail should show prompts for missing notes, context, and preferred contact method.
-- [ ] Make the contact detail page action-oriented.
-  - Put next action, last interaction, follow-up status, and quick log near the top.
-- [ ] Show relationship status and follow-up urgency on People list cards.
-- [ ] Add duplicate contact detection.
-  - Start with exact or near-exact name/email matches.
-- [ ] Add import and restore flows.
-  - Export exists, but users also need a way to restore or migrate data.
-
-### Technical Quality Backlog
-
-- [ ] Add automated tests for auth-guarded loaders and mutation error handling.
-- [ ] Add tests for dashboard categorization edge cases.
-- [ ] Add tests for historical interaction logging and `last_contacted_at` behavior.
-- [ ] Extract duplicated people form constants and helpers.
-  - Move `PRESET_TAGS`, `CUSTOM_TAG_COLORS`, `getTrimmedFormValue`, and `getOptionalFormValue` to a shared module.
-- [ ] Extract shared date formatting utilities.
-- [ ] Add a shared data-access layer or server-side mutation helpers for people, tags, interactions, settings, and export.
-- [ ] Check Supabase read errors consistently instead of treating `data ?? []` as success.
-- [ ] Add an in-flight tag creation guard to prevent rapid-click duplicate/race behavior.
-- [ ] Confirm cascade delete behavior in applied Supabase migrations.
-  - Current migrations define `on delete cascade`; verify the target Supabase project matches.
-- [ ] Confirm a fresh clone can run the app with documented setup steps.
 - [ ] Apply migrations to the target Supabase project.
+- [ ] Confirm cascade delete behavior in the target Supabase project after migrations are applied.
+- [ ] Run full manual QA against a real Supabase project:
+  - signup/login/logout
+  - dashboard
+  - people CRUD
+  - search/filter empty states
+  - tags
+  - interactions create/edit/delete
+  - follow-ups due/overdue/done/snoozed
+  - birthday reminders
+  - settings
+  - export/import/restore
 - [ ] Push the repository to GitHub.
+- [ ] Review npm audit findings and decide whether dependency upgrades are acceptable.
+
+### Future Improvements
+
+- [ ] Add real reminder delivery if email reminders are required.
+  - A weekly digest of overdue and due-soon contacts is the highest-impact first version.
+- [ ] Add broader automated tests for browser-level auth-guarded loaders, mutation error handling, import/restore, and export route failures.
+- [ ] Confirm a fresh clone can run the app with documented setup steps.
+- [ ] Consider a fuller server-side data-access/mutation layer if the client mutation surface grows further.
+- [ ] Add near-exact duplicate matching beyond normalized exact name/email.
 
 ### AI-Readiness Backlog
 

@@ -31,11 +31,16 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+  const isApiPath = pathname.startsWith('/api/')
   const isPublicPath =
     pathname === '/' ||
     pathname === '/auth/login' ||
     pathname === '/auth/signup' ||
     pathname.startsWith('/auth/callback')
+
+  if (isApiPath) {
+    return supabaseResponse
+  }
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
@@ -47,5 +52,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }

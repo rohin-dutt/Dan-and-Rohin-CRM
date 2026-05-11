@@ -1,39 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
+import {
+  CUSTOM_TAG_COLORS,
+  PRESET_TAGS,
+  getOptionalFormValue,
+  getTrimmedFormValue,
+} from "@/lib/form-utils";
 import { supabase } from "@/lib/supabase";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import type { Person, Tag } from "@/types/index";
-
-const PRESET_TAGS = [
-  { name: "Family",        color: "#2563EB" },
-  { name: "Friend",        color: "#16A34A" },
-  { name: "Close Friend",  color: "#7C3AED" },
-  { name: "Colleague",     color: "#D97706" },
-  { name: "Mentor",        color: "#0891B2" },
-  { name: "Recruiter",     color: "#DB2777" },
-  { name: "University",    color: "#6366F1" },
-  { name: "Work",          color: "#EA580C" },
-  { name: "High Priority", color: "#DC2626" },
-  { name: "Reconnect",     color: "#059669" },
-];
-
-const CUSTOM_TAG_COLORS = [
-  "#2563EB", "#16A34A", "#7C3AED", "#D97706",
-  "#DC2626", "#DB2777", "#0891B2", "#EA580C",
-];
-
-function getTrimmedFormValue(formData: FormData, key: string): string {
-  return ((formData.get(key) as string | null) ?? "").trim();
-}
-
-function getOptionalFormValue(formData: FormData, key: string): string | null {
-  const value = getTrimmedFormValue(formData, key);
-  return value === "" ? null : value;
-}
 
 export default function EditPersonPage() {
   const params = useParams<{ id: string }>();
@@ -46,6 +26,10 @@ export default function EditPersonPage() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [addingTag, setAddingTag] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const creatingTagNames = useRef(new Set<string>());
+
+  useUnsavedChanges(dirty && !saving);
 
   useEffect(() => {
     async function fetchData() {
@@ -67,6 +51,12 @@ export default function EditPersonPage() {
           .single(),
         supabase.from("tags").select("*").eq("user_id", user.id).order("name"),
       ]);
+
+      if (personRes.error || tagsRes.error) {
+        setError(personRes.error?.message ?? tagsRes.error?.message ?? "Failed to load person.");
+        setLoading(false);
+        return;
+      }
 
       if (personRes.data) setPerson(personRes.data);
       if (tagsRes.data) setAllTags(tagsRes.data);
@@ -96,6 +86,7 @@ export default function EditPersonPage() {
   }
 
   function toggleTagId(id: string) {
+    setDirty(true);
     setSelectedTagIds((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
     );
@@ -109,11 +100,16 @@ export default function EditPersonPage() {
       return;
     }
 
+    const tagKey = name.toLowerCase();
+    if (creatingTagNames.current.has(tagKey)) return;
+    creatingTagNames.current.add(tagKey);
+
     // Tag doesn't exist yet — create it then select it
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
+      creatingTagNames.current.delete(tagKey);
       router.push("/auth/login");
       return;
     }
@@ -124,22 +120,37 @@ export default function EditPersonPage() {
       .select()
       .single();
 
-    if (data && !tagError) {
+    creatingTagNames.current.delete(tagKey);
+
+    if (tagError) {
+      setError(tagError.message);
+      return;
+    }
+
+    if (data) {
       setAllTags((prev) => [...prev, data]);
       setSelectedTagIds((prev) => [...prev, data.id]);
+      setDirty(true);
     }
   }
 
   async function handleAddCustomTag() {
     const name = newTagName.trim();
-    if (!name) return;
+    if (!name || addingTag) return;
     setAddingTag(true);
+    const tagKey = name.toLowerCase();
+    if (creatingTagNames.current.has(tagKey)) {
+      setAddingTag(false);
+      return;
+    }
+    creatingTagNames.current.add(tagKey);
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
       setAddingTag(false);
+      creatingTagNames.current.delete(tagKey);
       router.push("/auth/login");
       return;
     }
@@ -152,6 +163,8 @@ export default function EditPersonPage() {
       }
       setNewTagName("");
       setAddingTag(false);
+      creatingTagNames.current.delete(tagKey);
+      setDirty(true);
       return;
     }
 
@@ -162,12 +175,16 @@ export default function EditPersonPage() {
       .select()
       .single();
 
-    if (data && !tagError) {
+    if (tagError) {
+      setError(tagError.message);
+    } else if (data) {
       setAllTags((prev) => [...prev, data]);
       setSelectedTagIds((prev) => [...prev, data.id]);
       setNewTagName("");
+      setDirty(true);
     }
 
+    creatingTagNames.current.delete(tagKey);
     setAddingTag(false);
   }
 
@@ -230,30 +247,18 @@ export default function EditPersonPage() {
       return;
     }
 
-    // Replace person's tags: delete existing, then insert selected
-    const { error: deleteTagsError } = await supabase
-      .from("person_tags")
-      .delete()
-      .eq("person_id", params.id);
+    const { error: replaceTagsError } = await supabase.rpc("replace_person_tags", {
+      p_person_id: params.id,
+      p_tag_ids: selectedTagIds,
+    });
 
-    if (deleteTagsError) {
-      setError(deleteTagsError.message ?? "Failed to update tags.");
+    if (replaceTagsError) {
+      setError(replaceTagsError.message ?? "Failed to update tags.");
       setSaving(false);
       return;
     }
 
-    if (selectedTagIds.length > 0) {
-      const { error: insertTagsError } = await supabase.from("person_tags").insert(
-        selectedTagIds.map((tag_id) => ({ person_id: params.id, tag_id }))
-      );
-
-      if (insertTagsError) {
-        setError(insertTagsError.message ?? "Failed to update tags.");
-        setSaving(false);
-        return;
-      }
-    }
-
+    setDirty(false);
     router.push(`/people/${params.id}`);
   }
 
@@ -297,7 +302,11 @@ export default function EditPersonPage() {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        onChange={() => setDirty(true)}
+        className="max-w-2xl space-y-6"
+      >
         {error && (
           <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
             {error}
