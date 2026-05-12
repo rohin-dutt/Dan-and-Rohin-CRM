@@ -34,6 +34,8 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 | color | text | yes |
 | created_at | timestamptz | yes, default `now()` |
 
+`tags_user_id_lower_name_key` prevents duplicate tag names per user regardless of case.
+
 ## interactions
 
 | Column | Type | Required |
@@ -45,7 +47,10 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 | notes | text | no |
 | follow_up_needed | boolean | yes, default `false` |
 | follow_up_date | date | no |
+| follow_up_status | text | yes, default `open`; one of `open`, `done`, `snoozed` |
+| follow_up_snoozed_until | date | no |
 | created_at | timestamptz | yes, default `now()` |
+| updated_at | timestamptz | yes, default `now()` |
 
 ## person_tags
 
@@ -61,11 +66,24 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 | id | uuid | yes, primary key, default `gen_random_uuid()` |
 | user_id | uuid | yes, unique FK to `auth.users(id)` with `on delete cascade` |
 | reminder_frequency_days | integer | yes, default `7` |
-| email_reminders_enabled | boolean | yes, default `false` |
+| email_reminders_enabled | boolean | yes, default `false`; retained for compatibility but not surfaced as a promise of delivery |
 | created_at | timestamptz | yes, default `now()` |
+
+## RPC Helpers
+
+- `create_interaction_and_touch_person(...)` inserts an interaction and only updates `people.last_contacted_at` when the interaction date is newer than the current value.
+- `touch_person_last_contacted(person_id, date)` applies the same safe last-contact update rule.
+- `recalculate_person_last_contacted(person_id)` derives `last_contacted_at` from the latest interaction after edits/deletes.
+- `replace_person_tags(person_id, tag_ids)` replaces tag assignments in one database transaction.
+- `merge_tags(source_tag_id, target_tag_id)` moves assignments to the target tag and deletes the source tag.
 
 ## RLS Ownership
 
 - `people`, `tags`, and `settings` use direct `user_id = auth.uid()` policies.
 - `interactions` are protected through the related `people.user_id`.
 - `person_tags` are protected through both the related `people.user_id` and `tags.user_id`.
+
+## Migration Notes
+
+- Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, and settings.
+- The target Supabase project still needs migrations applied manually or through the Supabase CLI.

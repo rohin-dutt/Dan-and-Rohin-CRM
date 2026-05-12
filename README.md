@@ -1,6 +1,6 @@
 # Personal CRM
 
-A private personal CRM for tracking relationships, tags, interaction history, and follow-up reminders.
+A private personal CRM for tracking relationships, tags, interaction history, follow-ups, birthdays, import/restore, and JSON export.
 
 ## Tech Stack
 
@@ -13,14 +13,19 @@ A private personal CRM for tracking relationships, tags, interaction history, an
 
 ## Current Features
 
-- Email/password signup, login, logout, and protected app routes
-- Dashboard for overdue, due soon, recently contacted, and neglected relationships
-- People CRUD with relationship details and contact cadence
-- Tags and person/tag assignments
-- Interaction logging with last-contacted updates
-- Settings for reminder preferences
+- Email/password signup, login, logout, callback handling, and protected app routes
+- Dashboard sections for overdue, due soon, coming up, recent, neglected, active follow-ups, and upcoming birthdays
+- People CRUD with search across name, company, role, email, notes, and tags
+- Duplicate warnings using normalized exact name/email matching
+- Quick Log from People and detail pages
+- Interaction create, edit, delete, and follow-up status controls
+- Follow-up states: due, overdue, done, and snoozed
+- Tags with assignment during people forms and management from Settings
+- Settings for in-app reminder cadence
 - JSON export at `/api/export`
+- Import/update and restore/replace flows for files created by the export route
 - Reproducible Supabase migrations in `supabase/migrations`
+- Focused deterministic tests for relationship categorization and follow-up logic
 
 ## Run Locally
 
@@ -50,4 +55,11 @@ npm run dev
 ```bash
 npm run lint
 npm run build
+npm test
 ```
+
+## Notes
+
+- Remote Supabase migrations are not applied by this repo automatically.
+- Email reminder delivery is not implemented; the Settings page only controls in-app reminder cadence.
+- `proxy.ts` provides optimistic page redirects. API routes perform their own auth checks and return JSON errors.

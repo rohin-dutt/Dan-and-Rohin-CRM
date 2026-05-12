@@ -26,6 +26,8 @@ export type Interaction = {
   notes: string | null;
   follow_up_needed: boolean;
   follow_up_date: string | null;
+  follow_up_status: "open" | "done" | "snoozed";
+  follow_up_snoozed_until: string | null;
   created_at: string;
 };
 
