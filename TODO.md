@@ -46,7 +46,7 @@
 
 ### External Authorization / Environment Work
 
-- [ ] Apply migrations to the target Supabase project.
+- [x] Apply migrations to the target Supabase project.
 - [ ] Confirm cascade delete behavior in the target Supabase project after migrations are applied.
 - [ ] Run full manual QA against a real Supabase project:
   - signup/login/logout

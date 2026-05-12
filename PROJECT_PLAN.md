@@ -38,7 +38,7 @@ Complete in code. Export checks Supabase errors, returns API-shaped failures, an
 
 ## Next Work
 
-- Apply migrations to the live Supabase project and test with a fresh database.
+- Test with a fresh database after applying the same migrations.
 - Run full manual QA with real Supabase credentials.
 - Expand automated browser/API coverage for auth redirects, mutation failure states, export failures, and import/restore.
 - Decide whether to add real email reminder delivery.
