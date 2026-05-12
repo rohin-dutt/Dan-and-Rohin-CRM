@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { getAuthCallbackUrl } from '@/lib/site-url'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -27,7 +28,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(),
       },
     })
 
