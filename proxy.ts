@@ -36,7 +36,8 @@ export async function proxy(request: NextRequest) {
     pathname === '/' ||
     pathname === '/auth/login' ||
     pathname === '/auth/signup' ||
-    pathname.startsWith('/auth/callback')
+    pathname.startsWith('/auth/callback') ||
+    pathname === '/onboarding'
 
   if (isApiPath) {
     return supabaseResponse
