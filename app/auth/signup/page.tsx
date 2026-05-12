@@ -24,7 +24,7 @@ export default function SignupPage() {
 
     setLoading(true)
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -34,6 +34,8 @@ export default function SignupPage() {
 
     if (error) {
       setError(error.message)
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setError('duplicate-email')
     } else {
       setSuccess(true)
     }
@@ -70,7 +72,16 @@ export default function SignupPage() {
 
         {error && (
           <p className="mb-4 mt-6 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {error}
+            {error === 'duplicate-email' ? (
+              <>
+                An account with this email already exists.{' '}
+                <Link href="/auth/login" className="font-medium underline">
+                  Please sign in instead.
+                </Link>
+              </>
+            ) : (
+              error
+            )}
           </p>
         )}
 
