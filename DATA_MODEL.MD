@@ -86,4 +86,4 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 ## Migration Notes
 
 - Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, and settings.
-- The target Supabase project still needs migrations applied manually or through the Supabase CLI.
+- The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration applied.
