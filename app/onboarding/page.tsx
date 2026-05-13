@@ -1,7 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,7 +19,11 @@ export default function OnboardingPage() {
   const [importError, setImportError] = useState('')
 
   useEffect(() => {
-    setSupportsContacts('contacts' in navigator)
+    if (typeof window !== 'undefined' &&
+        'contacts' in navigator &&
+        'ContactsManager' in window) {
+      setSupportsContacts(true)
+    }
   }, [])
 
   async function handleSelectContacts() {
@@ -84,7 +86,7 @@ export default function OnboardingPage() {
 
         {/* Debug info */}
         <p className="text-xs text-gray-400">
-          {'Debug: contacts in navigator = ' + String('contacts' in navigator) + ' | ContactsManager in window = ' + String('ContactsManager' in window)}
+          {'Debug: contacts in navigator = ' + String(typeof navigator !== 'undefined' && 'contacts' in navigator) + ' | ContactsManager in window = ' + String(typeof window !== 'undefined' && 'ContactsManager' in window)}
         </p>
 
         {/* Success state */}
