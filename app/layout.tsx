@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties } from "react";
 import "./globals.css";
 
@@ -9,11 +9,16 @@ const fontVariables = {
     '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
 } as CSSProperties;
 
+export const viewport: Viewport = {
+  themeColor: '#1D9E75',
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "Personal CRM",
   description: "Your personal relationship manager",
   manifest: "/manifest.json",
-  themeColor: "#1D9E75",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
