@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { getAuthCallbackUrl } from '@/lib/site-url'
 
 export default function SignupPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
+  const [confirmEmail, setConfirmEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,6 +19,11 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (email !== confirmEmail) {
+      setError('Email addresses do not match.')
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
@@ -36,6 +44,8 @@ export default function SignupPage() {
       setError(error.message)
     } else if (data.user && data.user.identities && data.user.identities.length === 0) {
       setError('duplicate-email')
+    } else if (data.session) {
+      router.push('/onboarding')
     } else {
       setSuccess(true)
     }
@@ -105,6 +115,24 @@ export default function SignupPage() {
 
           <div>
             <label
+              htmlFor="confirmEmail"
+              className="mb-1 block text-sm font-medium text-zinc-700"
+            >
+              Confirm email
+            </label>
+            <input
+              id="confirmEmail"
+              type="email"
+              required
+              placeholder="Confirm your email"
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label
               htmlFor="password"
               className="mb-1 block text-sm font-medium text-zinc-700"
             >
@@ -131,6 +159,7 @@ export default function SignupPage() {
               id="confirmPassword"
               type="password"
               required
+              placeholder="Confirm your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
