@@ -80,6 +80,11 @@ export default function OnboardingPage() {
           </p>
         </div>
 
+        {/* Debug info */}
+        <p className="text-xs text-gray-400">
+          {'Debug: contacts in navigator = ' + String('contacts' in navigator) + ' | ContactsManager in window = ' + String('ContactsManager' in window)}
+        </p>
+
         {/* Success state */}
         {importSuccess !== null && (
           <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center text-sm text-green-700">
