@@ -11,7 +11,14 @@ const fontVariables = {
 
 export const metadata: Metadata = {
   title: "Personal CRM",
-  description: "A private relationship tracker for personal follow-ups.",
+  description: "Your personal relationship manager",
+  manifest: "/manifest.json",
+  themeColor: "#1D9E75",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Personal CRM",
+  },
 };
 
 export default function RootLayout({
@@ -25,6 +32,14 @@ export default function RootLayout({
       className="h-full antialiased font-sans"
       style={fontVariables}
     >
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Personal CRM" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <meta name="theme-color" content="#1D9E75" />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
