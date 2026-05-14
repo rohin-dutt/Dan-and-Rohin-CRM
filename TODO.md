@@ -11,7 +11,7 @@ the roadmap or architecture direction changes.
   execution policy. Workaround used for the baseline: `npm.cmd test`, which
   passed. Owner: local Windows shell configuration.
   - README now documents the `npm.cmd` workaround for Windows PowerShell.
-- [ ] Apply the schema-drift reconciliation migration to the linked Supabase
+- [x] Apply the schema-drift reconciliation migration to the linked Supabase
   project as an intentional database release.
   - Read-only inspection found the linked project migration history only lists
     the later helper/hardening/cascade migrations, and the live base schema
@@ -19,8 +19,46 @@ the roadmap or architecture direction changes.
     `people.last_contacted_at`, check constraints, and tag-name uniqueness.
   - Local migration added:
     `supabase/migrations/20260514171147_reconcile_target_schema_drift.sql`.
-  - Before applying remotely, review existing data for duplicate tag names and
-    any rows that would violate the restored constraints.
+  - Released on May 14, 2026 through Supabase MCP because local Supabase CLI
+    login/linking was unavailable in this shell.
+    - `git fetch origin main` succeeded; local `main` matched `origin/main` at
+      `b6b01106da47d3050d1847ebac6cf7e1f0bb3cf6`.
+    - `npx.cmd supabase migration list` failed with `Cannot find project ref.
+      Have you run supabase link?`.
+    - `npx.cmd supabase link --project-ref ojebeswabngvcktqsduc` failed with
+      `Access token not provided. Supply an access token by running supabase
+      login or setting the SUPABASE_ACCESS_TOKEN environment variable.`
+    - `npx.cmd supabase db push --dry-run` failed with `Cannot find project
+      ref. Have you run supabase link?`.
+    - Pre-apply Supabase MCP migration history check showed only
+      `20260512010828_followups_and_atomic_helpers`,
+      `20260513185521_enforce_person_tags_tag_ownership`, and
+      `20260513215433_restore_user_owned_cascade_constraints`; the
+      reconciliation migration was not applied.
+    - Pre-apply Supabase MCP data preflight found no duplicate tag names per
+      user after `lower(trim(name))`, no duplicates for the actual
+      `lower(name)` index, and zero rows for the checked null/blank/nonpositive
+      risks in `people`, `tags`, `interactions`, and `settings`.
+    - Applied `reconcile_target_schema_drift` with the checked-in SQL through
+      Supabase MCP `apply_migration`; no destructive reset or data deletion was
+      performed.
+    - MCP initially recorded the applied migration as generated version
+      `20260514215454`, creating a clear migration-history mismatch with the
+      local file `20260514171147_reconcile_target_schema_drift.sql`. The single
+      unambiguous history row was repaired to version `20260514171147`.
+    - Post-apply Supabase MCP migration history now includes
+      `20260514171147_reconcile_target_schema_drift`.
+    - Post-apply schema checks confirmed restored `not null`/default drift,
+      `people.last_contacted_at` as `timestamptz`, the
+      `tags_user_id_lower_name_key` unique index, and the intended `not valid`
+      check constraints.
+    - Verification passed: `npm.cmd test`, `npm.cmd run lint`, and
+      `npm.cmd run build`.
+    - Manual smoke checks documented for follow-up: create person, edit person,
+      create tag, rename tag, merge tag, delete tag, export JSON,
+      import/update JSON, and restore/replace JSON should be spot-checked in
+      the authenticated app against the linked project after CLI/browser access
+      is available.
 - [ ] Restore/import is validated before writes, but the client-side restore
   sequence is still not one database transaction.
   - The import parser now rejects malformed nested records and invalid
