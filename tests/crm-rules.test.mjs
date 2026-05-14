@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import {
   categorizePeople,
+  findDuplicateContacts,
+  getFollowUpState,
   getFollowUpQueue,
   shouldTouchLastContacted,
 } from "../lib/crm-rules.js";
@@ -104,4 +106,63 @@ test("follow-up queue separates overdue, due, done, and snoozed states", () => {
   assert.deepEqual(queue.due.map((item) => item.id), ["due"]);
   assert.deepEqual(queue.done.map((item) => item.id), ["done"]);
   assert.deepEqual(queue.snoozed.map((item) => item.id), ["snoozed"]);
+});
+
+test("follow-up state transitions expired snoozes back into due or overdue", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+
+  assert.equal(
+    getFollowUpState(
+      {
+        follow_up_needed: true,
+        follow_up_date: "2026-05-12",
+        follow_up_status: "snoozed",
+        follow_up_snoozed_until: "2026-05-13",
+      },
+      today
+    ),
+    "snoozed"
+  );
+  assert.equal(
+    getFollowUpState(
+      {
+        follow_up_needed: true,
+        follow_up_date: "2026-05-12",
+        follow_up_status: "snoozed",
+        follow_up_snoozed_until: "2026-05-10",
+      },
+      today
+    ),
+    "due"
+  );
+  assert.equal(
+    getFollowUpState(
+      {
+        follow_up_needed: true,
+        follow_up_date: "2026-05-01",
+        follow_up_status: "snoozed",
+        follow_up_snoozed_until: "2026-05-10",
+      },
+      today
+    ),
+    "overdue"
+  );
+});
+
+test("duplicate detection normalizes email, names, accents, and punctuation", () => {
+  const people = [
+    { id: "email-a", name: "Ada One", email: "ADA@example.com" },
+    { id: "email-b", name: "Ada Two", email: "ada@example.com" },
+    { id: "name-a", name: "Jose Alvarez", email: null },
+    { id: "name-b", name: "José   Alvarez!", email: null },
+    { id: "unique", name: "Grace Hopper", email: "grace@example.com" },
+  ];
+
+  const warnings = findDuplicateContacts(people);
+
+  assert.match(warnings.get("email-a"), /email/);
+  assert.match(warnings.get("email-b"), /email/);
+  assert.match(warnings.get("name-a"), /name/);
+  assert.match(warnings.get("name-b"), /name/);
+  assert.equal(warnings.has("unique"), false);
 });

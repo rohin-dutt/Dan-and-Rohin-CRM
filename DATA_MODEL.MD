@@ -74,16 +74,17 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 - `create_interaction_and_touch_person(...)` inserts an interaction and only updates `people.last_contacted_at` when the interaction date is newer than the current value.
 - `touch_person_last_contacted(person_id, date)` applies the same safe last-contact update rule.
 - `recalculate_person_last_contacted(person_id)` derives `last_contacted_at` from the latest interaction after edits/deletes.
-- `replace_person_tags(person_id, tag_ids)` replaces tag assignments in one database transaction.
+- `replace_person_tags(person_id, tag_ids)` replaces tag assignments in one database transaction after confirming the person and every tag belong to the authenticated user.
 - `merge_tags(source_tag_id, target_tag_id)` moves assignments to the target tag and deletes the source tag.
 
 ## RLS Ownership
 
 - `people`, `tags`, and `settings` use direct `user_id = auth.uid()` policies.
 - `interactions` are protected through the related `people.user_id`.
-- `person_tags` are protected through both the related `people.user_id` and `tags.user_id`.
+- `person_tags` are protected through both the related `people.user_id` and `tags.user_id`; the replacement RPC repeats the same ownership check before writing associations.
 
 ## Migration Notes
 
 - Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, and settings.
-- The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration applied.
+- The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration, person-tag ownership hardening migration, and restored user-owned cascade constraints applied.
+- The local migration `20260514171147_reconcile_target_schema_drift.sql` reconciles older target-project drift in nullability, defaults, `people.last_contacted_at`, check constraints, and tag-name uniqueness. Apply it to the linked project only as an intentional database release step after reviewing existing data.
