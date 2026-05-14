@@ -420,8 +420,10 @@ Do not start until stabilization milestones are complete.
     fetch and push at `https://github.com/rohin-dutt/Dan-and-Rohin-CRM`, and
     the current branch is `main`.
   - No push was performed.
-- [ ] Review npm audit findings and decide whether dependency upgrades are
+- [x] Review npm audit findings and decide whether dependency upgrades are
       acceptable.
+  - Decision: accepted as temporary moderate risk; reassess when Next.js 
+    publishes a safe upgrade path that does not downgrade the major version.
   - Read-only `npm.cmd audit --json` on May 14, 2026 reported two moderate
     findings: `postcss <8.5.10`, via `next`.
   - npm's reported fix path suggests `next@9.3.3` as a semver-major downgrade,
