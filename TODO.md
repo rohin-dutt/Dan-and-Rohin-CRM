@@ -7,12 +7,12 @@ the roadmap or architecture direction changes.
 ## Bugs / Stability
 
 - [ ] Local shell issue: `npm test` failed in PowerShell before the test script
-  started because `C:\Program Files\nodejs\npm.ps1` is blocked by the system
-  execution policy. Workaround used for the baseline: `npm.cmd test`, which
-  passed. Owner: local Windows shell configuration.
+      started because `C:\Program Files\nodejs\npm.ps1` is blocked by the system
+      execution policy. Workaround used for the baseline: `npm.cmd test`, which
+      passed. Owner: local Windows shell configuration.
   - README now documents the `npm.cmd` workaround for Windows PowerShell.
 - [x] Apply the schema-drift reconciliation migration to the linked Supabase
-  project as an intentional database release.
+      project as an intentional database release.
   - Read-only inspection found the linked project migration history only lists
     the later helper/hardening/cascade migrations, and the live base schema
     still differs from `DATA_MODEL.MD` in some nullability, defaults,
@@ -24,12 +24,12 @@ the roadmap or architecture direction changes.
     - `git fetch origin main` succeeded; local `main` matched `origin/main` at
       `b6b01106da47d3050d1847ebac6cf7e1f0bb3cf6`.
     - `npx.cmd supabase migration list` failed with `Cannot find project ref.
-      Have you run supabase link?`.
+Have you run supabase link?`.
     - `npx.cmd supabase link --project-ref ojebeswabngvcktqsduc` failed with
       `Access token not provided. Supply an access token by running supabase
-      login or setting the SUPABASE_ACCESS_TOKEN environment variable.`
+login or setting the SUPABASE_ACCESS_TOKEN environment variable.`
     - `npx.cmd supabase db push --dry-run` failed with `Cannot find project
-      ref. Have you run supabase link?`.
+ref. Have you run supabase link?`.
     - Pre-apply Supabase MCP migration history check showed only
       `20260512010828_followups_and_atomic_helpers`,
       `20260513185521_enforce_person_tags_tag_ownership`, and
@@ -60,7 +60,7 @@ the roadmap or architecture direction changes.
       the authenticated app against the linked project after CLI/browser access
       is available.
 - [ ] Restore/import is validated before writes, but the client-side restore
-  sequence is still not one database transaction.
+      sequence is still not one database transaction.
   - The import parser now rejects malformed nested records and invalid
     cross-references before any write begins.
   - A future database RPC or server route should make restore/replace fully
@@ -72,7 +72,7 @@ the roadmap or architecture direction changes.
   - Fix: restored the explicit `{ person, nextBirthday, daysUntil }` callback
     type.
 - [x] Milestone 4.1 authenticated refactor QA completed against the linked
-  Supabase project with a disposable test account.
+      Supabase project with a disposable test account.
   - Signed-in QA passed for login, dashboard load, people list, create/edit/
     detail/delete person, people search, tag create/rename/merge/delete,
     interaction log/edit/delete, follow-up done/reopen/snooze, settings
@@ -101,7 +101,7 @@ the roadmap or architecture direction changes.
   - Original failure: browser QA on May 13, 2026 showed `Import failed.` and a
     Supabase 403 response:
     `new row violates row-level security policy (USING expression) for table
-    "person_tags"`.
+"person_tags"`.
   - Fix: import/update now writes tag assignments through
     `replace_person_tags`; the RPC and `person_tags` policies now verify both
     the person and every tag belong to the authenticated user.
@@ -139,13 +139,13 @@ Goal: make ownership clear across project docs.
 
 - [x] Keep `PROJECT_MASTER_PLAN.md` as the source of truth.
 - [x] Update `README.md` to focus on setup, environment variables, scripts,
-  current features, and verification commands.
+      current features, and verification commands.
 - [x] Convert `TODO.md` into the active execution queue organized by milestone.
 - [x] Update `AGENTS.md` with the Next.js 16 warning, project conventions,
-  verification gates, route-group rules, auth/data safety expectations, and
-  refactor rules.
+      verification gates, route-group rules, auth/data safety expectations, and
+      refactor rules.
 - [x] Keep `CLAUDE.md` short and point Claude to `AGENTS.md` and
-  `PROJECT_MASTER_PLAN.md`.
+      `PROJECT_MASTER_PLAN.md`.
 - [x] Leave `DATA_MODEL.MD` unchanged unless schema or migration notes change.
 - [x] Leave `REVIEW_FINDINGS.md` as historical context.
 
@@ -162,7 +162,7 @@ Goal: know what is currently working before route grouping or refactoring.
 - [x] Run `npm run build`.
   - Result: `npm.cmd run build` passed. Re-run after Milestone 2.1 fixes passed.
 - [x] Record any baseline failures in the Bugs / Stability section before
-  starting refactors.
+      starting refactors.
 - [x] Complete manual QA against a real Supabase project:
   - [x] Signup
   - [x] Login
@@ -208,7 +208,7 @@ reconciliation still tracked as a database release/setup risk.
 - [x] Move auth pages into `app/(auth)/auth/...`.
 - [x] Move dashboard, people, onboarding, and settings into `app/(app)/...`.
 - [ ] Add `app/(app)/layout.tsx` for the authenticated app shell only if it
-  reduces repeated layout code.
+      reduces repeated layout code.
 - [x] Keep top-level `app/layout.tsx`.
 - [x] Keep API route handlers under `app/api`.
 - [x] Keep `proxy.ts` aligned with preserved URLs.
@@ -217,7 +217,7 @@ reconciliation still tracked as a database release/setup risk.
   - `/onboarding` is now treated as an authenticated app route by both
     `proxy.ts` and page-level auth.
 - [x] Verify API routes return JSON-shaped auth errors instead of page
-  redirects.
+      redirects.
   - Result: `npm.cmd test`, `npm.cmd run lint`, and `npm.cmd run build`
     passed after the route-group move.
   - Smoke checks passed for `/`, `/auth/login`, `/auth/signup`, logged-out
@@ -240,7 +240,7 @@ Do not start until route separation is complete and verified.
   - Result: `app/(app)/people/_components/person-form.tsx` now owns shared
     fields and tag picker UI; create/edit pages keep their own Supabase writes.
 - [x] Extract settings form, tag management, import/export/restore panels, and
-  import validation helpers from Settings.
+      import validation helpers from Settings.
   - Result: settings panels moved to
     `app/(app)/settings/_components/settings-panels.tsx`; import payload
     validation moved to `app/(app)/settings/_lib/import-validation.ts`;
@@ -253,7 +253,7 @@ Do not start until route separation is complete and verified.
   - Result: people header, filters, empty state, and grid moved to
     `app/(app)/people/_components/people-list-sections.tsx`.
 - [ ] Centralize repeated auth redirect and Supabase error handling patterns
-  only where doing so reduces duplication.
+      only where doing so reduces duplication.
   - Deferred: no narrow helper emerged that reduced risk without broadening the
     refactor.
 - [x] Add tests for extracted pure logic.
@@ -421,7 +421,7 @@ Do not start until stabilization milestones are complete.
     the current branch is `main`.
   - No push was performed.
 - [ ] Review npm audit findings and decide whether dependency upgrades are
-  acceptable.
+      acceptable.
   - Read-only `npm.cmd audit --json` on May 14, 2026 reported two moderate
     findings: `postcss <8.5.10`, via `next`.
   - npm's reported fix path suggests `next@9.3.3` as a semver-major downgrade,
@@ -429,7 +429,7 @@ Do not start until stabilization milestones are complete.
     selects an acceptable upgrade path.
   - Rechecked after stabilization cleanup; the same two moderate findings
     remain.
-- [ ] Confirm a fresh clone can run the app with the documented setup steps.
+- [x] Confirm a fresh clone can run the app with the documented setup steps.
   - Not fully verified in this worktree because the repository currently has
     uncommitted route-group, test, migration, and documentation changes. Verify
     from a clean clone after committing or stashing this stabilization work.
