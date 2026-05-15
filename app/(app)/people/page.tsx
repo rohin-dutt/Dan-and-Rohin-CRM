@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import {
@@ -18,17 +18,22 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Interaction, Person, PersonTag, Tag } from "@/types/index";
 
-export default function PeoplePage() {
+function PeoplePageInner() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const statusFilter = searchParams.get("status") ?? "all";
+  const tagFilter = searchParams.get("tag") ?? "";
+  const query = searchParams.get("q") ?? "";
+  const sortFilter = searchParams.get("sort") ?? "last_contacted";
+
   const [people, setPeople] = useState<Person[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [personTags, setPersonTags] = useState<PersonTag[]>([]);
   const [followUps, setFollowUps] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [tagFilter, setTagFilter] = useState("");
-  const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -98,6 +103,20 @@ export default function PeoplePage() {
     fetchData();
   }, [router]);
 
+  const setParam = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === defaultValue) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [searchParams, pathname, router]
+  );
+
   const tagsById = useMemo(
     () => new Map(tags.map((tag) => [tag.id, tag])),
     [tags]
@@ -141,8 +160,36 @@ export default function PeoplePage() {
       });
     }
 
-    return result;
-  }, [people, personTags, query, statusFilter, tagFilter, tagsById]);
+    const sorted = [...result];
+    if (sortFilter === "last_contacted") {
+      sorted.sort((a, b) => {
+        if (!a.last_contacted_at && !b.last_contacted_at) return 0;
+        if (!a.last_contacted_at) return -1;
+        if (!b.last_contacted_at) return 1;
+        return (
+          new Date(a.last_contacted_at).getTime() -
+          new Date(b.last_contacted_at).getTime()
+        );
+      });
+    } else if (sortFilter === "most_contacted") {
+      const followUpCount = new Map<string, number>();
+      followUps.forEach((f) => {
+        followUpCount.set(f.person_id, (followUpCount.get(f.person_id) ?? 0) + 1);
+      });
+      sorted.sort(
+        (a, b) => (followUpCount.get(b.id) ?? 0) - (followUpCount.get(a.id) ?? 0)
+      );
+    } else if (sortFilter === "date_added") {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    } else if (sortFilter === "name") {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return sorted;
+  }, [people, personTags, query, statusFilter, tagFilter, tagsById, sortFilter, followUps]);
 
   async function handleExport() {
     setExporting(true);
@@ -172,9 +219,7 @@ export default function PeoplePage() {
   }
 
   function clearFilters() {
-    setStatusFilter("all");
-    setTagFilter("");
-    setQuery("");
+    router.replace(pathname);
   }
 
   const noFiltersActive = statusFilter === "all" && tagFilter === "" && !query.trim();
@@ -193,10 +238,12 @@ export default function PeoplePage() {
         query={query}
         statusFilter={statusFilter}
         tagFilter={tagFilter}
+        sortFilter={sortFilter}
         tags={tags}
-        onQueryChange={setQuery}
-        onStatusFilterChange={setStatusFilter}
-        onTagFilterChange={setTagFilter}
+        onQueryChange={(v) => setParam("q", v, "")}
+        onStatusFilterChange={(v) => setParam("status", v, "all")}
+        onTagFilterChange={(v) => setParam("tag", v, "")}
+        onSortFilterChange={(v) => setParam("sort", v, "last_contacted")}
       />
 
       {loading ? (
@@ -218,5 +265,13 @@ export default function PeoplePage() {
         />
       )}
     </AppLayout>
+  );
+}
+
+export default function PeoplePage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-zinc-500">Loading...</p>}>
+      <PeoplePageInner />
+    </Suspense>
   );
 }

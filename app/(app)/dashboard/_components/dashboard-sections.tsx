@@ -90,17 +90,23 @@ function StatCard({
   label,
   count,
   style,
+  href,
 }: {
   label: string;
   count: number;
   style: string;
+  href?: string;
 }) {
-  return (
-    <div className={cn("rounded-lg border p-4", style)}>
+  const inner = (
+    <div className={cn("rounded-lg border p-4 transition", style, href && "hover:shadow-md hover:border-primary/30 cursor-pointer")}>
       <p className="text-sm font-medium">{label}</p>
       <p className="mt-2 text-3xl font-semibold">{count}</p>
     </div>
   );
+  if (href) {
+    return <Link href={href}>{inner}</Link>;
+  }
+  return inner;
 }
 
 export function FirstRunEmptyState() {
@@ -253,16 +259,19 @@ export function DashboardSections({
           label="Overdue"
           count={overdue.length}
           style="border-red-200 bg-red-50 text-red-950 [&>p:first-child]:text-red-700"
+          href="/people?status=overdue"
         />
         <StatCard
           label="Due This Week"
           count={dueThisWeek.length}
           style="border-amber-200 bg-amber-50 text-amber-950 [&>p:first-child]:text-amber-700"
+          href="/people?status=due_this_week"
         />
         <StatCard
           label="Coming Up"
           count={comingUp.length}
           style="border-sky-200 bg-sky-50 text-sky-950 [&>p:first-child]:text-sky-700"
+          href="/people?status=coming_up"
         />
       </div>
 

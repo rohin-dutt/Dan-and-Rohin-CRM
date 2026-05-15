@@ -79,18 +79,22 @@ export function PeopleFilters({
   query,
   statusFilter,
   tagFilter,
+  sortFilter,
   tags,
   onQueryChange,
   onStatusFilterChange,
   onTagFilterChange,
+  onSortFilterChange,
 }: {
   query: string;
   statusFilter: string;
   tagFilter: string;
+  sortFilter: string;
   tags: Tag[];
   onQueryChange: (query: string) => void;
   onStatusFilterChange: (status: string) => void;
   onTagFilterChange: (tagId: string) => void;
+  onSortFilterChange: (sort: string) => void;
 }) {
   function statusBtnClass(key: string) {
     return `rounded-full px-3 py-1 text-sm font-medium transition ${
@@ -129,13 +133,13 @@ export function PeopleFilters({
           onClick={() => onStatusFilterChange("due_this_week")}
           className={statusBtnClass("due_this_week")}
         >
-          Due soon
+          Due This Week
         </button>
         <button
           onClick={() => onStatusFilterChange("coming_up")}
           className={statusBtnClass("coming_up")}
         >
-          Coming up
+          Coming Up
         </button>
         <button
           onClick={() => onStatusFilterChange("neglected")}
@@ -162,6 +166,17 @@ export function PeopleFilters({
             ))}
           </select>
         )}
+
+        <select
+          value={sortFilter}
+          onChange={(event) => onSortFilterChange(event.target.value)}
+          className="cursor-pointer rounded-full bg-muted py-1 pl-3 pr-7 text-sm font-medium text-muted-foreground transition hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="last_contacted">Last contacted</option>
+          <option value="most_contacted">Most contacted</option>
+          <option value="date_added">Date added</option>
+          <option value="name">A–Z</option>
+        </select>
       </div>
     </>
   );
