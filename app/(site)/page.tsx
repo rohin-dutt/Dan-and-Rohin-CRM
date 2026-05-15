@@ -40,7 +40,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-        <Link href="/" className="text-base font-semibold text-foreground">
+        <Link href="/" className="flex items-center gap-2 text-base font-semibold text-foreground">
+          <img src="/logo.svg" alt="" aria-hidden="true" width="28" height="28" />
           Roots
         </Link>
         <nav className="flex items-center gap-2 text-sm">
