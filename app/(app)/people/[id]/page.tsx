@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
@@ -38,6 +38,8 @@ export default function PersonDetailPage() {
   const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null);
   const [interactionError, setInteractionError] = useState<string | null>(null);
   const [deletingInteractionId, setDeletingInteractionId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -110,6 +112,16 @@ export default function PersonDetailPage() {
 
     fetchData();
   }, [params.id, router]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function handleDeletePerson() {
     setDeleting(true);
@@ -306,20 +318,35 @@ export default function PersonDetailPage() {
         <Link href="/people" className="text-sm font-medium text-muted-foreground">
           Back to people
         </Link>
-        <div className="flex gap-3">
-          <Link
-            href={`/people/${person.id}/edit`}
-            className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
-          >
-            Edit
-          </Link>
+        <div className="relative" ref={menuRef}>
           <button
-            onClick={() => setConfirmDeletePerson(true)}
-            disabled={deleting}
-            className="inline-flex h-9 items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label="More options"
+            className="inline-flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
-            Delete
+            ⋯
           </button>
+          {menuOpen && (
+            <div className="absolute right-0 z-10 mt-1 w-36 rounded-md border border-border bg-card shadow-md">
+              <Link
+                href={`/people/${person.id}/edit`}
+                className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                onClick={() => setMenuOpen(false)}
+              >
+                Edit
+              </Link>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmDeletePerson(true);
+                }}
+                disabled={deleting}
+                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-muted disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

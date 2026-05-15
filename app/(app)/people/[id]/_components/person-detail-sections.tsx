@@ -14,11 +14,29 @@ const INTERACTION_TYPES = [
   "Text",
   "Call",
   "Coffee",
+  "Lunch",
+  "Dinner",
   "Email",
-  "LinkedIn",
+  "Video Call",
   "In Person",
+  "LinkedIn",
+  "Letter",
   "Other",
 ];
+
+function formatGap(newerDate: string, olderDate: string): string {
+  const days = Math.round(
+    (new Date(newerDate).getTime() - new Date(olderDate).getTime()) /
+      (1000 * 60 * 60 * 24)
+  );
+  if (days < 14) return `${days} ${days === 1 ? "day" : "days"} later`;
+  if (days < 60) {
+    const weeks = Math.round(days / 7);
+    return `${weeks} ${weeks === 1 ? "week" : "weeks"} later`;
+  }
+  const months = Math.round(days / 30);
+  return `${months} ${months === 1 ? "month" : "months"} later`;
+}
 
 function nextActionText(person: Person) {
   const days = getNextDueDays(person);
@@ -268,11 +286,12 @@ export function InteractionTimeline({
             </Link>
           </div>
         ) : (
-          interactions.map((interaction) => (
-            <div
-              key={interaction.id}
-              className="rounded-lg border border-border bg-card p-5 shadow-sm"
-            >
+          interactions.flatMap((interaction, index) => {
+            const card = (
+              <div
+                key={interaction.id}
+                className="rounded-lg border border-border bg-card p-5 shadow-sm"
+              >
               {editingInteractionId === interaction.id ? (
                 <form
                   onSubmit={(event) => onUpdateInteraction(interaction, event)}
@@ -431,7 +450,20 @@ export function InteractionTimeline({
                 </>
               )}
             </div>
-          ))
+            );
+            if (index < interactions.length - 1) {
+              return [
+                card,
+                <p
+                  key={`gap-${interaction.id}`}
+                  className="text-xs text-muted-foreground text-center py-1"
+                >
+                  {formatGap(interaction.date, interactions[index + 1].date)}
+                </p>,
+              ];
+            }
+            return [card];
+          })
         )}
       </div>
     </section>
