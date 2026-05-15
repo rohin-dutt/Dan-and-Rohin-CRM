@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+
+const SIGNUP_URL = "https://dan-and-rohin-crm.vercel.app/auth/signup";
 
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
@@ -16,14 +19,73 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLinks({ mobile = false }: { mobile?: boolean }) {
+function InviteModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [onClose]);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(SIGNUP_URL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+      <div
+        ref={modalRef}
+        className="mx-4 w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
+      >
+        <h2 className="mb-1 text-base font-semibold">Invite a friend to Roots</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Share the link and they can sign up for free.
+        </p>
+        <input
+          type="text"
+          readOnly
+          value={SIGNUP_URL}
+          className="mb-3 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={handleCopy}
+            className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            {copied ? "Copied!" : "Copy link"}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NavLinks({
+  mobile = false,
+  onInviteClick,
+}: {
+  mobile?: boolean;
+  onInviteClick: () => void;
+}) {
   const pathname = usePathname();
 
   return (
     <nav
-      className={cn(
-        mobile ? "grid grid-cols-3 gap-2" : "flex flex-col gap-1"
-      )}
+      className={cn(mobile ? "grid grid-cols-4 gap-2" : "flex flex-col gap-1")}
       aria-label="Main navigation"
     >
       {navLinks.map((link) => {
@@ -47,12 +109,21 @@ function NavLinks({ mobile = false }: { mobile?: boolean }) {
           </Link>
         );
       })}
+      {mobile && (
+        <button
+          onClick={onInviteClick}
+          className="rounded-md px-3 py-2 text-sm font-medium text-center text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          Invite
+        </button>
+      )}
     </nav>
   );
 }
 
 export default function Sidebar() {
   const router = useRouter();
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -61,6 +132,8 @@ export default function Sidebar() {
 
   return (
     <>
+      {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
+
       <header className="border-b border-border bg-background px-4 py-4 md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold">
           <img src="/logo.svg" alt="" aria-hidden="true" width="24" height="24" />
@@ -68,7 +141,7 @@ export default function Sidebar() {
         </Link>
         <p className="mt-1 text-xs text-muted-foreground">Stay close to the people who matter</p>
         <div className="mt-4">
-          <NavLinks mobile />
+          <NavLinks mobile onInviteClick={() => setInviteOpen(true)} />
         </div>
       </header>
 
@@ -81,14 +154,22 @@ export default function Sidebar() {
           <p className="mt-1 text-sm text-muted-foreground">Stay close to the people who matter</p>
         </div>
 
-        <NavLinks />
+        <NavLinks onInviteClick={() => setInviteOpen(true)} />
 
-        <button
-          onClick={handleLogout}
-          className="mt-auto rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-left"
-        >
-          Log out
-        </button>
+        <div className="mt-auto flex flex-col gap-1">
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-left"
+          >
+            Invite a friend
+          </button>
+          <button
+            onClick={handleLogout}
+            className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-left"
+          >
+            Log out
+          </button>
+        </div>
       </aside>
     </>
   );
