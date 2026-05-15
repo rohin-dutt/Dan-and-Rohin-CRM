@@ -6,9 +6,12 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   categorizePeople,
   getBirthdayReminders,
-  getDaysSince,
   getFollowUpQueue,
-  getNextDueDays,
+  getMostContacted,
+  getNeedsAttention,
+  getOnTimeRate,
+  getTotalContacts,
+  getTotalInteractions,
   pluralize,
 } from "@/lib/crm-rules";
 import { formatDate, formatShortDate } from "@/lib/date-utils";
@@ -188,6 +191,51 @@ function FollowUpQueue({
   );
 }
 
+function MilestonesSection({
+  people,
+  interactions,
+}: {
+  people: Person[];
+  interactions: Interaction[];
+}) {
+  const onTimeRate = getOnTimeRate(people);
+  const mostContacted = getMostContacted(people, interactions) as Person | null;
+  const needsAttention = getNeedsAttention(people) as Person | null;
+
+  const stats = [
+    { label: "Total contacts", value: String(getTotalContacts(people)) },
+    {
+      label: "Interactions logged",
+      value: String(getTotalInteractions(interactions)),
+    },
+    {
+      label: "On-time rate",
+      value: onTimeRate === null ? "—" : `${onTimeRate}%`,
+    },
+    { label: "Most contacted", value: mostContacted?.name ?? "—" },
+    { label: "Needs attention", value: needsAttention?.name ?? "—" },
+  ];
+
+  return (
+    <section className="mb-8 mt-10">
+      <h2 className="text-lg font-semibold text-emerald-700">Your Roots</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {stats.map(({ label, value }) => (
+          <div
+            key={label}
+            className="rounded-lg border border-border bg-card p-4 shadow-sm"
+          >
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            <p className="mt-2 truncate text-2xl font-semibold text-foreground">
+              {value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function DashboardSections({
   people,
   followUps,
@@ -195,13 +243,12 @@ export function DashboardSections({
   people: Person[];
   followUps: FollowUpInteraction[];
 }) {
-  const { overdue, dueThisWeek, comingUp, recentlyContacted, neglected } =
-    categorizePeople(people);
+  const { overdue, dueThisWeek, comingUp } = categorizePeople(people);
   const birthdays = getBirthdayReminders(people);
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <StatCard
           label="Overdue"
           count={overdue.length}
@@ -217,102 +264,9 @@ export function DashboardSections({
           count={comingUp.length}
           style="border-sky-200 bg-sky-50 text-sky-950 [&>p:first-child]:text-sky-700"
         />
-        <StatCard
-          label="Recent"
-          count={recentlyContacted.length}
-          style="border-emerald-200 bg-emerald-50 text-emerald-950 [&>p:first-child]:text-emerald-700"
-        />
-        <StatCard
-          label="Neglected"
-          count={neglected.length}
-          style="border-border bg-muted text-foreground [&>p:first-child]:text-muted-foreground"
-        />
       </div>
 
       <FollowUpQueue interactions={followUps} />
-
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold text-foreground">
-          Overdue ({overdue.length})
-        </h2>
-        {overdue.length === 0 ? (
-          <SectionEmptyState message="No one overdue." />
-        ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {overdue.map((person: Person) => {
-              const days = Math.abs(getNextDueDays(person) ?? 0);
-              return (
-                <PersonCard
-                  key={person.id}
-                  person={person}
-                  badge={`Overdue by ${pluralize(days, "day")}`}
-                  badgeStyle="bg-red-100 text-red-700"
-                  subtext={`Last contacted: ${formatDate(person.last_contacted_at)}`}
-                  showQuickLog
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold text-foreground">
-          Due This Week ({dueThisWeek.length})
-        </h2>
-        {dueThisWeek.length === 0 ? (
-          <SectionEmptyState message="No one due this week." />
-        ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {dueThisWeek.map((person: Person) => {
-              const days = getNextDueDays(person);
-              return (
-                <PersonCard
-                  key={person.id}
-                  person={person}
-                  badge={
-                    days === 0
-                      ? "Due today"
-                      : `Due in ${pluralize(days, "day")}`
-                  }
-                  badgeStyle="bg-amber-100 text-amber-700"
-                  subtext={`Last contacted: ${formatDate(person.last_contacted_at)}`}
-                  showQuickLog
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold text-foreground">
-          Coming Up ({comingUp.length})
-        </h2>
-        {comingUp.length === 0 ? (
-          <SectionEmptyState message="No steady-state contacts waiting in the queue." />
-        ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {comingUp.map((person: Person) => {
-              const days = getNextDueDays(person);
-              return (
-                <PersonCard
-                  key={person.id}
-                  person={person}
-                  badge={
-                    days === null
-                      ? "Not scheduled"
-                      : `Due in ${pluralize(days, "day")}`
-                  }
-                  badgeStyle="bg-sky-100 text-sky-700"
-                  subtext={`Last contacted: ${formatDate(person.last_contacted_at)}`}
-                  showQuickLog
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-foreground">
@@ -349,68 +303,7 @@ export function DashboardSections({
         )}
       </section>
 
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold text-foreground">
-          Recently Contacted ({recentlyContacted.length})
-        </h2>
-        {recentlyContacted.length === 0 ? (
-          <SectionEmptyState message="No recent contacts in the last 7 days." />
-        ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {recentlyContacted.map((person: Person) => {
-              const daysSince = getDaysSince(person.last_contacted_at);
-              const nextDays = getNextDueDays(person);
-              return (
-                <PersonCard
-                  key={person.id}
-                  person={person}
-                  badge={
-                    daysSince === 0
-                      ? "Contacted today"
-                      : `Contacted ${pluralize(daysSince, "day")} ago`
-                  }
-                  badgeStyle="bg-emerald-100 text-emerald-700"
-                  subtext={
-                    nextDays === null
-                      ? undefined
-                      : nextDays === 0
-                        ? "Next due: today"
-                        : `Next due: in ${pluralize(nextDays, "day")}`
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="mb-8 mt-10">
-        <h2 className="text-lg font-semibold text-foreground">
-          Neglected ({neglected.length})
-        </h2>
-        {neglected.length === 0 ? (
-          <SectionEmptyState message="No one neglected." />
-        ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {neglected.map((person: Person) => {
-              const daysSince = getDaysSince(person.last_contacted_at);
-              return (
-                <PersonCard
-                  key={person.id}
-                  person={person}
-                  badge={
-                    daysSince === null
-                      ? "Never contacted"
-                      : `${pluralize(daysSince, "day")} since contact`
-                  }
-                  badgeStyle="bg-muted text-muted-foreground"
-                  showQuickLog
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
+      <MilestonesSection people={people} interactions={followUps} />
     </>
   );
 }
