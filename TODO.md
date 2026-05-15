@@ -6,6 +6,13 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] `npm test` fails on `tests/date-utils.test.mjs` with
+      `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
+      TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.
+      `--import tsx` or `ts-node/esm`) to the test script, or compile
+      `lib/date-utils.ts` before running the test. Pre-existing; confirmed
+      present before Phase 2/3 landing + auth changes. Owner: test runner
+      configuration.
 - [ ] Local shell issue: `npm test` failed in PowerShell before the test script
       started because `C:\Program Files\nodejs\npm.ps1` is blocked by the system
       execution policy. Workaround used for the baseline: `npm.cmd test`, which

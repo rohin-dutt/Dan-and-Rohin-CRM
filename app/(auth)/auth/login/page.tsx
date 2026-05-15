@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { RotatingQuote } from './_components/RotatingQuote'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -37,6 +38,8 @@ export default function LoginPage() {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
           Sign in
         </h1>
+
+        <RotatingQuote />
 
         {error && (
           <p className="mb-4 mt-6 rounded-md bg-red-50 p-3 text-sm text-red-700">

@@ -34,6 +34,10 @@ export async function proxy(request: NextRequest) {
   const isApiPath = pathname.startsWith('/api/')
   const isPublicPath =
     pathname === '/' ||
+    pathname === '/about' ||
+    pathname === '/faq' ||
+    pathname === '/privacy' ||
+    pathname === '/contact' ||
     pathname === '/auth/login' ||
     pathname === '/auth/signup' ||
     pathname.startsWith('/auth/callback')
