@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import {
-  AccountPanel,
+  AccountTab,
+  BillingTab,
+  ExportSection,
   ImportRestorePanel,
   SettingsForm,
   TagManagementPanel,
@@ -17,8 +19,18 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Settings, Tag } from "@/types/index";
 
+type Tab = "account" | "notifications" | "data" | "billing";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "account", label: "Account" },
+  { id: "notifications", label: "Notifications" },
+  { id: "data", label: "Data" },
+  { id: "billing", label: "Billing" },
+];
+
 export default function SettingsPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>("account");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +43,8 @@ export default function SettingsPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -109,6 +123,12 @@ export default function SettingsPage() {
 
     loadSettings();
   }, [router]);
+
+  function switchTab(tab: Tab) {
+    setActiveTab(tab);
+    setSaved(false);
+    setError(null);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -304,6 +324,33 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch("/api/export");
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Export failed.");
+      }
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "crm-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/auth/login");
@@ -312,7 +359,7 @@ export default function SettingsPage() {
   return (
     <AppLayout>
       <div className="max-w-3xl">
-        <div className="mb-8">
+        <div className="mb-6">
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Settings
           </p>
@@ -321,19 +368,25 @@ export default function SettingsPage() {
           </h1>
         </div>
 
+        <div className="mb-6 flex gap-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => switchTab(tab.id)}
+              className={
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground px-4 py-2 text-sm font-medium"
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading...</p>
-        ) : error && !settings ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-3 rounded-md bg-card px-3 py-2 text-sm font-medium text-red-700"
-            >
-              Retry
-            </button>
-          </div>
         ) : (
           <div className="space-y-6">
             {error && (
@@ -347,38 +400,65 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <SettingsForm
-              settings={settings}
-              saving={saving}
-              onSubmit={handleSubmit}
-            />
+            {activeTab === "account" && (
+              <AccountTab onLogout={handleLogout} />
+            )}
 
-            <TagManagementPanel
-              tags={tags}
-              confirmDeleteTagId={confirmDeleteTagId}
-              mergeSourceId={mergeSourceId}
-              mergeTargetId={mergeTargetId}
-              onTagNameChange={(tagId, name) => patchTag(tagId, { name })}
-              onTagColorChange={(tagId, color) => patchTag(tagId, { color })}
-              onSaveTag={updateTag}
-              onRequestDeleteTag={setConfirmDeleteTagId}
-              onConfirmDeleteTag={deleteTag}
-              onCancelDeleteTag={() => setConfirmDeleteTagId(null)}
-              onMergeSourceChange={setMergeSourceId}
-              onMergeTargetChange={setMergeTargetId}
-              onMergeTags={mergeTags}
-            />
+            {activeTab === "notifications" && (
+              settings ? (
+                <SettingsForm
+                  settings={settings}
+                  saving={saving}
+                  onSubmit={handleSubmit}
+                />
+              ) : (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+                  <p>Could not load notification settings.</p>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 rounded-md bg-card px-3 py-2 text-sm font-medium text-red-700"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )
+            )}
 
-            <ImportRestorePanel
-              importFile={importFile}
-              importing={importing}
-              importMessage={importMessage}
-              onFileChange={setImportFile}
-              onImport={() => restoreFromExport(false)}
-              onRestore={() => restoreFromExport(true)}
-            />
+            {activeTab === "data" && (
+              <>
+                <ExportSection
+                  exporting={exporting}
+                  exportError={exportError}
+                  onExport={handleExport}
+                />
+                <ImportRestorePanel
+                  importFile={importFile}
+                  importing={importing}
+                  importMessage={importMessage}
+                  onFileChange={setImportFile}
+                  onImport={() => restoreFromExport(false)}
+                  onRestore={() => restoreFromExport(true)}
+                />
+                <TagManagementPanel
+                  tags={tags}
+                  confirmDeleteTagId={confirmDeleteTagId}
+                  mergeSourceId={mergeSourceId}
+                  mergeTargetId={mergeTargetId}
+                  onTagNameChange={(tagId, name) => patchTag(tagId, { name })}
+                  onTagColorChange={(tagId, color) => patchTag(tagId, { color })}
+                  onSaveTag={updateTag}
+                  onRequestDeleteTag={setConfirmDeleteTagId}
+                  onConfirmDeleteTag={deleteTag}
+                  onCancelDeleteTag={() => setConfirmDeleteTagId(null)}
+                  onMergeSourceChange={setMergeSourceId}
+                  onMergeTargetChange={setMergeTargetId}
+                  onMergeTags={mergeTags}
+                />
+              </>
+            )}
 
-            <AccountPanel onLogout={handleLogout} />
+            {activeTab === "billing" && <BillingTab />}
           </div>
         )}
       </div>

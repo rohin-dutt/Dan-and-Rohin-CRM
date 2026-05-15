@@ -1,5 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
 import type { Settings, Tag } from "@/types/index";
 
 export function SettingsForm({
@@ -15,7 +19,7 @@ export function SettingsForm({
     <form onSubmit={onSubmit}>
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="mb-4 text-base font-semibold text-foreground">
-          In-app Reminder Cadence
+          Reminders
         </h2>
         <label
           htmlFor="reminder_frequency_days"
@@ -232,17 +236,270 @@ export function ImportRestorePanel({
   );
 }
 
-export function AccountPanel({ onLogout }: { onLogout: () => void }) {
+export function ExportSection({
+  exporting,
+  exportError,
+  onExport,
+}: {
+  exporting: boolean;
+  exportError: string | null;
+  onExport: () => void;
+}) {
   return (
     <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <h2 className="mb-4 text-base font-semibold text-foreground">Account</h2>
+      <h2 className="mb-4 text-base font-semibold text-foreground">Export</h2>
       <button
         type="button"
-        onClick={onLogout}
-        className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+        disabled={exporting}
+        onClick={onExport}
+        className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground disabled:opacity-50"
       >
-        Log out
+        {exporting ? "Exporting..." : "Export contacts"}
       </button>
+      {exportError && (
+        <p className="mt-2 text-sm text-red-700">{exportError}</p>
+      )}
+    </section>
+  );
+}
+
+export function AccountTab({ onLogout }: { onLogout: () => void }) {
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileStatus, setProfileStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [emailStatus, setEmailStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [passwordStatus, setPasswordStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setDisplayName(
+          user.user_metadata?.full_name ?? user.user_metadata?.name ?? ""
+        );
+      }
+    });
+  }, []);
+
+  async function saveProfile() {
+    setProfileStatus(null);
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: displayName },
+    });
+    if (error) {
+      setProfileStatus({ ok: false, msg: error.message });
+    } else {
+      setProfileStatus({ ok: true, msg: "Profile updated." });
+    }
+  }
+
+  async function saveEmail() {
+    setEmailStatus(null);
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) {
+      setEmailStatus({ ok: false, msg: error.message });
+    } else {
+      setEmailStatus({ ok: true, msg: "Confirmation sent. Check your inbox." });
+      setNewEmail("");
+    }
+  }
+
+  async function savePassword() {
+    setPasswordStatus(null);
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ ok: false, msg: "Passwords do not match." });
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setPasswordStatus({ ok: false, msg: error.message });
+    } else {
+      setPasswordStatus({ ok: true, msg: "Password updated." });
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  }
+
+  async function confirmDeleteAccount() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Failed to delete account.");
+      }
+      router.push("/auth/login");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account.");
+      setDeleteConfirming(false);
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-foreground">Profile</h2>
+        <label className="mb-1 block text-sm font-medium text-foreground">
+          Display name
+        </label>
+        <input
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <button
+          type="button"
+          onClick={saveProfile}
+          className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
+        >
+          Save
+        </button>
+        {profileStatus && (
+          <p
+            className={`mt-2 text-sm ${profileStatus.ok ? "text-emerald-700" : "text-red-700"}`}
+          >
+            {profileStatus.msg}
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-foreground">
+          Email &amp; Password
+        </h2>
+
+        <div className="mb-5">
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            New email
+          </label>
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="New email address"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button
+            type="button"
+            onClick={saveEmail}
+            className="mt-3 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
+          >
+            Update email
+          </button>
+          {emailStatus && (
+            <p
+              className={`mt-2 text-sm ${emailStatus.ok ? "text-emerald-700" : "text-red-700"}`}
+            >
+              {emailStatus.msg}
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            New password
+          </label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="New password"
+            className="mb-3 w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Confirm password
+          </label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm new password"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button
+            type="button"
+            onClick={savePassword}
+            className="mt-3 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
+          >
+            Update password
+          </button>
+          {passwordStatus && (
+            <p
+              className={`mt-2 text-sm ${passwordStatus.ok ? "text-emerald-700" : "text-red-700"}`}
+            >
+              {passwordStatus.msg}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-foreground">Danger Zone</h2>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+          >
+            Log out
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteConfirming(true)}
+            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+          >
+            Delete account
+          </button>
+        </div>
+
+        {deleteError && (
+          <p className="mt-3 text-sm text-red-700">{deleteError}</p>
+        )}
+
+        {deleteConfirming && (
+          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p>
+              This will permanently delete your account and all your contacts.
+              This cannot be undone.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={confirmDeleteAccount}
+                disabled={deleting}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Confirm delete"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirming(false)}
+                className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export function BillingTab() {
+  return (
+    <section className="rounded-lg border border-border bg-card p-5">
+      <h2 className="mb-2 text-base font-semibold text-foreground">Free plan</h2>
+      <p className="text-sm text-muted-foreground">
+        You&apos;re on the free plan. Paid plans with additional features are coming soon.
+      </p>
     </section>
   );
 }
