@@ -1,6 +1,6 @@
 {
-  "name": "Personal CRM",
-  "short_name": "CRM",
+  "name": "Roots",
+  "short_name": "Roots",
   "description": "Your personal relationship manager",
   "start_url": "/dashboard",
   "display": "standalone",

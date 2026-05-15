@@ -313,7 +313,7 @@ export default function SettingsPage() {
     <AppLayout>
       <div className="max-w-3xl">
         <div className="mb-8">
-          <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+          <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Settings
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -322,14 +322,14 @@ export default function SettingsPage() {
         </div>
 
         {loading ? (
-          <p className="text-sm text-zinc-500">Loading...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         ) : error && !settings ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             <p>{error}</p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-3 rounded-md bg-white px-3 py-2 text-sm font-medium text-red-700"
+              className="mt-3 rounded-md bg-card px-3 py-2 text-sm font-medium text-red-700"
             >
               Retry
             </button>

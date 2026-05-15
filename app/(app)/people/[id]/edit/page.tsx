@@ -260,7 +260,7 @@ export default function EditPersonPage() {
   if (loading) {
     return (
       <AppLayout>
-        <p className="text-sm text-zinc-500">Loading...</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </AppLayout>
     );
   }
@@ -268,11 +268,11 @@ export default function EditPersonPage() {
   if (!person) {
     return (
       <AppLayout>
-        <Link href="/people" className="text-sm font-medium text-zinc-600">
+        <Link href="/people" className="text-sm font-medium text-muted-foreground">
           ← Back to people
         </Link>
-        <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-zinc-600">Person not found.</p>
+        <div className="mt-6 rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+          <p className="text-muted-foreground">Person not found.</p>
         </div>
       </AppLayout>
     );
@@ -283,7 +283,7 @@ export default function EditPersonPage() {
       <div className="mb-8">
         <Link
           href={`/people/${person.id}`}
-          className="text-sm font-medium text-zinc-600"
+          className="text-sm font-medium text-muted-foreground"
         >
           ← Back to {person.name}
         </Link>

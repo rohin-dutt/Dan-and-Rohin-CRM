@@ -29,12 +29,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-          Personal CRM
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 shadow-sm">
+        <p className="text-sm font-medium uppercase tracking-wide text-primary">
+          Roots
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
           Sign in
         </h1>
 
@@ -48,7 +48,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-zinc-700"
+              className="mb-1 block text-sm font-medium text-foreground"
             >
               Email
             </label>
@@ -58,7 +58,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -66,13 +66,13 @@ export default function LoginPage() {
             <div className="mb-1 flex items-center justify-between">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-zinc-700"
+                className="block text-sm font-medium text-foreground"
               >
                 Password
               </label>
               <Link
                 href="/auth/forgot-password"
-                className="text-xs text-zinc-400 hover:text-zinc-600"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 Forgot password?
               </Link>
@@ -83,22 +83,22 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-zinc-600">
+        <p className="mt-4 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="font-medium text-zinc-900 underline">
+          <Link href="/auth/signup" className="font-medium text-primary underline">
             Sign up
           </Link>
         </p>

@@ -287,7 +287,7 @@ export default function PersonDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <p className="text-sm text-zinc-500">Loading...</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </AppLayout>
     );
   }
@@ -303,13 +303,13 @@ export default function PersonDetailPage() {
   return (
     <AppLayout>
       <div className="flex items-center justify-between">
-        <Link href="/people" className="text-sm font-medium text-zinc-600">
+        <Link href="/people" className="text-sm font-medium text-muted-foreground">
           Back to people
         </Link>
         <div className="flex gap-3">
           <Link
             href={`/people/${person.id}/edit`}
-            className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+            className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
             Edit
           </Link>

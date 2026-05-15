@@ -238,7 +238,7 @@ export default function NewPersonPage() {
   return (
     <AppLayout>
       <div className="mb-8">
-        <Link href="/people" className="text-sm font-medium text-zinc-600">
+        <Link href="/people" className="text-sm font-medium text-muted-foreground">
           ← Back to people
         </Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">

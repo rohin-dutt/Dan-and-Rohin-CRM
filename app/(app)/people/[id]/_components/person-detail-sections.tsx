@@ -31,11 +31,11 @@ function nextActionText(person: Person) {
 export function PersonNotFound() {
   return (
     <>
-      <Link href="/people" className="text-sm font-medium text-zinc-600">
+      <Link href="/people" className="text-sm font-medium text-muted-foreground">
         Back to people
       </Link>
-      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-        <p className="text-zinc-600">Person not found.</p>
+      <div className="mt-6 rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+        <p className="text-muted-foreground">Person not found.</p>
       </div>
     </>
   );
@@ -67,7 +67,7 @@ export function DeletePersonConfirmation({
         </button>
         <button
           onClick={onCancel}
-          className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700"
+          className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground"
         >
           Cancel
         </button>
@@ -94,23 +94,23 @@ export function PersonSummary({
   );
 
   return (
-    <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+    <section className="mt-6 rounded-lg border border-border bg-card p-6 shadow-sm">
       {person.relationship_type && (
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           {person.relationship_type}
         </p>
       )}
       <div className="mt-2 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">{person.name}</h1>
-          <p className="mt-2 text-lg text-zinc-600">
+          <p className="mt-2 text-lg text-muted-foreground">
             {[person.role, person.company].filter(Boolean).join(" at ") ||
               "No role or company yet"}
           </p>
         </div>
         <Link
           href={`/people/${person.id}/interactions/new`}
-          className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
           Quick Log
         </Link>
@@ -131,14 +131,14 @@ export function PersonSummary({
       )}
 
       <div className="mt-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg bg-zinc-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Next Action
           </p>
           <p className="mt-2 font-semibold">{nextActionText(person)}</p>
         </div>
-        <div className="rounded-lg bg-zinc-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Last Interaction
           </p>
           <p className="mt-2 font-semibold">
@@ -147,8 +147,8 @@ export function PersonSummary({
               : "No interactions yet"}
           </p>
         </div>
-        <div className="rounded-lg bg-zinc-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Follow-ups
           </p>
           <p className="mt-2 font-semibold">
@@ -157,8 +157,8 @@ export function PersonSummary({
               : `${activeFollowUps.length} active`}
           </p>
         </div>
-        <div className="rounded-lg bg-zinc-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Last Contacted
           </p>
           <p className="mt-2 font-semibold">{formatDate(person.last_contacted_at)}</p>
@@ -176,11 +176,11 @@ export function PersonSummary({
           ["Contact Rhythm", `Every ${person.contact_frequency_days} days`],
           ["How Met", person.how_met],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-zinc-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div key={label} className="rounded-lg bg-muted p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {label}
             </p>
-            <p className="mt-2 text-sm leading-6 text-zinc-700">
+            <p className="mt-2 text-sm leading-6 text-foreground">
               {value || `Add ${String(label).toLowerCase()} details.`}
             </p>
           </div>
@@ -189,7 +189,7 @@ export function PersonSummary({
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Notes</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-700">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground">
           {person.notes ||
             "Add context, conversation threads, or anything useful for the next reach-out."}
         </p>
@@ -239,7 +239,7 @@ export function InteractionTimeline({
         <h2 className="text-xl font-semibold">Interaction Timeline</h2>
         <Link
           href={`/people/${personId}/interactions/new`}
-          className="inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+          className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
           Log Interaction
         </Link>
@@ -253,16 +253,16 @@ export function InteractionTimeline({
 
       <div className="mt-4 space-y-3">
         {interactionsLoading ? (
-          <p className="text-sm text-zinc-500">Loading interactions...</p>
+          <p className="text-sm text-muted-foreground">Loading interactions...</p>
         ) : interactions.length === 0 ? (
-          <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-            <h3 className="font-semibold text-zinc-900">No interactions logged yet.</h3>
-            <p className="mt-2 text-sm text-zinc-500">
+          <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+            <h3 className="font-semibold text-foreground">No interactions logged yet.</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
               Log the last call, message, or meeting so the dashboard can track cadence.
             </p>
             <Link
               href={`/people/${personId}/interactions/new`}
-              className="mt-3 inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+              className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
             >
               Log your first interaction
             </Link>
@@ -271,7 +271,7 @@ export function InteractionTimeline({
           interactions.map((interaction) => (
             <div
               key={interaction.id}
-              className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm"
+              className="rounded-lg border border-border bg-card p-5 shadow-sm"
             >
               {editingInteractionId === interaction.id ? (
                 <form
@@ -282,7 +282,7 @@ export function InteractionTimeline({
                     <select
                       name="type"
                       defaultValue={interaction.type}
-                      className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                     >
                       {INTERACTION_TYPES.map((type) => (
                         <option key={type} value={type}>
@@ -295,17 +295,17 @@ export function InteractionTimeline({
                       type="date"
                       required
                       defaultValue={interaction.date}
-                      className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                     />
                   </div>
                   <textarea
                     name="notes"
                     rows={3}
                     defaultValue={interaction.notes ?? ""}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
                   />
                   <div className="grid gap-3 md:grid-cols-3">
-                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                    <label className="flex items-center gap-2 text-sm text-foreground">
                       <input
                         name="follow_up_needed"
                         type="checkbox"
@@ -317,12 +317,12 @@ export function InteractionTimeline({
                       name="follow_up_date"
                       type="date"
                       defaultValue={interaction.follow_up_date ?? ""}
-                      className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                     />
                     <select
                       name="follow_up_status"
                       defaultValue={interaction.follow_up_status}
-                      className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                     >
                       <option value="open">Open</option>
                       <option value="snoozed">Snoozed</option>
@@ -332,17 +332,17 @@ export function InteractionTimeline({
                       name="follow_up_snoozed_until"
                       type="date"
                       defaultValue={interaction.follow_up_snoozed_until ?? ""}
-                      className="rounded-md border border-zinc-300 px-3 py-2 text-sm md:col-span-3"
+                      className="rounded-md border border-border bg-card px-3 py-2 text-sm md:col-span-3"
                     />
                   </div>
                   <div className="flex gap-2">
-                    <button className="inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white">
+                    <button className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
                       Save
                     </button>
                     <button
                       type="button"
                       onClick={onCancelEditInteraction}
-                      className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700"
+                      className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground"
                     >
                       Cancel
                     </button>
@@ -352,10 +352,10 @@ export function InteractionTimeline({
                 <>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
+                      <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
                         {interaction.type}
                       </span>
-                      <span className="ml-3 text-sm text-zinc-500">
+                      <span className="ml-3 text-sm text-muted-foreground">
                         {formatDate(interaction.date)}
                       </span>
                     </div>
@@ -363,7 +363,7 @@ export function InteractionTimeline({
                       <button
                         type="button"
                         onClick={() => onEditInteraction(interaction.id)}
-                        className="text-sm font-medium text-zinc-700 underline"
+                        className="text-sm font-medium text-foreground underline"
                       >
                         Edit
                       </button>
@@ -379,7 +379,7 @@ export function InteractionTimeline({
                           <button
                             type="button"
                             onClick={onCancelDeleteInteraction}
-                            className="text-sm font-medium text-zinc-700 underline"
+                            className="text-sm font-medium text-foreground underline"
                           >
                             Cancel
                           </button>
@@ -396,7 +396,7 @@ export function InteractionTimeline({
                     </div>
                   </div>
                   {interaction.notes && (
-                    <p className="mt-3 text-sm leading-6 text-zinc-700">
+                    <p className="mt-3 text-sm leading-6 text-foreground">
                       {interaction.notes}
                     </p>
                   )}
@@ -409,19 +409,19 @@ export function InteractionTimeline({
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button
                           onClick={() => onFollowUpStatus(interaction, "done")}
-                          className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Mark done
                         </button>
                         <button
                           onClick={() => onFollowUpStatus(interaction, "snoozed")}
-                          className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Snooze 7 days
                         </button>
                         <button
                           onClick={() => onFollowUpStatus(interaction, "open")}
-                          className="rounded-md bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+                          className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Reopen
                         </button>

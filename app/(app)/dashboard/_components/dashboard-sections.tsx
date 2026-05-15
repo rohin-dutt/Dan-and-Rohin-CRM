@@ -33,7 +33,7 @@ function PersonCard({
   showQuickLog?: boolean;
 }) {
   return (
-    <div className="relative rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+    <div className="relative rounded-lg border border-border bg-card p-4 shadow-sm transition hover:shadow-md">
       <Link
         href={`/people/${person.id}`}
         className="absolute inset-0 rounded-lg"
@@ -41,9 +41,9 @@ function PersonCard({
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-zinc-900">{person.name}</p>
+          <p className="font-semibold text-foreground">{person.name}</p>
           {person.company && (
-            <p className="mt-0.5 truncate text-sm text-zinc-500">
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
               {person.company}
             </p>
           )}
@@ -57,7 +57,7 @@ function PersonCard({
           {badge}
         </span>
       </div>
-      {subtext && <p className="mt-2 text-xs text-zinc-400">{subtext}</p>}
+      {subtext && <p className="mt-2 text-xs text-muted-foreground">{subtext}</p>}
       {showQuickLog && (
         <div className="mt-3">
           <Link
@@ -77,7 +77,7 @@ function PersonCard({
 
 function SectionEmptyState({ message }: { message: string }) {
   return (
-    <p className="mt-3 rounded-lg border border-zinc-100 bg-white px-4 py-4 text-sm text-zinc-400 shadow-sm">
+    <p className="mt-3 rounded-lg border border-border bg-card px-4 py-4 text-sm text-muted-foreground shadow-sm">
       {message}
     </p>
   );
@@ -102,20 +102,17 @@ function StatCard({
 
 export function FirstRunEmptyState() {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-      <h2 className="text-xl font-semibold text-zinc-900">
+    <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+      <h2 className="text-xl font-semibold text-foreground">
         Add your first contact to get started.
       </h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-600">
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
         Once you add someone, this dashboard will show follow-ups, birthdays,
         and relationship cadence.
       </p>
       <Link
         href="/people/new"
-        className={cn(
-          buttonVariants({ size: "sm" }),
-          "mt-5 bg-zinc-900 text-white hover:bg-zinc-700"
-        )}
+        className={cn(buttonVariants({ size: "sm" }), "mt-5")}
       >
         Add contact
       </Link>
@@ -143,13 +140,13 @@ function FollowUpQueue({
     ...queue.snoozed.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Snoozed",
-      style: "bg-zinc-100 text-zinc-600",
+      style: "bg-muted text-muted-foreground",
     })),
   ].slice(0, 6);
 
   return (
     <section className="mt-10">
-      <h2 className="text-lg font-semibold text-zinc-900">
+      <h2 className="text-lg font-semibold text-foreground">
         Follow-up Queue ({visible.length})
       </h2>
       {visible.length === 0 ? (
@@ -160,14 +157,14 @@ function FollowUpQueue({
             <Link
               key={interaction.id}
               href={`/people/${interaction.person_id}`}
-              className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm transition hover:border-zinc-300"
+              className="rounded-lg border border-border bg-card p-4 shadow-sm transition hover:border-primary/30"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-zinc-900">
+                  <p className="font-semibold text-foreground">
                     {interaction.person_name}
                   </p>
-                  <p className="mt-1 text-sm text-zinc-600">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {interaction.type} on {formatDate(interaction.date)}
                   </p>
                 </div>
@@ -180,7 +177,7 @@ function FollowUpQueue({
                   {interaction.state}
                 </span>
               </div>
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="mt-3 text-xs text-muted-foreground">
                 Follow up: {formatDate(interaction.follow_up_date)}
               </p>
             </Link>
@@ -228,14 +225,14 @@ export function DashboardSections({
         <StatCard
           label="Neglected"
           count={neglected.length}
-          style="border-zinc-200 bg-zinc-50 text-zinc-900 [&>p:first-child]:text-zinc-600"
+          style="border-border bg-muted text-foreground [&>p:first-child]:text-muted-foreground"
         />
       </div>
 
       <FollowUpQueue interactions={followUps} />
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Overdue ({overdue.length})
         </h2>
         {overdue.length === 0 ? (
@@ -260,7 +257,7 @@ export function DashboardSections({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Due This Week ({dueThisWeek.length})
         </h2>
         {dueThisWeek.length === 0 ? (
@@ -289,7 +286,7 @@ export function DashboardSections({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Coming Up ({comingUp.length})
         </h2>
         {comingUp.length === 0 ? (
@@ -318,7 +315,7 @@ export function DashboardSections({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Birthdays ({birthdays.length})
         </h2>
         {birthdays.length === 0 ? (
@@ -353,7 +350,7 @@ export function DashboardSections({
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Recently Contacted ({recentlyContacted.length})
         </h2>
         {recentlyContacted.length === 0 ? (
@@ -388,7 +385,7 @@ export function DashboardSections({
       </section>
 
       <section className="mb-8 mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-lg font-semibold text-foreground">
           Neglected ({neglected.length})
         </h2>
         {neglected.length === 0 ? (
@@ -406,7 +403,7 @@ export function DashboardSections({
                       ? "Never contacted"
                       : `${pluralize(daysSince, "day")} since contact`
                   }
-                  badgeStyle="bg-zinc-100 text-zinc-600"
+                  badgeStyle="bg-muted text-muted-foreground"
                   showQuickLog
                 />
               );

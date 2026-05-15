@@ -13,13 +13,13 @@ export function SettingsForm({
 }) {
   return (
     <form onSubmit={onSubmit}>
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold text-zinc-900">
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold text-foreground">
           In-app Reminder Cadence
         </h2>
         <label
           htmlFor="reminder_frequency_days"
-          className="mb-1 block text-sm font-medium text-zinc-700"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           Reminder frequency (days)
         </label>
@@ -29,15 +29,15 @@ export function SettingsForm({
           type="number"
           min="1"
           defaultValue={settings?.reminder_frequency_days ?? 7}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           Used for in-app dashboard reminders. Email delivery is not enabled in this repo.
         </p>
         <button
           type="submit"
           disabled={saving}
-          className="mt-5 inline-flex h-10 items-center rounded-md bg-zinc-900 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 disabled:opacity-50"
+          className="mt-5 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save settings"}
         </button>
@@ -76,21 +76,21 @@ export function TagManagementPanel({
   onMergeTags: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-zinc-900">Tag Management</h2>
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-foreground">Tag Management</h2>
       {tags.length === 0 ? (
-        <p className="mt-3 text-sm text-zinc-500">No tags created yet.</p>
+        <p className="mt-3 text-sm text-muted-foreground">No tags created yet.</p>
       ) : (
         <div className="mt-4 space-y-3">
           {tags.map((tag) => (
-            <div key={tag.id} className="rounded-lg border border-zinc-100 p-3">
+            <div key={tag.id} className="rounded-lg border border-border p-3">
               <div className="grid gap-2 md:grid-cols-[1fr_6rem_auto_auto]">
                 <input
                   value={tag.name}
                   onChange={(event) =>
                     onTagNameChange(tag.id, event.target.value)
                   }
-                  className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+                  className="rounded-md border border-border bg-card px-3 py-2 text-sm"
                 />
                 <input
                   type="color"
@@ -98,19 +98,19 @@ export function TagManagementPanel({
                   onChange={(event) =>
                     onTagColorChange(tag.id, event.target.value)
                   }
-                  className="h-10 rounded-md border border-zinc-300 bg-white px-2"
+                  className="h-10 rounded-md border border-border bg-card px-2"
                 />
                 <button
                   type="button"
                   onClick={() => onSaveTag(tag)}
-                  className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
+                  className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => onRequestDeleteTag(tag.id)}
-                  className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700"
+                  className="rounded-md border border-red-200 bg-card px-3 py-2 text-sm font-medium text-red-700"
                 >
                   Delete
                 </button>
@@ -129,7 +129,7 @@ export function TagManagementPanel({
                     <button
                       type="button"
                       onClick={onCancelDeleteTag}
-                      className="rounded-md bg-white px-3 py-1.5 text-zinc-700"
+                      className="rounded-md bg-card px-3 py-1.5 text-foreground"
                     >
                       Cancel
                     </button>
@@ -146,7 +146,7 @@ export function TagManagementPanel({
           <select
             value={mergeSourceId}
             onChange={(event) => onMergeSourceChange(event.target.value)}
-            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+            className="rounded-md border border-border bg-card px-3 py-2 text-sm"
           >
             <option value="">Merge from...</option>
             {tags.map((tag) => (
@@ -158,7 +158,7 @@ export function TagManagementPanel({
           <select
             value={mergeTargetId}
             onChange={(event) => onMergeTargetChange(event.target.value)}
-            className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+            className="rounded-md border border-border bg-card px-3 py-2 text-sm"
           >
             <option value="">Into...</option>
             {tags.map((tag) => (
@@ -170,7 +170,7 @@ export function TagManagementPanel({
           <button
             type="button"
             onClick={onMergeTags}
-            className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
+            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
           >
             Merge
           </button>
@@ -196,23 +196,23 @@ export function ImportRestorePanel({
   onRestore: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-zinc-900">Import and Restore</h2>
-      <p className="mt-2 text-sm text-zinc-500">
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-foreground">Import and Restore</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
         Use a JSON file created by Export Data. Restore replaces current people and tags.
       </p>
       <input
         type="file"
         accept="application/json"
         onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
-        className="mt-4 block w-full text-sm text-zinc-700"
+        className="mt-4 block w-full text-sm text-foreground"
       />
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
           disabled={importing || !importFile}
           onClick={onImport}
-          className="rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 disabled:opacity-50"
+          className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground disabled:opacity-50"
         >
           {importing ? "Working..." : "Import / update"}
         </button>
@@ -234,8 +234,8 @@ export function ImportRestorePanel({
 
 export function AccountPanel({ onLogout }: { onLogout: () => void }) {
   return (
-    <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-4 text-base font-semibold text-zinc-900">Account</h2>
+    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+      <h2 className="mb-4 text-base font-semibold text-foreground">Account</h2>
       <button
         type="button"
         onClick={onLogout}

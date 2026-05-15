@@ -37,10 +37,10 @@ function NavLinks({ mobile = false }: { mobile?: boolean }) {
               "rounded-md px-3 py-2 text-sm font-medium transition-colors",
               mobile && "text-center",
               isActive
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950",
-              !mobile && isActive && "bg-white text-zinc-950",
-              !mobile && !isActive && "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              !mobile && isActive && "bg-sidebar-primary text-sidebar-primary-foreground",
+              !mobile && !isActive && "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             )}
           >
             {link.label}
@@ -61,29 +61,31 @@ export default function Sidebar() {
 
   return (
     <>
-      <header className="border-b border-zinc-200 bg-white px-4 py-4 md:hidden">
-        <Link href="/dashboard" className="block text-base font-semibold">
-          Personal CRM
+      <header className="border-b border-border bg-background px-4 py-4 md:hidden">
+        <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold">
+          <img src="/logo.svg" alt="" aria-hidden="true" width="24" height="24" />
+          Roots
         </Link>
-        <p className="mt-1 text-xs text-zinc-500">Relationship tracker</p>
+        <p className="mt-1 text-xs text-muted-foreground">Stay close to the people who matter</p>
         <div className="mt-4">
           <NavLinks mobile />
         </div>
       </header>
 
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-zinc-800 bg-zinc-950 px-4 py-6 text-white md:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar px-4 py-6 text-sidebar-foreground md:flex">
         <div className="mb-8">
-          <Link href="/dashboard" className="text-lg font-semibold">
-            Personal CRM
+          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold">
+            <img src="/logo.svg" alt="" aria-hidden="true" width="24" height="24" />
+            Roots
           </Link>
-          <p className="mt-1 text-sm text-zinc-400">Relationship tracker</p>
+          <p className="mt-1 text-sm text-muted-foreground">Stay close to the people who matter</p>
         </div>
 
         <NavLinks />
 
         <button
           onClick={handleLogout}
-          className="mt-auto rounded-md px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white text-left"
+          className="mt-auto rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-left"
         >
           Log out
         </button>

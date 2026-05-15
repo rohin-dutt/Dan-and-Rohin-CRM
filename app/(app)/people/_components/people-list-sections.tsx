@@ -30,7 +30,7 @@ function statusBadge(person: Person) {
     return { label: "Recent", className: "bg-emerald-100 text-emerald-700" };
   }
   if (status === "neglected") {
-    return { label: "Needs first log", className: "bg-zinc-100 text-zinc-600" };
+    return { label: "Needs first log", className: "bg-muted text-muted-foreground" };
   }
   return {
     label:
@@ -49,7 +49,7 @@ export function PeopleHeader({
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           People
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -60,13 +60,13 @@ export function PeopleHeader({
         <button
           onClick={onExport}
           disabled={exporting}
-          className="inline-flex h-10 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:opacity-50"
+          className="inline-flex h-10 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
           {exporting ? "Exporting..." : "Export Data"}
         </button>
         <Link
           href="/people/new"
-          className="inline-flex h-10 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700"
+          className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
           Add Person
         </Link>
@@ -95,8 +95,8 @@ export function PeopleFilters({
   function statusBtnClass(key: string) {
     return `rounded-full px-3 py-1 text-sm font-medium transition ${
       statusFilter === key
-        ? "bg-zinc-900 text-white"
-        : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+        ? "bg-primary text-primary-foreground"
+        : "bg-muted text-muted-foreground hover:bg-muted/80"
     }`;
   }
 
@@ -111,7 +111,7 @@ export function PeopleFilters({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Search name, company, role, email, notes, or tags..."
-          className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
@@ -148,10 +148,10 @@ export function PeopleFilters({
           <select
             value={tagFilter}
             onChange={(event) => onTagFilterChange(event.target.value)}
-            className={`cursor-pointer rounded-full py-1 pl-3 pr-7 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-zinc-400 ${
+            className={`cursor-pointer rounded-full py-1 pl-3 pr-7 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-primary ${
               tagFilter
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
             <option value="">All Tags</option>
@@ -175,11 +175,11 @@ export function PeopleEmptyState({
   onClearFilters: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
-      <h2 className="text-lg font-semibold text-zinc-900">
+    <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+      <h2 className="text-lg font-semibold text-foreground">
         {noFiltersActive ? "No people yet." : "No people match your filters."}
       </h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
+      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         {noFiltersActive
           ? "Add someone you want to keep in touch with, then log your first interaction."
           : "Try a broader search or clear the active filters."}
@@ -187,7 +187,7 @@ export function PeopleEmptyState({
       {noFiltersActive ? (
         <Link
           href="/people/new"
-          className="mt-4 inline-flex h-9 items-center rounded-md bg-zinc-900 px-4 text-sm font-medium text-white"
+          className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
         >
           Add your first person
         </Link>
@@ -195,7 +195,7 @@ export function PeopleEmptyState({
         <button
           type="button"
           onClick={onClearFilters}
-          className="mt-4 inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700"
+          className="mt-4 inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground"
         >
           Clear filters
         </button>
@@ -224,7 +224,7 @@ export function PeopleGrid({
         return (
           <div
             key={person.id}
-            className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+            className="rounded-lg border border-border bg-card p-5 shadow-sm transition hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -234,7 +234,7 @@ export function PeopleGrid({
                 >
                   {person.name}
                 </Link>
-                <p className="mt-1 text-sm text-zinc-600">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {[person.role, person.company].filter(Boolean).join(" at ") ||
                     "No role or company yet"}
                 </p>
@@ -248,7 +248,7 @@ export function PeopleGrid({
 
             <div className="mt-4 flex flex-wrap gap-2">
               {person.relationship_strength && (
-                <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600">
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                   {person.relationship_strength}
                 </span>
               )}
@@ -264,20 +264,20 @@ export function PeopleGrid({
               )}
             </div>
 
-            <p className="mt-4 text-sm text-zinc-600">
+            <p className="mt-4 text-sm text-muted-foreground">
               Last contacted: {formatDate(person.last_contacted_at)}
             </p>
 
             <div className="mt-4 flex gap-2">
               <Link
                 href={`/people/${person.id}`}
-                className="inline-flex h-9 items-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700"
+                className="inline-flex h-9 items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground"
               >
                 Details
               </Link>
               <Link
                 href={`/people/${person.id}/interactions/new`}
-                className="inline-flex h-9 items-center rounded-md bg-zinc-900 px-3 text-sm font-medium text-white"
+                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
               >
                 Quick Log
               </Link>

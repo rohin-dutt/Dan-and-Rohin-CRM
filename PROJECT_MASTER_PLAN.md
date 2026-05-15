@@ -447,6 +447,15 @@ Acceptance criteria:
 - Every new feature has a user flow, data impact, test plan, and rollback note.
 - New feature work does not bypass the verification rules.
 
+## Phase 8 - Roots UX & Rebrand
+
+In progress. The app is being renamed Roots and rebuilt toward a
+production-quality user experience. This phase covers the full design
+system, landing page, auth polish, dashboard redesign, people tab
+improvements, add person flow, person profile, sidebar updates, and
+settings overhaul. See the Roots UX Build Plan v3 for the full
+sequenced phase breakdown and rules.
+
 ## Team Workflow
 
 Use two work lanes:

@@ -29,19 +29,19 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-card p-8 shadow-sm">
         <Link
           href="/auth/login"
-          className="mb-6 inline-flex items-center text-sm text-zinc-500 hover:text-zinc-700"
+          className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           ← Back to sign in
         </Link>
 
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
           Reset your password
         </h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           Enter your email and we&apos;ll send you a reset link.
         </p>
 
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-1 block text-sm font-medium text-zinc-700"
+                  className="mb-1 block text-sm font-medium text-foreground"
                 >
                   Email
                 </label>
@@ -71,14 +71,14 @@ export default function ForgotPasswordPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
               >
                 {loading ? 'Sending…' : 'Send reset link'}
               </button>

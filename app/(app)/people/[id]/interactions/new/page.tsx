@@ -138,7 +138,7 @@ export default function NewInteractionPage() {
       <div className="mb-8">
         <Link
           href={`/people/${params.id}`}
-          className="text-sm font-medium text-zinc-600"
+          className="text-sm font-medium text-muted-foreground"
         >
           Back to {person?.name ?? "person"}
         </Link>
@@ -158,9 +158,9 @@ export default function NewInteractionPage() {
           </div>
         )}
 
-        <div className="space-y-5 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+        <div className="space-y-5 rounded-lg border border-border bg-card p-6 shadow-sm">
           <div>
-            <label htmlFor="type" className="mb-1 block text-sm font-medium text-zinc-700">
+            <label htmlFor="type" className="mb-1 block text-sm font-medium text-foreground">
               Type <span className="text-red-500">*</span>
             </label>
             <select
@@ -168,7 +168,7 @@ export default function NewInteractionPage() {
               name="type"
               required
               defaultValue=""
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="" disabled>
                 Select type...
@@ -182,7 +182,7 @@ export default function NewInteractionPage() {
           </div>
 
           <div>
-            <label htmlFor="date" className="mb-1 block text-sm font-medium text-zinc-700">
+            <label htmlFor="date" className="mb-1 block text-sm font-medium text-foreground">
               Date <span className="text-red-500">*</span>
             </label>
             <input
@@ -191,12 +191,12 @@ export default function NewInteractionPage() {
               type="date"
               required
               defaultValue={todayInputValue()}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           <div>
-            <label htmlFor="notes" className="mb-1 block text-sm font-medium text-zinc-700">
+            <label htmlFor="notes" className="mb-1 block text-sm font-medium text-foreground">
               Notes
             </label>
             <textarea
@@ -204,7 +204,7 @@ export default function NewInteractionPage() {
               name="notes"
               rows={4}
               placeholder="What did you talk about?"
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -218,23 +218,23 @@ export default function NewInteractionPage() {
                 setFollowUpNeeded(event.target.checked);
                 setDirty(true);
               }}
-              className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
-            <label htmlFor="follow_up_needed" className="text-sm font-medium text-zinc-700">
+            <label htmlFor="follow_up_needed" className="text-sm font-medium text-foreground">
               Follow-up needed
             </label>
           </div>
 
           {followUpNeeded && (
             <div>
-              <label htmlFor="follow_up_date" className="mb-1 block text-sm font-medium text-zinc-700">
+              <label htmlFor="follow_up_date" className="mb-1 block text-sm font-medium text-foreground">
                 Follow-up date
               </label>
               <input
                 id="follow_up_date"
                 name="follow_up_date"
                 type="date"
-                className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           )}
@@ -244,13 +244,13 @@ export default function NewInteractionPage() {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex h-10 items-center rounded-md bg-zinc-900 px-5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-700 disabled:opacity-50"
+            className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Log Interaction"}
           </button>
           <Link
             href={`/people/${params.id}`}
-            className="inline-flex h-10 items-center rounded-md border border-zinc-300 bg-white px-5 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50"
+            className="inline-flex h-10 items-center rounded-md border border-border bg-card px-5 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
             Cancel
           </Link>
