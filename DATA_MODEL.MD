@@ -67,7 +67,63 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 | user_id | uuid | yes, unique FK to `auth.users(id)` with `on delete cascade` |
 | reminder_frequency_days | integer | yes, default `7` |
 | email_reminders_enabled | boolean | yes, default `false`; retained for compatibility but not surfaced as a promise of delivery |
+| push_followups_enabled | boolean | yes, default `true` |
+| push_birthdays_enabled | boolean | yes, default `true` |
+| notification_timezone | text | no |
+| quiet_hours_enabled | boolean | yes, default `false` |
+| quiet_hours_start | time | no |
+| quiet_hours_end | time | no |
 | created_at | timestamptz | yes, default `now()` |
+
+## push_tokens
+
+| Column | Type | Required |
+|--------|------|----------|
+| id | uuid | yes, primary key, default `gen_random_uuid()` |
+| user_id | uuid | yes, FK to `auth.users(id)` with `on delete cascade` |
+| token | text | yes |
+| provider | text | yes, default `expo`; one of `expo`, `apns` |
+| platform | text | yes, default `ios`; one of `ios`, `android` |
+| app_install_id | text | no |
+| device_name | text | no |
+| app_version | text | no |
+| build_number | text | no |
+| environment | text | yes |
+| status | text | yes, default `active`; one of `active`, `revoked`, `invalid` |
+| last_seen_at | timestamptz | yes, default `now()` |
+| revoked_at | timestamptz | no |
+| created_at | timestamptz | yes, default `now()` |
+| updated_at | timestamptz | yes, default `now()` |
+
+`push_tokens_token_key` prevents duplicate push tokens. Push token rows are
+owned by `user_id` and should not contain private relationship notes or contact
+payloads.
+
+## notification_deliveries
+
+| Column | Type | Required |
+|--------|------|----------|
+| id | uuid | yes, primary key, default `gen_random_uuid()` |
+| user_id | uuid | yes, FK to `auth.users(id)` with `on delete cascade` |
+| push_token_id | uuid | no, FK to `push_tokens(id)` with `on delete set null` |
+| kind | text | yes; one of `follow_up_due`, `follow_up_overdue`, `birthday` |
+| subject_type | text | yes; one of `person`, `interaction` |
+| subject_id | uuid | no |
+| scheduled_for | date | yes |
+| send_after | timestamptz | no |
+| idempotency_key | text | yes |
+| status | text | yes, default `pending`; one of `pending`, `sent`, `failed`, `skipped`, `invalid_token` |
+| attempt_count | integer | yes, default `0` |
+| provider_message_id | text | no |
+| error_code | text | no |
+| last_attempt_at | timestamptz | no |
+| created_at | timestamptz | yes, default `now()` |
+| updated_at | timestamptz | yes, default `now()` |
+
+`notification_deliveries_idempotency_key_key` prevents duplicate delivery
+records for the same scheduled notification. Delivery rows are server-written
+audit/idempotency records and must not store private notes, notification message
+bodies, or raw contact payloads.
 
 ## RPC Helpers
 
@@ -79,12 +135,14 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 
 ## RLS Ownership
 
-- `people`, `tags`, and `settings` use direct `user_id = auth.uid()` policies.
+- `people`, `tags`, `settings`, and `push_tokens` use direct `user_id = auth.uid()` policies.
 - `interactions` are protected through the related `people.user_id`.
 - `person_tags` are protected through both the related `people.user_id` and `tags.user_id`; the replacement RPC repeats the same ownership check before writing associations.
+- `notification_deliveries` allows authenticated users to read only their own rows. Client insert, update, and delete are intentionally not allowed; trusted server code should write delivery records.
 
 ## Migration Notes
 
-- Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, and settings.
+- Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, settings, push tokens, and notification deliveries.
 - The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration, person-tag ownership hardening migration, and restored user-owned cascade constraints applied.
 - The local migration `20260514171147_reconcile_target_schema_drift.sql` reconciles older target-project drift in nullability, defaults, `people.last_contacted_at`, check constraints, and tag-name uniqueness. Apply it to the linked project only as an intentional database release step after reviewing existing data.
+- The local migration `20260516170000_mobile_notification_readiness.sql` adds mobile push token storage, push notification settings fields, and privacy-safe notification delivery logging/idempotency records for the Roots iOS app.

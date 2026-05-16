@@ -402,7 +402,9 @@ Do not start until stabilization milestones are complete.
     action, and privacy opt-out.
   - Rollback note: hide summary UI and stop generation while preserving raw
     interactions.
-- [ ] Feature: PWA and offline read polish.
+- [ ] Feature: Web PWA polish if the desktop/admin fallback needs offline read.
+  - Status: superseded for primary daily use by the native iOS mobile plan in
+    `docs/`; keep this only as a future web-fallback/admin-surface option.
   - Problem it solves: users may want reliable access to relationship context
     while traveling or away from stable connectivity.
   - User flow: user installs the app, opens cached people/detail data offline,
