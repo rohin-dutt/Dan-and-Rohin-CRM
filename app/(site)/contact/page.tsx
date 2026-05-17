@@ -15,10 +15,10 @@ export default function ContactPage() {
           Have a question, found a bug, or just want to say hello? Send us an
           email at{" "}
           <a
-            href="mailto:hello@roots.app"
+            href="mailto:dan.rohin.crm@gmail.com"
             className="text-primary underline underline-offset-2"
           >
-            hello@roots.app
+            dan.rohin.crm@gmail.com
           </a>
           . We read every message and typically reply within a day or two.
         </p>

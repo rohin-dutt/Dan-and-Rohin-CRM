@@ -3,7 +3,11 @@ import { expect, test } from "@playwright/test";
 test.describe("unauthenticated smoke coverage", () => {
   test("public and auth pages render", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Personal CRM" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: /Stay close to the people who matter most\./,
+      })
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign up" }).first()).toBeVisible();
 
@@ -16,6 +20,22 @@ test.describe("unauthenticated smoke coverage", () => {
     await expect(page.getByRole("heading", { name: "Create an account" })).toBeVisible();
     await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Confirm email")).toBeVisible();
+  });
+
+  test("policy and legal pages are public", async ({ page }) => {
+    await page.goto("/privacy");
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(
+      page.getByRole("heading", { name: "Privacy policy" })
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+
+    await page.goto("/terms");
+    await expect(page).toHaveURL(/\/terms$/);
+    await expect(
+      page.getByRole("heading", { name: "Terms of service" })
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
   });
 
   for (const path of ["/dashboard", "/onboarding", "/people", "/settings"]) {

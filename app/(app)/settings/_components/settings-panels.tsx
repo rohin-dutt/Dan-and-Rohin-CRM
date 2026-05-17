@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -437,6 +438,30 @@ export function AccountTab({ onLogout }: { onLogout: () => void }) {
               {passwordStatus.msg}
             </p>
           )}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-2 text-base font-semibold text-foreground">
+          Legal
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Review the policies that explain how Roots handles your account and
+          data.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/privacy"
+            className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            Privacy policy
+          </Link>
+          <Link
+            href="/terms"
+            className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+          >
+            Terms of service
+          </Link>
         </div>
       </section>
 
