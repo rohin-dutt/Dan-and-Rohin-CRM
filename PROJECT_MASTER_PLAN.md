@@ -23,8 +23,11 @@ make future changes smaller, safer, and easier for two teammates to coordinate.
 
 1. Keep this as one Next.js project for now.
 2. Separate the public website and authenticated CRM app with route groups.
-3. Do not start a separate native/mobile app yet.
-4. Treat the current installable/responsive web app as the first app surface.
+3. Start the native iOS app as the next product surface because mobile-native
+   requirements are now real: Contacts import, push notifications, offline
+   read access, and App Store distribution.
+4. Keep the current responsive web app live as the desktop/admin fallback while
+   mobile becomes the primary daily-use app.
 5. Refactor only where it directly reduces regression risk or unlocks cleaner
    feature work.
 6. Keep Supabase Row-Level Security as the database safety layer, but keep auth
@@ -151,16 +154,22 @@ Current app surfaces:
 
 ### Native App
 
-Do not build a separate native app yet. First make the web app responsive,
-installable, and reliable.
+The project is now moving forward with a native iOS app for Roots. The mobile
+plan lives in `docs/`:
 
-Revisit native app only if one of these becomes a real requirement:
+- `docs/MOBILE_MASTER_PLAN.md` controls mobile product strategy.
+- `docs/MOBILE_TODO.md` controls mobile execution.
+- `docs/MOBILE_TECHNICAL_SPEC.md` records mobile engineering decisions.
+- `docs/MOBILE_SCREEN_MAP.md` records mobile screens and QA surfaces.
+- `docs/APP_STORE_READINESS.md` tracks App Store submission requirements.
 
-- Native contacts integration
-- Push notifications
-- Offline-first sync
-- App Store or Play Store distribution
-- Device-specific capabilities that the PWA cannot provide well
+Keep the existing web app operational during mobile development. Do not move
+the web app into `apps/web` or perform a broad repo restructuring until the
+mobile foundation is stable and the move has a clear review/verification plan.
+
+The native app should reuse the existing Supabase backend, RLS policies,
+migrations, and portable CRM business rules. It should not reuse web UI
+components directly.
 
 ## Refactor Strategy
 
@@ -440,7 +449,9 @@ Possible next features after stabilization:
 - More robust contact import formats.
 - Person summaries or suggested next action, only after privacy rules are
   written.
-- PWA polish and offline-read behavior if users need it.
+- Native mobile offline-read behavior is now tracked in `docs/`; web PWA
+  polish should be treated as a separate fallback/admin-surface need only if
+  users ask for it.
 
 Acceptance criteria:
 

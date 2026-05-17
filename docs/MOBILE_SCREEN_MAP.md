@@ -3,6 +3,19 @@
 This document maps the intended iOS app screens, their data needs, and primary
 actions. It should guide implementation and QA.
 
+## Global Screen Requirements
+
+Every screen should account for:
+
+- loading, empty, error, and offline states where relevant
+- safe-area layout on small and large iPhones
+- keyboard avoidance for forms and search inputs
+- Dynamic Type without clipped labels or unusable controls
+- VoiceOver labels for icon-only controls, destructive actions, and form fields
+- clear disabled states for offline-unavailable writes
+- unsaved-change confirmation on create/edit forms where data loss is likely
+- privacy-safe display in notifications, screenshots, and review/demo data
+
 ## Root App States
 
 ### Launch

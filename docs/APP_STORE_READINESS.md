@@ -7,8 +7,13 @@ This checklist tracks what Roots needs before App Store submission.
 - [ ] Apple Developer Program enrollment confirmed.
 - [ ] App Store Connect access confirmed.
 - [ ] Team owner identified.
+- [ ] One Apple Developer account owner is assigned before Phase 4/TestFlight
+      work begins.
 - [ ] Bundle ID created.
 - [ ] App record created in App Store Connect.
+
+Decision: create an Apple Developer account for Roots. The specific owner is
+pending until the account exists.
 
 Proposed bundle ID:
 
@@ -16,9 +21,12 @@ Proposed bundle ID:
 com.roots.crm
 ```
 
+Decision: use `com.roots.crm` for now, but allow one final revisit before Apple
+provisioning if a stronger brand or company identifier is chosen.
+
 ## App Identity
 
-- [ ] App name confirmed: Roots.
+- [x] App name confirmed: Roots.
 - [ ] Subtitle drafted.
 - [ ] App description drafted.
 - [ ] Keywords drafted.
@@ -30,18 +38,23 @@ com.roots.crm
 
 - [ ] Expo app config created.
 - [ ] EAS project configured.
+- [ ] EAS development, preview/TestFlight, and production profiles defined.
 - [ ] iOS bundle identifier set.
 - [ ] App icon complete.
 - [ ] Splash screen complete.
-- [ ] Version and build number process defined.
+- [x] Version and build number process defined.
+  - Decision: use date-based build numbers, such as `2026051601`.
+- [ ] Release channel/update policy defined.
+- [ ] Rollback approach defined for bad builds or OTA updates.
 - [ ] TestFlight build uploaded.
 - [ ] TestFlight install verified on real iPhone.
 
 ## URLs
 
-- [ ] Privacy policy URL.
-- [ ] Support URL.
+- [x] Privacy policy URL.
+- [x] Support URL.
 - [ ] Marketing URL, if used.
+- [ ] User privacy choices or account deletion URL, if used.
 - [ ] Supabase auth redirect URLs configured.
 - [ ] Deep link scheme configured.
 
@@ -50,6 +63,9 @@ Proposed deep link scheme:
 ```text
 roots://
 ```
+
+Decision: use the existing website privacy page and contact page for mobile v1
+legal/support links. Use `roots://` as the app deep link scheme.
 
 ## App Privacy
 
@@ -70,9 +86,31 @@ Required decisions:
 
 - [ ] Confirm data linked to user.
 - [ ] Confirm data not sold.
-- [ ] Confirm whether diagnostics are collected.
-- [ ] Confirm retention policy for deleted accounts.
-- [ ] Confirm cached private data clearing on logout/account deletion.
+- [x] Confirm whether diagnostics are collected.
+  - Decision: no analytics or crash reporting SDK in mobile v1.
+- [x] Confirm whether crash reporting, analytics, or logging SDKs are used.
+  - Decision: no analytics or crash reporting SDK in mobile v1.
+- [x] Confirm retention policy for deleted accounts.
+  - Decision: account deletion deletes private CRM data immediately.
+- [x] Confirm cached private data clearing on logout/account deletion.
+  - Decision: private offline cache must be encrypted for v1 and cleared on
+    logout/account deletion; delay offline cache if encrypted storage is not
+    practical.
+- [x] Confirm contacts are imported only after user selection and review.
+  - Decision: users can select contacts or choose import all, but both paths
+    require review before save.
+- [x] Confirm unselected Contacts data is not uploaded or persisted.
+
+## Privacy Manifest And SDK Review
+
+- [ ] `PrivacyInfo.xcprivacy` exists if required by app behavior or selected
+      native dependencies.
+- [ ] Collected data declarations match App Store privacy answers.
+- [ ] Required-reason API usage is declared where applicable.
+- [ ] Third-party SDK privacy manifests are present where required.
+- [ ] SDK list reviewed for tracking domains, analytics, ads, and diagnostics.
+- [ ] No tracking use is present unless explicitly approved, disclosed, and
+      reflected in privacy answers.
 
 ## Permissions
 
@@ -81,7 +119,12 @@ Contacts:
 - [ ] Purpose string written.
 - [ ] Permission pre-prompt screen implemented.
 - [ ] Denied-permission fallback implemented.
+- [ ] Limited/partial access behavior implemented if applicable.
 - [ ] Import review-before-save implemented.
+- [ ] Unselected contacts are not uploaded or persisted.
+
+Decision: support selected-contact import and an import-all option. Import all
+must still pass through review before save.
 
 Push Notifications:
 
@@ -89,6 +132,18 @@ Push Notifications:
 - [ ] Permission request implemented.
 - [ ] User can disable reminder notifications.
 - [ ] Notification payloads avoid private notes/details.
+- [ ] Notification preferences, token cleanup, and delivery logging match the
+      privacy policy.
+
+## Accessibility And Device QA
+
+- [ ] Dynamic Type checked on key screens.
+- [ ] VoiceOver basics checked for navigation, forms, and destructive actions.
+- [ ] Color contrast checked for text, controls, tags, and status indicators.
+- [ ] Reduced Motion behavior checked if animations are used.
+- [ ] Keyboard avoidance checked for auth, person forms, and interaction forms.
+- [ ] Safe areas checked on small and large iPhone sizes.
+- [ ] Empty, loading, error, and offline states checked on device.
 
 ## Review Notes
 
@@ -98,6 +153,7 @@ Push Notifications:
 - [ ] Review notes explain Notifications permission.
 - [ ] Review notes explain account deletion path.
 - [ ] Review notes mention no payment/subscription in mobile v1.
+- [ ] Review notes mention offline cache behavior if relevant to testing.
 
 ## Screenshots And Media
 
@@ -140,6 +196,11 @@ Screenshot rules:
 - [ ] Import/update.
 - [ ] Restore/replace.
 - [ ] Account deletion.
+- [ ] Local cache clearing after logout.
+- [ ] Local cache clearing after account deletion.
+- [ ] Push token cleanup after logout/account deletion where practical.
+- [ ] Restore/replace atomicity verified.
+- [ ] Mobile trusted API auth rejects missing/invalid bearer tokens.
 
 ## Submission Gate
 
@@ -151,3 +212,6 @@ Do not submit until:
 - [ ] No known auth, data ownership, or account deletion blocker remains.
 - [ ] Contacts and notification permissions match review notes.
 - [ ] Support and privacy URLs are live.
+- [ ] Privacy manifest and SDK privacy review are complete.
+- [ ] Accessibility/device QA has no known release blocker.
+- [ ] Version/build-number and rollback process are documented.

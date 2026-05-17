@@ -25,6 +25,35 @@ portable CRM business rules. Do not reuse web UI components directly.
 - Email reminders: intentionally out of scope for this mobile build plan.
 - Web app: remains live as a desktop/admin fallback while mobile becomes the
   primary daily-use app.
+- Top-level project direction: `PROJECT_MASTER_PLAN.md` now recognizes the
+  native iOS app as approved product work. This file owns the detailed mobile
+  strategy.
+
+## Web And Mobile Transition
+
+The web app remains live during and after the mobile launch. Do not deprecate
+the web app as part of mobile v1.
+
+Web responsibilities:
+
+- public acquisition surface for users who find Roots through search, social,
+  direct links, or referrals
+- desktop/admin fallback for settings, import/export/restore, account
+  management, and support flows
+- continued support for existing CRM workflows while mobile reaches parity
+- future email reminder or weekly digest delivery if that feature is built;
+  email delivery is server/web-owned unless a later mobile plan explicitly
+  changes that
+
+Mobile responsibilities:
+
+- primary daily-use surface for relationship review, follow-ups, Contacts
+  import, push reminders, and offline read access
+- native iOS experience through TestFlight and App Store distribution
+
+After the iOS app is available, add a restrained website banner or callout that
+points users to the App Store listing. Keep signup/login and web CRM access
+available.
 
 ## Target Repository Shape
 
@@ -103,17 +132,40 @@ Secondary screens should be stack-based:
 ## Build Phases
 
 1. Product and launch readiness.
-2. Shared core extraction.
-3. Expo foundation and native design system.
-4. Auth, session persistence, and early TestFlight.
-5. Onboarding.
-6. Core CRM vertical slice.
-7. Full CRM parity.
-8. Native Contacts import.
-9. Push notifications.
-10. Offline read cache.
-11. Data management and account deletion.
-12. App Store release.
+2. Backend, API, and schema readiness.
+3. Shared core extraction.
+4. Expo foundation and native design system.
+5. Auth, session persistence, and early TestFlight.
+6. Onboarding.
+7. Core CRM vertical slice.
+8. Full CRM parity.
+9. Native Contacts import.
+10. Push notifications.
+11. Offline read cache.
+12. Data management and account deletion.
+13. App Store release.
+
+Backend readiness comes before deep feature work because push notifications,
+offline cache clearing, account deletion, mobile API authentication, and
+atomic restore/replace all affect schema, server boundaries, privacy answers,
+and QA.
+
+## Launch Blockers
+
+Mobile v1 must not ship until:
+
+- Restore/replace runs atomically through an RPC or trusted server route.
+- Account deletion works from the app and deletes or expires all private app
+  data, cached data, and push tokens.
+- Push notification storage, delivery, preferences, and logging are defined.
+- Mobile privileged operations use a documented API authentication contract;
+  service-role keys never ship in the app.
+- Offline private data has a documented storage layer, retention policy,
+  stale-data UI, and logout/account-deletion clearing behavior.
+- App Store privacy labels, privacy manifest, permission strings, support URL,
+  privacy URL, and review notes match the app's real behavior.
+- TestFlight has been used on at least one real iPhone for auth, push,
+  contacts, offline launch, import/restore, and account deletion.
 
 ## Success Criteria
 
@@ -127,6 +179,12 @@ The plan is working if:
 - Private cached data is cleared on logout and account deletion.
 - Push notification payloads do not leak sensitive relationship details.
 - App Store metadata and privacy answers match the app's actual behavior.
+- Mobile release operations are repeatable: EAS profiles, build numbers,
+  environment selection, crash/logging decisions, and rollback approach are
+  documented before submission.
+- Accessibility and device QA cover Dynamic Type, VoiceOver basics, contrast,
+  reduced motion, keyboard behavior, safe areas, and small/large iPhone
+  layouts.
 
 ## Coordination Rules
 
