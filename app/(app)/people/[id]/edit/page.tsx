@@ -189,10 +189,12 @@ export default function EditPersonPage() {
     const formData = new FormData(e.currentTarget);
     const contactFrequency =
       Number(formData.get("contact_frequency_days")) || 30;
-    const name = getTrimmedFormValue(formData, "name");
+    const firstName = getTrimmedFormValue(formData, "first_name");
+    const lastName = getTrimmedFormValue(formData, "last_name");
+    const name = [firstName, lastName].filter(Boolean).join(" ");
 
-    if (!name) {
-      setError("Name is required.");
+    if (!firstName) {
+      setError("First name is required.");
       setSaving(false);
       return;
     }

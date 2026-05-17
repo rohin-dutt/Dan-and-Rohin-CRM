@@ -42,6 +42,44 @@ export default function PrivacyPage() {
             </p>
           </section>
           <section>
+            <h2 className="font-medium text-foreground">Cookies</h2>
+            <p className="mt-2">
+              We use cookies solely for authentication and session management. We
+              do not use tracking or advertising cookies.
+            </p>
+          </section>
+          <section>
+            <h2 className="font-medium text-foreground">Data retention</h2>
+            <p className="mt-2">
+              When you delete your account, all associated data including
+              contacts, interactions, tags, and settings is permanently and
+              immediately deleted from our systems.
+            </p>
+          </section>
+          <section>
+            <h2 className="font-medium text-foreground">Children</h2>
+            <p className="mt-2">
+              Roots is not intended for users under 13 years of age. We do not
+              knowingly collect personal data from children under 13.
+            </p>
+          </section>
+          <section>
+            <h2 className="font-medium text-foreground">Changes to this policy</h2>
+            <p className="mt-2">
+              We may update this policy from time to time. We will notify users
+              of significant changes via email. Continued use of Roots after
+              changes constitutes acceptance of the updated policy.
+            </p>
+          </section>
+          <section>
+            <h2 className="font-medium text-foreground">Jurisdiction</h2>
+            <p className="mt-2">
+              Roots is operated from the United States. By using the service you
+              agree that your data is processed in the United States in
+              accordance with this policy.
+            </p>
+          </section>
+          <section>
             <h2 className="font-medium text-foreground">Contact</h2>
             <p className="mt-2">
               Questions about this policy? Reach out via the{" "}

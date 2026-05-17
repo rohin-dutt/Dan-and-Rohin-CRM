@@ -15,10 +15,17 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
 
     if (email !== confirmEmail) {
       setError('Email addresses do not match.')
@@ -27,6 +34,11 @@ export default function SignupPage() {
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
+      return
+    }
+
+    if (!agreed) {
+      setError('Please agree to the Terms of Service and Privacy Policy.')
       return
     }
 
@@ -164,6 +176,25 @@ export default function SignupPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+          </div>
+
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <label>
+              I agree to the{' '}
+              <Link href="/terms" className="text-primary underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-primary underline">
+                Privacy Policy
+              </Link>
+            </label>
           </div>
 
           <button

@@ -12,6 +12,9 @@ export function SiteFooter() {
           <Link href="/faq" className="transition hover:text-foreground">
             FAQ
           </Link>
+          <Link href="/terms" className="transition hover:text-foreground">
+            Terms
+          </Link>
           <Link href="/privacy" className="transition hover:text-foreground">
             Privacy
           </Link>
