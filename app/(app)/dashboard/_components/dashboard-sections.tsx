@@ -249,7 +249,7 @@ export function DashboardSections({
   people: Person[];
   followUps: FollowUpInteraction[];
 }) {
-  const { overdue, dueThisWeek, comingUp } = categorizePeople(people);
+  const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), followUps);
   const birthdays = getBirthdayReminders(people);
 
   return (

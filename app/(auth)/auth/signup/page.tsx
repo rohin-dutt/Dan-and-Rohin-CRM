@@ -20,6 +20,12 @@ export default function SignupPage() {
     e.preventDefault()
     setError('')
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
+
     if (email !== confirmEmail) {
       setError('Email addresses do not match.')
       return

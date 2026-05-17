@@ -32,6 +32,7 @@ const FREQ_OPTIONS = [
   { label: "Every month", value: 30 },
   { label: "Every 3 months", value: 90 },
   { label: "Every 6 months", value: 180 },
+  { label: "Once a year", value: 365 },
 ] as const;
 
 function getClosestFreq(days: number): number {

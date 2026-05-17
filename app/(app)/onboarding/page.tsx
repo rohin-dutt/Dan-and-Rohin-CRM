@@ -12,11 +12,31 @@ const ONBOARDING_CATEGORY_PILLS = [
   { label: 'Professional', tagName: 'Colleague', tagColor: '#D97706', selectedClass: 'bg-sky-500 text-white border-sky-500' },
 ] as const
 
+// Bug 2: Matches person-form.tsx frequency options exactly
 const ONBOARDING_FREQ_OPTIONS = [
-  { label: 'Weekly', value: 7 },
-  { label: 'Monthly', value: 30 },
-  { label: 'Quarterly', value: 90 },
+  { label: 'Every week', value: 7 },
+  { label: 'Every 2 weeks', value: 14 },
+  { label: 'Every month', value: 30 },
+  { label: 'Every 3 months', value: 90 },
+  { label: 'Every 6 months', value: 180 },
+  { label: 'Once a year', value: 365 },
 ] as const
+
+// Bug 1: Dynamic headings per person added
+const STEP_HEADINGS = [
+  {
+    heading: "Who’s someone you’ve been meaning to reach out to?",
+    subheading: "Start with someone you’ve lost touch with — a friend, colleague, or family member you mean to contact more.",
+  },
+  {
+    heading: "Great. Who’s someone else?",
+    subheading: "Think of a colleague worth keeping up with, or a friend in a different city.",
+  },
+  {
+    heading: "One more person.",
+    subheading: "Last one — someone you genuinely want to stay close to.",
+  },
+]
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -34,6 +54,11 @@ export default function OnboardingPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+  // Bug 3: Contextual field state
+  const [company, setCompany] = useState('')
+  const [role, setRole] = useState('')
+  const [birthday, setBirthday] = useState('')
+  const [relationship, setRelationship] = useState('')
   const [howMet, setHowMet] = useState('')
   const [selectedFreq, setSelectedFreq] = useState(30)
   const [saving, setSaving] = useState(false)
@@ -56,6 +81,10 @@ export default function OnboardingPage() {
     setFirstName('')
     setLastName('')
     setSelectedCategory('')
+    setCompany('')
+    setRole('')
+    setBirthday('')
+    setRelationship('')
     setHowMet('')
     setSelectedFreq(30)
     setFormError(null)
@@ -72,6 +101,11 @@ export default function OnboardingPage() {
     setSaving(true)
     setFormError(null)
 
+    // Bug 3: Derive contextual visibility from current state for insert
+    const isProfessional = selectedCategory === 'Professional'
+    const isFamily = selectedCategory === 'Family'
+    const hasBirthday = selectedCategory === 'Friend' || isFamily
+
     const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(' ')
 
     const { data, error: insertError } = await supabase
@@ -81,6 +115,11 @@ export default function OnboardingPage() {
         name,
         how_met: howMet.trim() || null,
         contact_frequency_days: selectedFreq,
+        // Bug 3: Include contextual fields
+        company: isProfessional && company.trim() ? company.trim() : null,
+        role: isProfessional && role.trim() ? role.trim() : null,
+        birthday: hasBirthday && birthday ? birthday : null,
+        relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
       })
       .select()
       .single()
@@ -123,11 +162,15 @@ export default function OnboardingPage() {
       }
     }
 
-    setSavedCount((c) => c + 1)
+    // Bug 1: Only advance to step 3 after 3rd person; stay on step 2 otherwise
+    const newCount = savedCount + 1
+    setSavedCount(newCount)
     setLastSavedFirstName(trimmedFirst)
     resetForm()
     setSaving(false)
-    setStep(3)
+    if (newCount >= 3) {
+      setStep(3)
+    }
   }
 
   if (loading) {
@@ -184,7 +227,15 @@ export default function OnboardingPage() {
     )
   }
 
-  // ── Step 2 — Add first person ─────────────────────────────────────────────
+  // ── Step 2 — Add people (mandatory 3) ────────────────────────────────────
+  // Bug 3: Contextual field visibility derived from selectedCategory
+  const showProfessionalFields = selectedCategory === 'Professional'
+  const showFamilyFields = selectedCategory === 'Family'
+  const showBirthday = selectedCategory === 'Friend' || showFamilyFields
+
+  // Bug 1: Dynamic headings based on how many people have been saved
+  const { heading, subheading } = STEP_HEADINGS[Math.min(savedCount, 2)]
+
   if (step === 2) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
@@ -199,13 +250,17 @@ export default function OnboardingPage() {
 
           <div className="space-y-1">
             <h1 className="font-heading text-2xl font-semibold text-foreground">
-              Who&apos;s someone you&apos;ve been meaning to reach out to?
+              {heading}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Start with one person — a friend you&apos;ve lost touch with, a
-              colleague worth keeping up with, or family you mean to call more.
+              {subheading}
             </p>
           </div>
+
+          {/* Bug 1: Progress indicator */}
+          <p className="text-xs text-muted-foreground">
+            Added {savedCount} of 3 people
+          </p>
 
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-5">
             {formError && (
@@ -254,9 +309,7 @@ export default function OnboardingPage() {
                     <button
                       key={label}
                       type="button"
-                      onClick={() =>
-                        setSelectedCategory(selected ? '' : label)
-                      }
+                      onClick={() => setSelectedCategory(selected ? '' : label)}
                       className={`${pillBase} ${
                         selected
                           ? selectedClass
@@ -268,6 +321,58 @@ export default function OnboardingPage() {
                   )
                 })}
               </div>
+            </div>
+
+            {/* Bug 3: Professional — Company + Role (className="hidden" when not selected) */}
+            <div className={showProfessionalFields ? 'grid grid-cols-2 gap-3' : 'hidden'}>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Company
+                </label>
+                <input
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Role
+                </label>
+                <input
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            {/* Bug 3: Friend or Family — Birthday (className="hidden" when neither selected) */}
+            <div className={showBirthday ? '' : 'hidden'}>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Birthday
+              </label>
+              <input
+                type="date"
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Bug 3: Family — Relationship label (className="hidden" when not selected) */}
+            <div className={showFamilyFields ? '' : 'hidden'}>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Relationship e.g. parent, sibling
+              </label>
+              <input
+                type="text"
+                value={relationship}
+                onChange={(e) => setRelationship(e.target.value)}
+                className={inputClass}
+              />
             </div>
 
             {/* How did you meet? */}
@@ -284,7 +389,7 @@ export default function OnboardingPage() {
               />
             </div>
 
-            {/* Stay in touch */}
+            {/* Stay in touch — Bug 2: Full frequency list */}
             <div>
               <p className="mb-2 text-sm font-medium text-foreground">
                 Stay in touch
@@ -316,22 +421,14 @@ export default function OnboardingPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <button
-              onClick={() => setStep(3)}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Skip for now →
-            </button>
-          </div>
+          {/* Bug 1: "Skip for now" link removed */}
         </div>
       </div>
     )
   }
 
-  // ── Step 3 — Add more or continue ─────────────────────────────────────────
-  const saved = savedCount > 0
-
+  // ── Step 3 — Done ─────────────────────────────────────────────────────────
+  // Bug 1: Simplified — always reached after 3 people, single CTA
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <p className="mb-8 text-xs text-muted-foreground tracking-wide">
@@ -343,58 +440,26 @@ export default function OnboardingPage() {
           <img src="/logo.svg" alt="Roots" width={28} height={28} />
         </div>
 
-        {saved ? (
-          <>
-            <div className="space-y-2">
-              <h1 className="font-heading text-2xl font-semibold text-foreground">
-                Great start.
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Your dashboard will show{' '}
-                <span className="font-medium text-foreground">
-                  {lastSavedFirstName}
-                </span>{' '}
-                and remind you when it&apos;s time to reach out.
-              </p>
-            </div>
+        <div className="space-y-2">
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            You&apos;re all set.
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Your dashboard is ready. Roots will remind you when it&apos;s time
+            to reach out to{' '}
+            <span className="font-medium text-foreground">
+              {lastSavedFirstName}
+            </span>{' '}
+            and the others.
+          </p>
+        </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  resetForm()
-                  setStep(2)
-                }}
-                className="w-full rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
-              >
-                Add another person →
-              </button>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-full text-sm text-muted-foreground hover:text-foreground"
-              >
-                Go to my dashboard →
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <h1 className="font-heading text-2xl font-semibold text-foreground">
-                No problem.
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                You can add people anytime from your dashboard.
-              </p>
-            </div>
-
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="w-full rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
-            >
-              Go to my dashboard →
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="w-full rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
+        >
+          Go to my dashboard →
+        </button>
       </div>
     </div>
   )
