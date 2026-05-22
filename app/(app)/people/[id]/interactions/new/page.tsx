@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import AppLayout from "@/components/AppLayout";
 import { todayInputValue } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
+import { updateStreakAfterAction } from "@/lib/crm-rules";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import type { Person } from "@/types/index";
@@ -120,6 +121,7 @@ export default function NewInteractionPage() {
       return;
     }
 
+    await updateStreakAfterAction(supabase);
     setDirty(false);
     router.push(`/people/${params.id}`);
   }

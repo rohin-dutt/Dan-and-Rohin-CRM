@@ -109,6 +109,46 @@ function StatCard({
   return inner;
 }
 
+function StreakBadge({ streak }: { streak: number }) {
+  if (streak === 0) return null
+
+  const emoji = streak >= 100 ? "🏆"
+    : streak >= 30 ? "⭐"
+    : "🔥"
+
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1">
+      <span className="text-sm">{emoji}</span>
+      <span className="text-sm font-semibold text-orange-700">
+        {streak} day{streak === 1 ? "" : "s"} streak
+      </span>
+    </div>
+  )
+}
+
+function MilestoneCelebration({ streak }: { streak: number }) {
+  const milestones = [7, 30, 100]
+  if (!milestones.includes(streak)) return null
+
+  const key = `roots-milestone-shown-${streak}`
+  if (typeof window !== "undefined" && sessionStorage.getItem(key)) return null
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(key, "true")
+  }
+
+  const messages: Record<number, string> = {
+    7: "7 day streak! You're building a habit. 🔥",
+    30: "30 days! Roots is working. ⭐",
+    100: "100 days! You're remarkable. 🏆"
+  }
+
+  return (
+    <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800 mb-4">
+      {messages[streak]}
+    </div>
+  )
+}
+
 export function FirstRunEmptyState() {
   return (
     <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
@@ -258,15 +298,25 @@ function MilestonesSection({
 export function DashboardSections({
   people,
   followUps,
+  streak,
+  onStreakUpdate,
 }: {
   people: Person[];
   followUps: FollowUpInteraction[];
+  streak: number;
+  onStreakUpdate: () => void;
 }) {
   const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), followUps);
   const birthdays = getBirthdayReminders(people);
 
   return (
     <>
+      <MilestoneCelebration streak={streak} />
+      {streak > 0 && (
+        <div className="mb-4">
+          <StreakBadge streak={streak} />
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <StatCard
           label="Overdue"

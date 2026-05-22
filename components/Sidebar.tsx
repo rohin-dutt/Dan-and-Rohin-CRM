@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { updateStreakAfterAction } from "@/lib/crm-rules";
 import { todayInputValue } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 
@@ -147,6 +148,7 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
     }
 
     setSaveResult("success");
+    await updateStreakAfterAction(supabase);
     setTimeout(() => onClose(), 1500);
   }
 
@@ -383,6 +385,25 @@ export default function Sidebar() {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    async function fetchStreak() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data } = await supabase
+          .from("settings")
+          .select("current_streak")
+          .eq("user_id", user.id)
+          .maybeSingle()
+        setStreak(data?.current_streak ?? 0)
+      } catch {
+        // silent fail
+      }
+    }
+    fetchStreak()
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -433,6 +454,14 @@ export default function Sidebar() {
         <NavLinks onInviteClick={() => setInviteOpen(true)} />
 
         <div className="mt-auto flex flex-col gap-1">
+          {streak > 0 && (
+            <div className="mb-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground">
+              <span>🔥</span>
+              <span className="font-medium">
+                {streak} day{streak === 1 ? "" : "s"} streak
+              </span>
+            </div>
+          )}
           <button
             onClick={() => setInviteOpen(true)}
             className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-left"

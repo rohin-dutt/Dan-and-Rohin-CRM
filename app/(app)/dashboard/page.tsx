@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [followUps, setFollowUps] = useState<FollowUpInteraction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -51,6 +52,14 @@ export default function DashboardPage() {
 
       const fetchedPeople = peopleData ?? [];
       setPeople(fetchedPeople);
+
+      const { data: settingsData } = await supabase
+        .from("settings")
+        .select("current_streak, last_streak_date")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      setStreak(settingsData?.current_streak ?? 0);
 
       if (fetchedPeople.length > 0) {
         const personIds = fetchedPeople.map((person) => person.id);
@@ -111,7 +120,12 @@ export default function DashboardPage() {
       ) : people.length === 0 ? (
         <FirstRunEmptyState />
       ) : (
-        <DashboardSections people={people} followUps={followUps} />
+        <DashboardSections
+          people={people}
+          followUps={followUps}
+          streak={streak}
+          onStreakUpdate={() => setStreak((s) => s + 1)}
+        />
       )}
     </AppLayout>
   );

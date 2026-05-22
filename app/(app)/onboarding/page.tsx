@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 
 import { todayInputValue } from '@/lib/date-utils'
 import { INTERACTION_TYPES } from '@/lib/form-utils'
+import { updateStreakAfterAction } from '@/lib/crm-rules'
 import { supabase } from '@/lib/supabase'
 
 const ONBOARDING_CATEGORY_PILLS = [
@@ -179,6 +180,7 @@ export default function OnboardingPage() {
       return
     }
 
+    await updateStreakAfterAction(supabase)
     router.push('/dashboard')
   }
 
