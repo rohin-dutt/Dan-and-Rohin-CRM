@@ -6,8 +6,10 @@ import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { todayInputValue } from "@/lib/date-utils";
+import { INTERACTION_TYPES } from "@/lib/form-utils";
 
-const SIGNUP_URL = "https://dan-and-rohin-crm.vercel.app/auth/signup";
+const SIGNUP_URL = "https://useroots.app/auth/signup";
 
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
@@ -74,6 +76,262 @@ function InviteModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function QuickAddModal({ onClose }: { onClose: () => void }) {
+  type View = "menu" | "log";
+  const router = useRouter();
+  const modalRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<View>("menu");
+  const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [selectedPersonName, setSelectedPersonName] = useState("");
+  const [selectedType, setSelectedType] = useState("Text");
+  const [selectedDate, setSelectedDate] = useState(todayInputValue());
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<"idle" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [fetchError, setFetchError] = useState("");
+
+  useEffect(() => {
+    async function fetchPeople() {
+      const { data, error } = await supabase
+        .from("people")
+        .select("id, name")
+        .order("name");
+      if (error) {
+        setFetchError("Failed to load people.");
+        return;
+      }
+      setPeople(data ?? []);
+    }
+    fetchPeople();
+  }, []);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [onClose]);
+
+  const filteredPeople = searchQuery
+    ? people.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : people;
+
+  async function handleSave() {
+    if (!selectedPersonId) return;
+    setSaving(true);
+    setErrorMsg("");
+
+    const { error } = await supabase.rpc("create_interaction_and_touch_person", {
+      p_person_id: selectedPersonId,
+      p_type: selectedType,
+      p_date: selectedDate,
+      p_notes: notes.trim() || null,
+      p_follow_up_needed: false,
+      p_follow_up_date: null,
+      p_follow_up_status: "done",
+    });
+
+    if (error) {
+      setErrorMsg(error.message ?? "Failed to save.");
+      setSaveResult("error");
+      setSaving(false);
+      return;
+    }
+
+    setSaveResult("success");
+    setTimeout(() => onClose(), 1500);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+      <div
+        ref={modalRef}
+        className="mx-4 w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
+      >
+        {saveResult === "success" ? (
+          <div className="py-8 text-center">
+            <p className="text-lg font-semibold text-foreground">Logged ✓</p>
+          </div>
+        ) : view === "menu" ? (
+          <>
+            <h2 className="mb-4 text-base font-semibold">Quick Add</h2>
+            {fetchError && (
+              <p className="mb-3 text-sm text-red-700">{fetchError}</p>
+            )}
+            <div className="space-y-3">
+              <button
+                onClick={() => setView("log")}
+                className="w-full rounded-lg border border-border bg-card p-4 text-left transition hover:border-primary/30 hover:shadow-sm"
+              >
+                <p className="font-medium text-foreground">💬 Log a chat</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Record a recent conversation
+                </p>
+              </button>
+              <button
+                onClick={() => {
+                  router.push("/people/new");
+                  onClose();
+                }}
+                className="w-full rounded-lg border border-border bg-card p-4 text-left transition hover:border-primary/30 hover:shadow-sm"
+              >
+                <p className="font-medium text-foreground">👤 Add someone new</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add a new person to Roots
+                </p>
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="mt-4 w-full rounded-md border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent"
+            >
+              Close
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setView("menu")}
+              className="mb-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              ← Back
+            </button>
+            <h2 className="mb-4 text-base font-semibold">Log a chat</h2>
+
+            {/* Person search */}
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Who did you talk to?
+              </label>
+              {people.length === 0 && !fetchError ? (
+                <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+                  <Link
+                    href="/people/new"
+                    onClick={onClose}
+                    className="font-medium underline"
+                  >
+                    Add someone to Roots first
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (selectedPersonId) {
+                        setSelectedPersonId(null);
+                        setSelectedPersonName("");
+                      }
+                    }}
+                    placeholder="Search by name..."
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  {searchQuery && !selectedPersonId && filteredPeople.length > 0 && (
+                    <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-card shadow-sm">
+                      {filteredPeople.slice(0, 8).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPersonId(p.id);
+                            setSelectedPersonName(p.name);
+                            setSearchQuery(p.name);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {searchQuery && !selectedPersonId && filteredPeople.length === 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">No matches</p>
+                  )}
+                  {selectedPersonId && (
+                    <p className="mt-1 text-xs text-emerald-600">
+                      ✓ {selectedPersonName}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Type pills */}
+            <div className="mb-4">
+              <label className="mb-2 block text-sm font-medium text-foreground">
+                How did you connect?
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {INTERACTION_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setSelectedType(type)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition",
+                      selectedType === type
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date */}
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                When?
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="mb-4">
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="What did you talk about? (optional)"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {saveResult === "error" && (
+              <p className="mb-3 text-sm text-red-700">{errorMsg}</p>
+            )}
+
+            <button
+              onClick={handleSave}
+              disabled={saving || !selectedPersonId}
+              className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NavLinks({
   mobile = false,
   onInviteClick,
@@ -124,6 +382,7 @@ function NavLinks({
 export default function Sidebar() {
   const router = useRouter();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -133,12 +392,22 @@ export default function Sidebar() {
   return (
     <>
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
+      {quickAddOpen && <QuickAddModal onClose={() => setQuickAddOpen(false)} />}
 
       <header className="border-b border-border bg-background px-4 py-4 md:hidden">
-        <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold">
-          <img src="/logo.svg" alt="" aria-hidden="true" width="24" height="24" />
-          Roots
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold">
+            <img src="/logo.svg" alt="" aria-hidden="true" width="24" height="24" />
+            Roots
+          </Link>
+          <button
+            onClick={() => setQuickAddOpen(true)}
+            className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground"
+            aria-label="Quick Add"
+          >
+            +
+          </button>
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">Stay close to the people who matter</p>
         <div className="mt-4">
           <NavLinks mobile onInviteClick={() => setInviteOpen(true)} />
@@ -153,6 +422,13 @@ export default function Sidebar() {
           </Link>
           <p className="mt-1 text-sm text-muted-foreground">Stay close to the people who matter</p>
         </div>
+
+        <button
+          onClick={() => setQuickAddOpen(true)}
+          className="mb-4 w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
+        >
+          ＋ Quick Add
+        </button>
 
         <NavLinks onInviteClick={() => setInviteOpen(true)} />
 

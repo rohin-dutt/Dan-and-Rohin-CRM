@@ -22,6 +22,12 @@ export const CUSTOM_TAG_COLORS = [
   "#EA580C",
 ];
 
+export const INTERACTION_TYPES = [
+  "Text", "Call", "Coffee", "Lunch", "Dinner",
+  "Email", "Video Call", "In Person", "LinkedIn",
+  "Letter", "Other",
+];
+
 export function getTrimmedFormValue(formData: FormData, key: string): string {
   return ((formData.get(key) as string | null) ?? "").trim();
 }

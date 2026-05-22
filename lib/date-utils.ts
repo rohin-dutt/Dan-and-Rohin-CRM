@@ -22,7 +22,9 @@ function parseDisplayDate(value: string | Date): Date {
 
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "Never";
-  const date = parseDisplayDate(value);
+  const normalized =
+    typeof value === "string" && value.includes("T") ? value.slice(0, 10) : value;
+  const date = parseDisplayDate(normalized);
   if (Number.isNaN(date.getTime())) return "Unknown";
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -33,7 +35,23 @@ export function formatDate(value: string | Date | null | undefined): string {
 
 export function formatShortDate(value: string | Date | null | undefined): string {
   if (!value) return "Not set";
-  const date = parseDisplayDate(value);
+  const normalized =
+    typeof value === "string" && value.includes("T") ? value.slice(0, 10) : value;
+  const date = parseDisplayDate(normalized);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function formatBirthdayDate(
+  value: string | Date | null | undefined
+): string {
+  if (!value) return "Not set";
+  const normalized =
+    typeof value === "string" && value.includes("T") ? value.slice(0, 10) : value;
+  const date = parseDisplayDate(normalized);
   if (Number.isNaN(date.getTime())) return "Unknown";
   return date.toLocaleDateString("en-US", {
     month: "short",

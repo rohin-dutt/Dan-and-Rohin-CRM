@@ -95,11 +95,10 @@ export default function DashboardPage() {
           Dashboard
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-          Relationship follow-ups
+          Who needs your attention
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
-          A practical snapshot of who needs attention, what follow-ups are open,
-          and what is coming up next.
+          The people worth reaching out to this week.
         </p>
       </div>
 

@@ -10,9 +10,32 @@ import {
 import { formatDate } from "@/lib/date-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
 
-function statusBadge(person: Person) {
+function statusBadge(person: Person, activeFollowUpDate: string | null = null) {
   const status = getRelationshipStatus(person);
   const nextDueDays = getNextDueDays(person);
+
+  if (activeFollowUpDate) {
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const [fuYear, fuMonth, fuDay] = activeFollowUpDate.split("-").map(Number);
+    const followUpDateObj = new Date(fuYear, fuMonth - 1, fuDay);
+    const followUpDays = Math.round(
+      (followUpDateObj.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const isSoonerThanCadence = nextDueDays === null || followUpDays < nextDueDays;
+    if (isSoonerThanCadence) {
+      if (followUpDays < 0) {
+        return { label: "Follow-up overdue", className: "bg-red-100 text-red-700" };
+      }
+      if (followUpDays <= 7) {
+        return { label: "Due This Week", className: "bg-amber-100 text-amber-700" };
+      }
+      return {
+        label: `Follow up: ${formatDate(activeFollowUpDate)}`,
+        className: "bg-sky-100 text-sky-700",
+      };
+    }
+  }
 
   if (status === "overdue") {
     return {
@@ -30,7 +53,7 @@ function statusBadge(person: Person) {
     return { label: "Recent", className: "bg-emerald-100 text-emerald-700" };
   }
   if (status === "neglected") {
-    return { label: "Needs first log", className: "bg-muted text-muted-foreground" };
+    return { label: "New", className: "bg-muted text-muted-foreground" };
   }
   return {
     label:
@@ -53,7 +76,7 @@ export function PeopleHeader({
           People
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-          Relationship list
+          Your people
         </h1>
       </div>
       <div className="flex gap-2">
@@ -68,7 +91,7 @@ export function PeopleHeader({
           href="/people/new"
           className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
-          Add Person
+          Add someone
         </Link>
       </div>
     </div>
@@ -145,7 +168,7 @@ export function PeopleFilters({
           onClick={() => onStatusFilterChange("neglected")}
           className={statusBtnClass("neglected")}
         >
-          Needs first log
+          New
         </button>
 
         {tags.length > 0 && (
@@ -192,11 +215,11 @@ export function PeopleEmptyState({
   return (
     <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
       <h2 className="text-lg font-semibold text-foreground">
-        {noFiltersActive ? "No people yet." : "No people match your filters."}
+        {noFiltersActive ? "No one here yet." : "No people match your filters."}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         {noFiltersActive
-          ? "Add someone you want to keep in touch with, then log your first interaction."
+          ? "Add someone you want to stay close to."
           : "Try a broader search or clear the active filters."}
       </p>
       {noFiltersActive ? (
@@ -222,16 +245,18 @@ export function PeopleEmptyState({
 export function PeopleGrid({
   people,
   followUps,
+  followUpsByPersonId,
   duplicateWarnings,
 }: {
   people: Person[];
   followUps: Interaction[];
+  followUpsByPersonId: Map<string, string>;
   duplicateWarnings: Map<string, string>;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {people.map((person) => {
-        const badge = statusBadge(person);
+        const badge = statusBadge(person, followUpsByPersonId.get(person.id) ?? null);
         const activeFollowUps = followUps.filter(
           (followUp) => followUp.person_id === person.id
         ).length;
@@ -251,7 +276,7 @@ export function PeopleGrid({
                 </Link>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {[person.role, person.company].filter(Boolean).join(" at ") ||
-                    "No role or company yet"}
+                    "No details yet"}
                 </p>
               </div>
               <span
@@ -280,7 +305,7 @@ export function PeopleGrid({
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground">
-              Last contacted: {formatDate(person.last_contacted_at)}
+              Last talked: {formatDate(person.last_contacted_at)}
             </p>
 
             <div className="mt-4 flex gap-2">
@@ -294,7 +319,7 @@ export function PeopleGrid({
                 href={`/people/${person.id}/interactions/new`}
                 className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
               >
-                Quick Log
+                Log chat
               </Link>
             </div>
           </div>

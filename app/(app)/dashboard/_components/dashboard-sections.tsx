@@ -14,7 +14,7 @@ import {
   getTotalInteractions,
   pluralize,
 } from "@/lib/crm-rules";
-import { formatDate, formatShortDate } from "@/lib/date-utils";
+import { formatBirthdayDate, formatDate, todayInputValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import type { Interaction, Person } from "@/types/index";
 
@@ -113,11 +113,10 @@ export function FirstRunEmptyState() {
   return (
     <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
       <h2 className="text-xl font-semibold text-foreground">
-        Add your first contact to get started.
+        Add your first person to get started.
       </h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-        Once you add someone, this dashboard will show follow-ups, birthdays,
-        and relationship cadence.
+        Once you add someone, Roots will show you who to reach out to and when.
       </p>
       <Link
         href="/people/new"
@@ -135,17 +134,31 @@ function FollowUpQueue({
   interactions: FollowUpInteraction[];
 }) {
   const queue = getFollowUpQueue(interactions);
+  const today = todayInputValue();
+  const todayDate = new Date(today + "T00:00:00");
+
+  const splitDue = queue.due.map((item: FollowUpInteraction) => {
+    const rawDate = item.follow_up_date;
+    if (!rawDate) {
+      return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700" };
+    }
+    const dateStr =
+      typeof rawDate === "string" && rawDate.includes("T") ? rawDate.slice(0, 10) : rawDate;
+    const dueDate = new Date(dateStr + "T00:00:00");
+    const days = Math.round((dueDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (days > 7) {
+      return { ...item, state: "Coming Up", style: "bg-sky-100 text-sky-700" };
+    }
+    return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700" };
+  });
+
   const visible = [
     ...queue.overdue.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Overdue",
       style: "bg-red-100 text-red-700",
     })),
-    ...queue.due.map((item: FollowUpInteraction) => ({
-      ...item,
-      state: "Due",
-      style: "bg-amber-100 text-amber-700",
-    })),
+    ...splitDue,
     ...queue.snoozed.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Snoozed",
@@ -156,10 +169,10 @@ function FollowUpQueue({
   return (
     <section className="mt-10">
       <h2 className="text-lg font-semibold text-foreground">
-        Follow-up Queue ({visible.length})
+        Open follow-ups ({visible.length})
       </h2>
       {visible.length === 0 ? (
-        <SectionEmptyState message="No active follow-ups." />
+        <SectionEmptyState message="You're all caught up 🌱" />
       ) : (
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {visible.map((interaction) => (
@@ -304,7 +317,7 @@ export function DashboardSections({
                       : `In ${pluralize(daysUntil, "day")}`
                   }
                   badgeStyle="bg-fuchsia-100 text-fuchsia-700"
-                  subtext={`Birthday: ${formatShortDate(nextBirthday)}`}
+                  subtext={`Birthday: ${formatBirthdayDate(nextBirthday)}`}
                 />
               )
             )}

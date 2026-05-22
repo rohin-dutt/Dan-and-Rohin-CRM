@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 
+import { todayInputValue } from '@/lib/date-utils'
+import { INTERACTION_TYPES } from '@/lib/form-utils'
 import { supabase } from '@/lib/supabase'
 
 const ONBOARDING_CATEGORY_PILLS = [
@@ -12,7 +14,6 @@ const ONBOARDING_CATEGORY_PILLS = [
   { label: 'Professional', tagName: 'Colleague', tagColor: '#D97706', selectedClass: 'bg-sky-500 text-white border-sky-500' },
 ] as const
 
-// Bug 2: Matches person-form.tsx frequency options exactly
 const ONBOARDING_FREQ_OPTIONS = [
   { label: 'Every week', value: 7 },
   { label: 'Every 2 weeks', value: 14 },
@@ -21,22 +22,6 @@ const ONBOARDING_FREQ_OPTIONS = [
   { label: 'Every 6 months', value: 180 },
   { label: 'Once a year', value: 365 },
 ] as const
-
-// Bug 1: Dynamic headings per person added
-const STEP_HEADINGS = [
-  {
-    heading: "Who’s someone you’ve been meaning to reach out to?",
-    subheading: "Start with someone you’ve lost touch with — a friend, colleague, or family member you mean to contact more.",
-  },
-  {
-    heading: "Great. Who’s someone else?",
-    subheading: "Think of a colleague worth keeping up with, or a friend in a different city.",
-  },
-  {
-    heading: "One more person.",
-    subheading: "Last one — someone you genuinely want to stay close to.",
-  },
-]
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -47,14 +32,13 @@ export default function OnboardingPage() {
 
   // Flow
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [savedCount, setSavedCount] = useState(0)
+  const [savedPersonId, setSavedPersonId] = useState<string | null>(null)
   const [lastSavedFirstName, setLastSavedFirstName] = useState('')
 
   // Step 2 form
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
-  // Bug 3: Contextual field state
   const [company, setCompany] = useState('')
   const [role, setRole] = useState('')
   const [birthday, setBirthday] = useState('')
@@ -63,6 +47,13 @@ export default function OnboardingPage() {
   const [selectedFreq, setSelectedFreq] = useState(30)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Step 3 form
+  const [interactionType, setInteractionType] = useState('Call')
+  const [interactionDate, setInteractionDate] = useState(todayInputValue())
+  const [interactionNotes, setInteractionNotes] = useState('')
+  const [step3Saving, setStep3Saving] = useState(false)
+  const [step3Error, setStep3Error] = useState<string | null>(null)
 
   useEffect(() => {
     async function checkAuth() {
@@ -101,7 +92,6 @@ export default function OnboardingPage() {
     setSaving(true)
     setFormError(null)
 
-    // Bug 3: Derive contextual visibility from current state for insert
     const isProfessional = selectedCategory === 'Professional'
     const isFamily = selectedCategory === 'Family'
     const hasBirthday = selectedCategory === 'Friend' || isFamily
@@ -115,7 +105,6 @@ export default function OnboardingPage() {
         name,
         how_met: howMet.trim() || null,
         contact_frequency_days: selectedFreq,
-        // Bug 3: Include contextual fields
         company: isProfessional && company.trim() ? company.trim() : null,
         role: isProfessional && role.trim() ? role.trim() : null,
         birthday: hasBirthday && birthday ? birthday : null,
@@ -162,15 +151,35 @@ export default function OnboardingPage() {
       }
     }
 
-    // Bug 1: Only advance to step 3 after 3rd person; stay on step 2 otherwise
-    const newCount = savedCount + 1
-    setSavedCount(newCount)
+    setSavedPersonId(data.id)
     setLastSavedFirstName(trimmedFirst)
     resetForm()
     setSaving(false)
-    if (newCount >= 3) {
-      setStep(3)
+    setStep(3)
+  }
+
+  async function handleSaveInteraction() {
+    if (!savedPersonId) return
+    setStep3Saving(true)
+    setStep3Error(null)
+
+    const { error } = await supabase.rpc('create_interaction_and_touch_person', {
+      p_person_id: savedPersonId,
+      p_type: interactionType,
+      p_date: interactionDate,
+      p_notes: interactionNotes.trim() || null,
+      p_follow_up_needed: false,
+      p_follow_up_date: null,
+      p_follow_up_status: 'done',
+    })
+
+    if (error) {
+      setStep3Error(error.message ?? 'Failed to save. Please try again.')
+      setStep3Saving(false)
+      return
     }
+
+    router.push('/dashboard')
   }
 
   if (loading) {
@@ -227,14 +236,10 @@ export default function OnboardingPage() {
     )
   }
 
-  // ── Step 2 — Add people (mandatory 3) ────────────────────────────────────
-  // Bug 3: Contextual field visibility derived from selectedCategory
+  // ── Step 2 — Add one person ───────────────────────────────────────────────
   const showProfessionalFields = selectedCategory === 'Professional'
   const showFamilyFields = selectedCategory === 'Family'
   const showBirthday = selectedCategory === 'Friend' || showFamilyFields
-
-  // Bug 1: Dynamic headings based on how many people have been saved
-  const { heading, subheading } = STEP_HEADINGS[Math.min(savedCount, 2)]
 
   if (step === 2) {
     return (
@@ -250,17 +255,13 @@ export default function OnboardingPage() {
 
           <div className="space-y-1">
             <h1 className="font-heading text-2xl font-semibold text-foreground">
-              {heading}
+              Who&apos;s someone you want to stay close to?
             </h1>
             <p className="text-sm text-muted-foreground">
-              {subheading}
+              A friend you&apos;ve lost touch with, a colleague worth keeping up
+              with, or family you mean to call more.
             </p>
           </div>
-
-          {/* Bug 1: Progress indicator */}
-          <p className="text-xs text-muted-foreground">
-            Added {savedCount} of 3 people
-          </p>
 
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-5">
             {formError && (
@@ -323,7 +324,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Bug 3: Professional — Company + Role (className="hidden" when not selected) */}
+            {/* Professional — Company + Role */}
             <div className={showProfessionalFields ? 'grid grid-cols-2 gap-3' : 'hidden'}>
               <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">
@@ -349,7 +350,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Bug 3: Friend or Family — Birthday (className="hidden" when neither selected) */}
+            {/* Friend or Family — Birthday */}
             <div className={showBirthday ? '' : 'hidden'}>
               <label className="mb-1 block text-sm font-medium text-foreground">
                 Birthday
@@ -362,7 +363,7 @@ export default function OnboardingPage() {
               />
             </div>
 
-            {/* Bug 3: Family — Relationship label (className="hidden" when not selected) */}
+            {/* Family — Relationship label */}
             <div className={showFamilyFields ? '' : 'hidden'}>
               <label className="mb-1 block text-sm font-medium text-foreground">
                 Relationship e.g. parent, sibling
@@ -389,7 +390,7 @@ export default function OnboardingPage() {
               />
             </div>
 
-            {/* Stay in touch — Bug 2: Full frequency list */}
+            {/* Stay in touch */}
             <div>
               <p className="mb-2 text-sm font-medium text-foreground">
                 Stay in touch
@@ -420,46 +421,112 @@ export default function OnboardingPage() {
               {saving ? 'Saving…' : 'Add to my roots →'}
             </button>
           </div>
-
-          {/* Bug 1: "Skip for now" link removed */}
         </div>
       </div>
     )
   }
 
-  // ── Step 3 — Done ─────────────────────────────────────────────────────────
-  // Bug 1: Simplified — always reached after 3 people, single CTA
+  // ── Step 3 — Log first interaction ────────────────────────────────────────
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <p className="mb-8 text-xs text-muted-foreground tracking-wide">
         Step 3 of 3
       </p>
 
-      <div className="w-full max-w-lg space-y-6 text-center">
+      <div className="w-full max-w-lg space-y-6">
         <div className="flex justify-center">
           <img src="/logo.svg" alt="Roots" width={28} height={28} />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1">
           <h1 className="font-heading text-2xl font-semibold text-foreground">
-            You&apos;re all set.
+            When did you last talk to {lastSavedFirstName}?
           </h1>
           <p className="text-sm text-muted-foreground">
-            Your dashboard is ready. Roots will remind you when it&apos;s time
-            to reach out to{' '}
-            <span className="font-medium text-foreground">
-              {lastSavedFirstName}
-            </span>{' '}
-            and the others.
+            This gives Roots the context it needs to remind you at the right time.
           </p>
         </div>
 
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="w-full rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
-        >
-          Go to my dashboard →
-        </button>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-5">
+          {step3Error && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+              {step3Error}{' '}
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="font-medium underline"
+              >
+                Skip anyway →
+              </button>
+            </div>
+          )}
+
+          {/* Interaction type */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-foreground">
+              How did you connect?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {INTERACTION_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setInteractionType(type)}
+                  className={`${pillBase} ${
+                    interactionType === type
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border bg-card text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              When?
+            </label>
+            <input
+              type="date"
+              value={interactionDate}
+              onChange={(e) => setInteractionDate(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              Notes (optional)
+            </label>
+            <textarea
+              rows={3}
+              value={interactionNotes}
+              onChange={(e) => setInteractionNotes(e.target.value)}
+              placeholder="What did you talk about?"
+              className={inputClass}
+            />
+          </div>
+
+          <button
+            onClick={handleSaveInteraction}
+            disabled={step3Saving}
+            className="w-full rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/80 disabled:opacity-50"
+          >
+            {step3Saving ? 'Saving…' : 'Save and see my dashboard →'}
+          </button>
+
+          <div className="text-center">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="text-sm text-muted-foreground hover:underline"
+            >
+              Skip — I&apos;ll add this later →
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

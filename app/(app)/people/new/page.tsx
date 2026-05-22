@@ -244,7 +244,7 @@ export default function NewPersonPage() {
           ← Back to people
         </Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-          Add person
+          Add someone new
         </h1>
       </div>
 

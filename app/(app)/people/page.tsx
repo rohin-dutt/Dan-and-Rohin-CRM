@@ -122,6 +122,21 @@ function PeoplePageInner() {
     [tags]
   );
   const duplicateWarnings = useMemo(() => findDuplicateContacts(people), [people]);
+  const followUpsByPersonId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const fu of followUps) {
+      if (
+        fu.follow_up_date &&
+        (fu.follow_up_status === "open" || !fu.follow_up_status)
+      ) {
+        const existing = map.get(fu.person_id);
+        if (!existing || fu.follow_up_date < existing) {
+          map.set(fu.person_id, fu.follow_up_date);
+        }
+      }
+    }
+    return map;
+  }, [followUps]);
 
   const displayed = useMemo(() => {
     const normalizedQuery = normalizeContactText(query);
@@ -261,6 +276,7 @@ function PeoplePageInner() {
         <PeopleGrid
           people={displayed}
           followUps={followUps}
+          followUpsByPersonId={followUpsByPersonId}
           duplicateWarnings={duplicateWarnings}
         />
       )}

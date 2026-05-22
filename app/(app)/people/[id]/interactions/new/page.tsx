@@ -6,19 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
 import { todayInputValue } from "@/lib/date-utils";
+import { INTERACTION_TYPES } from "@/lib/form-utils";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import type { Person } from "@/types/index";
-
-const INTERACTION_TYPES = [
-  "Text",
-  "Call",
-  "Coffee",
-  "Email",
-  "LinkedIn",
-  "In Person",
-  "Other",
-];
 
 export default function NewInteractionPage() {
   const params = useParams<{ id: string }>();
@@ -143,7 +134,7 @@ export default function NewInteractionPage() {
           Back to {person?.name ?? "person"}
         </Link>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-          Log Interaction{person ? ` with ${person.name}` : ""}
+          {person ? `Catch up with ${person.name}` : "Log a chat"}
         </h1>
       </div>
 
@@ -161,7 +152,7 @@ export default function NewInteractionPage() {
         <div className="space-y-5 rounded-lg border border-border bg-card p-6 shadow-sm">
           <div>
             <label htmlFor="type" className="mb-1 block text-sm font-medium text-foreground">
-              Type <span className="text-red-500">*</span>
+              How did you connect? <span className="text-red-500">*</span>
             </label>
             <select
               id="type"
@@ -197,7 +188,7 @@ export default function NewInteractionPage() {
 
           <div>
             <label htmlFor="notes" className="mb-1 block text-sm font-medium text-foreground">
-              Notes
+              What did you talk about?
             </label>
             <textarea
               id="notes"
@@ -221,14 +212,14 @@ export default function NewInteractionPage() {
               className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
             <label htmlFor="follow_up_needed" className="text-sm font-medium text-foreground">
-              Follow-up needed
+              Want to follow up?
             </label>
           </div>
 
           {followUpNeeded && (
             <div>
               <label htmlFor="follow_up_date" className="mb-1 block text-sm font-medium text-foreground">
-                Follow-up date
+                Remind me on
               </label>
               <input
                 id="follow_up_date"
@@ -246,7 +237,7 @@ export default function NewInteractionPage() {
             disabled={saving}
             className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Log Interaction"}
+            {saving ? "Saving..." : "Save"}
           </button>
           <Link
             href={`/people/${params.id}`}

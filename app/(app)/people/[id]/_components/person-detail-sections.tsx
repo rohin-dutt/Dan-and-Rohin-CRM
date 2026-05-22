@@ -7,22 +7,9 @@ import {
   getNextDueDays,
   pluralize,
 } from "@/lib/crm-rules";
-import { formatDate } from "@/lib/date-utils";
+import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
+import { INTERACTION_TYPES } from "@/lib/form-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
-
-const INTERACTION_TYPES = [
-  "Text",
-  "Call",
-  "Coffee",
-  "Lunch",
-  "Dinner",
-  "Email",
-  "Video Call",
-  "In Person",
-  "LinkedIn",
-  "Letter",
-  "Other",
-];
 
 function formatGap(newerDate: string, olderDate: string): string {
   const days = Math.round(
@@ -130,7 +117,7 @@ export function PersonSummary({
           href={`/people/${person.id}/interactions/new`}
           className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
-          Quick Log
+          Log a chat
         </Link>
       </div>
 
@@ -151,13 +138,13 @@ export function PersonSummary({
       <div className="mt-6 grid gap-4 md:grid-cols-4">
         <div className="rounded-lg bg-muted p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Next Action
+            Next step
           </p>
           <p className="mt-2 font-semibold">{nextActionText(person)}</p>
         </div>
         <div className="rounded-lg bg-muted p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Last Interaction
+            Last chat
           </p>
           <p className="mt-2 font-semibold">
             {latestInteraction
@@ -188,11 +175,11 @@ export function PersonSummary({
           ["Email", person.email],
           ["Phone", person.phone],
           ["Location", person.location],
-          ["Birthday", formatDate(person.birthday)],
+          ["Birthday", formatBirthdayDate(person.birthday)],
           ["Relationship Strength", person.relationship_strength],
           ["Preferred Contact", person.preferred_contact_method],
-          ["Contact Rhythm", `Every ${person.contact_frequency_days} days`],
-          ["How Met", person.how_met],
+          ["How often you connect", `Every ${person.contact_frequency_days} days`],
+          ["How you met", person.how_met],
         ].map(([label, value]) => (
           <div key={label} className="rounded-lg bg-muted p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -254,12 +241,12 @@ export function InteractionTimeline({
   return (
     <section className="mt-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Interaction Timeline</h2>
+        <h2 className="text-xl font-semibold">Your history</h2>
         <Link
           href={`/people/${personId}/interactions/new`}
           className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
         >
-          Log Interaction
+          Log a chat
         </Link>
       </div>
 
@@ -274,15 +261,15 @@ export function InteractionTimeline({
           <p className="text-sm text-muted-foreground">Loading interactions...</p>
         ) : interactions.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
-            <h3 className="font-semibold text-foreground">No interactions logged yet.</h3>
+            <h3 className="font-semibold text-foreground">No history yet.</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Log the last call, message, or meeting so the dashboard can track cadence.
+              Log your first conversation so Roots can track your cadence.
             </p>
             <Link
               href={`/people/${personId}/interactions/new`}
               className="mt-3 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
             >
-              Log your first interaction
+              Add your first conversation
             </Link>
           </div>
         ) : (
