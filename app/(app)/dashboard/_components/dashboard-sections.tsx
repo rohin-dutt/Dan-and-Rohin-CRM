@@ -120,8 +120,18 @@ function StreakBadge({ streak }: { streak: number }) {
     <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1">
       <span className="text-sm">{emoji}</span>
       <span className="text-sm font-semibold text-orange-700">
-        {streak} day{streak === 1 ? "" : "s"} streak
+        {streak} day streak
       </span>
+    </div>
+  )
+}
+
+function StreakLostBanner({ previousStreak }: { previousStreak: number }) {
+  if (previousStreak === 0) return null
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-full bg-muted border border-border px-3 py-1 text-sm text-muted-foreground">
+      <span>💔</span>
+      <span>Your {previousStreak} day streak ended — start a new one today</span>
     </div>
   )
 }
@@ -196,6 +206,11 @@ function FollowUpQueue({
     ...queue.overdue.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Overdue",
+      style: "bg-red-100 text-red-700",
+    })),
+    ...queue.due_today.map((item: FollowUpInteraction) => ({
+      ...item,
+      state: "Due today",
       style: "bg-red-100 text-red-700",
     })),
     ...splitDue,
@@ -299,11 +314,15 @@ export function DashboardSections({
   people,
   followUps,
   streak,
+  streakLost,
+  previousStreak,
   onStreakUpdate,
 }: {
   people: Person[];
   followUps: FollowUpInteraction[];
   streak: number;
+  streakLost: boolean;
+  previousStreak: number;
   onStreakUpdate: () => void;
 }) {
   const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), followUps);
@@ -312,11 +331,15 @@ export function DashboardSections({
   return (
     <>
       <MilestoneCelebration streak={streak} />
-      {streak > 0 && (
+      {streakLost ? (
+        <div className="mb-4">
+          <StreakLostBanner previousStreak={previousStreak} />
+        </div>
+      ) : streak > 0 ? (
         <div className="mb-4">
           <StreakBadge streak={streak} />
         </div>
-      )}
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <StatCard
           label="Overdue"

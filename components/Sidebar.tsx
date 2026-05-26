@@ -458,7 +458,7 @@ export default function Sidebar() {
             <div className="mb-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-muted-foreground">
               <span>🔥</span>
               <span className="font-medium">
-                {streak} day{streak === 1 ? "" : "s"} streak
+                {streak} day streak
               </span>
             </div>
           )}

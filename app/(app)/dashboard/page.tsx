@@ -19,6 +19,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
+  const [streakLost, setStreakLost] = useState(false);
+  const [previousStreak, setPreviousStreak] = useState(0);
 
   useEffect(() => {
     async function fetchDashboard() {
@@ -59,7 +61,33 @@ export default function DashboardPage() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      setStreak(settingsData?.current_streak ?? 0);
+      const rawStreak = settingsData?.current_streak ?? 0;
+      const lastStreakDate = settingsData?.last_streak_date;
+
+      function isStreakActive(lastDate: string | null | undefined): boolean {
+        if (!lastDate) return false;
+        const today = new Date();
+        const todayStr = [
+          today.getFullYear(),
+          String(today.getMonth() + 1).padStart(2, "0"),
+          String(today.getDate()).padStart(2, "0"),
+        ].join("-");
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = [
+          yesterday.getFullYear(),
+          String(yesterday.getMonth() + 1).padStart(2, "0"),
+          String(yesterday.getDate()).padStart(2, "0"),
+        ].join("-");
+        return lastDate === todayStr || lastDate === yesterdayStr;
+      }
+
+      const activeStreak = isStreakActive(lastStreakDate) ? rawStreak : 0;
+      setStreak(activeStreak);
+      if (rawStreak > 0 && !isStreakActive(lastStreakDate)) {
+        setStreakLost(true);
+        setPreviousStreak(rawStreak);
+      }
 
       if (fetchedPeople.length > 0) {
         const personIds = fetchedPeople.map((person) => person.id);
@@ -124,6 +152,8 @@ export default function DashboardPage() {
           people={people}
           followUps={followUps}
           streak={streak}
+          streakLost={streakLost}
+          previousStreak={previousStreak}
           onStreakUpdate={() => setStreak((s) => s + 1)}
         />
       )}
