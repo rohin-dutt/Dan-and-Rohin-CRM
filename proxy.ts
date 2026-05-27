@@ -41,6 +41,8 @@ export async function proxy(request: NextRequest) {
     pathname === '/contact' ||
     pathname === '/auth/login' ||
     pathname === '/auth/signup' ||
+    pathname === '/auth/forgot-password' ||
+    pathname === '/auth/update-password' ||
     pathname.startsWith('/auth/callback')
 
   if (isApiPath) {

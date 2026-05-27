@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { getSiteUrl } from '@/lib/site-url'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,7 @@ export default function ForgotPasswordPage() {
     setLoading(true)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://dan-and-rohin-crm.vercel.app/auth/update-password',
+      redirectTo: `${getSiteUrl()}/auth/callback?type=recovery`,
     })
 
     if (error) {

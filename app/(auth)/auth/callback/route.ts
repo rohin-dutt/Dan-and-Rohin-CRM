@@ -7,6 +7,9 @@
 // Redirect URLs (add both):
 //   https://dan-and-rohin-crm.vercel.app/**
 //   https://dan-and-rohin-crm.vercel.app/auth/update-password
+//   https://useroots.app/**
+//   https://useroots.app/auth/callback
+//   https://useroots.app/auth/callback?type=recovery
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -47,6 +50,17 @@ export async function GET(request: NextRequest) {
   }
 
   const user = data.session.user
+
+  const type = searchParams.get("type")
+  if (type === "recovery") {
+    const recoveryResponse = NextResponse.redirect(
+      new URL('/auth/update-password', request.url)
+    )
+    response.cookies.getAll().forEach(({ name, value, ...options }) =>
+      recoveryResponse.cookies.set(name, value, options)
+    )
+    return recoveryResponse
+  }
 
   const { count, error: countError } = await supabase
     .from('people')
