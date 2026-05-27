@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [tagSaved, setTagSaved] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -182,6 +183,8 @@ export default function SettingsPage() {
     }
 
     setTags((prev) => prev.map((item) => (item.id === tag.id ? data : item)));
+    setTagSaved(true);
+    setTimeout(() => setTagSaved(false), 2500);
   }
 
   async function deleteTag(tagId: string) {
@@ -225,6 +228,8 @@ export default function SettingsPage() {
     setTags((prev) => prev.filter((tag) => tag.id !== mergeSourceId));
     setMergeSourceId("");
     setMergeTargetId("");
+    setTagSaved(true);
+    setTimeout(() => setTagSaved(false), 2500);
   }
 
   async function parseImportFile(): Promise<ExportPayload> {
@@ -446,6 +451,11 @@ export default function SettingsPage() {
                   onImport={() => restoreFromExport(false)}
                   onRestore={() => restoreFromExport(true)}
                 />
+                {tagSaved && (
+                  <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">
+                    Tags updated.
+                  </div>
+                )}
                 <TagManagementPanel
                   tags={tags}
                   confirmDeleteTagId={confirmDeleteTagId}

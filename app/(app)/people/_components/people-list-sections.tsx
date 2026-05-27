@@ -53,7 +53,7 @@ function statusBadge(person: Person, activeFollowUpDate: string | null = null) {
     return { label: "Recent", className: "bg-emerald-100 text-emerald-700" };
   }
   if (status === "neglected") {
-    return { label: "New", className: "bg-muted text-muted-foreground" };
+    return { label: "Not yet contacted", className: "bg-muted text-muted-foreground" };
   }
   return {
     label:
@@ -168,7 +168,7 @@ export function PeopleFilters({
           onClick={() => onStatusFilterChange("neglected")}
           className={statusBtnClass("neglected")}
         >
-          New
+          Not yet contacted
         </button>
 
         {tags.length > 0 && (

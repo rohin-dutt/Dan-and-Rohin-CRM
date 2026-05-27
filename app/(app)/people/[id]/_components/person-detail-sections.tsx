@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import {
   getFollowUpState,
@@ -10,6 +11,102 @@ import {
 import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
+
+function InteractionEditForm({
+  interaction,
+  onSubmit,
+  onCancel,
+}: {
+  interaction: Interaction;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  const [followUpNeeded, setFollowUpNeeded] = useState(
+    interaction.follow_up_needed
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        <select
+          name="type"
+          defaultValue={interaction.type}
+          className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+        >
+          {INTERACTION_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+        <input
+          name="date"
+          type="date"
+          required
+          defaultValue={interaction.date}
+          className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+        />
+      </div>
+      <textarea
+        name="notes"
+        rows={3}
+        defaultValue={interaction.notes ?? ""}
+        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+      />
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          <input
+            name="follow_up_needed"
+            type="checkbox"
+            checked={followUpNeeded}
+            onChange={(e) => setFollowUpNeeded(e.target.checked)}
+          />
+          Follow-up
+        </label>
+        {followUpNeeded && (
+          <>
+            <input
+              name="follow_up_date"
+              type="date"
+              defaultValue={interaction.follow_up_date ?? ""}
+              className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+            />
+            <select
+              name="follow_up_status"
+              defaultValue={interaction.follow_up_status}
+              className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+            >
+              <option value="open">Open</option>
+              <option value="snoozed">Snoozed</option>
+              <option value="done">Done</option>
+            </select>
+            <input
+              name="follow_up_snoozed_until"
+              type="date"
+              defaultValue={interaction.follow_up_snoozed_until ?? ""}
+              className="rounded-md border border-border bg-card px-3 py-2 text-sm md:col-span-3"
+            />
+          </>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function followUpStateDisplay(state: string): { label: string; preposition: string } {
   switch (state) {
@@ -298,80 +395,11 @@ export function InteractionTimeline({
                 className="rounded-lg border border-border bg-card p-5 shadow-sm"
               >
               {editingInteractionId === interaction.id ? (
-                <form
+                <InteractionEditForm
+                  interaction={interaction}
                   onSubmit={(event) => onUpdateInteraction(interaction, event)}
-                  className="space-y-4"
-                >
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <select
-                      name="type"
-                      defaultValue={interaction.type}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-                    >
-                      {INTERACTION_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      name="date"
-                      type="date"
-                      required
-                      defaultValue={interaction.date}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <textarea
-                    name="notes"
-                    rows={3}
-                    defaultValue={interaction.notes ?? ""}
-                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
-                  />
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <label className="flex items-center gap-2 text-sm text-foreground">
-                      <input
-                        name="follow_up_needed"
-                        type="checkbox"
-                        defaultChecked={interaction.follow_up_needed}
-                      />
-                      Follow-up
-                    </label>
-                    <input
-                      name="follow_up_date"
-                      type="date"
-                      defaultValue={interaction.follow_up_date ?? ""}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-                    />
-                    <select
-                      name="follow_up_status"
-                      defaultValue={interaction.follow_up_status}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-                    >
-                      <option value="open">Open</option>
-                      <option value="snoozed">Snoozed</option>
-                      <option value="done">Done</option>
-                    </select>
-                    <input
-                      name="follow_up_snoozed_until"
-                      type="date"
-                      defaultValue={interaction.follow_up_snoozed_until ?? ""}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm md:col-span-3"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancelEditInteraction}
-                      className="inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                  onCancel={onCancelEditInteraction}
+                />
               ) : (
                 <>
                   <div className="flex items-start justify-between gap-4">
