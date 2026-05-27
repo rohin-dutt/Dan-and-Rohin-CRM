@@ -135,19 +135,19 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="mb-8">
-        <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Dashboard
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Who needs your attention
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           The people worth reaching out to this week.
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Loading...</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       ) : error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
           {error}

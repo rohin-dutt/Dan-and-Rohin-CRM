@@ -161,19 +161,56 @@ function MilestoneCelebration({ streak }: { streak: number }) {
 
 export function FirstRunEmptyState() {
   return (
-    <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
-      <h2 className="text-xl font-semibold text-foreground">
-        Add your first person to get started.
-      </h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-        Once you add someone, Roots will show you who to reach out to and when.
-      </p>
-      <Link
-        href="/people/new"
-        className={cn(buttonVariants({ size: "sm" }), "mt-5")}
-      >
-        Add contact
-      </Link>
+    <div className="space-y-6">
+      <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+        <div className="text-4xl mb-4">🌱</div>
+        <h2 className="text-xl font-semibold text-foreground">
+          Welcome to Roots
+        </h2>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+          Add your first person and Roots will start tracking your relationship
+          cadence — reminding you when it&apos;s time to reach out before
+          connections go quiet.
+        </p>
+        <Link
+          href="/people/new"
+          className={cn(buttonVariants({ size: "sm" }), "mt-5")}
+        >
+          Add your first person
+        </Link>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Takes less than a minute
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          {
+            emoji: "🔔",
+            title: "Get reminded",
+            body: "Roots nudges you when it's time to reach out — before relationships go quiet.",
+          },
+          {
+            emoji: "📝",
+            title: "Remember context",
+            body: "Log what you talked about so you always have something meaningful to say.",
+          },
+          {
+            emoji: "🗺️",
+            title: "See your network",
+            body: "Visualize where your people are and stay intentional about every relationship.",
+          },
+        ].map(({ emoji, title, body }) => (
+          <div
+            key={title}
+            className="rounded-lg border border-border bg-card p-5 shadow-sm"
+          >
+            <div className="text-2xl mb-2">{emoji}</div>
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{body}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -310,6 +347,28 @@ function MilestonesSection({
   );
 }
 
+function SparseDashboardBanner({ peopleCount }: { peopleCount: number }) {
+  const remaining = Math.max(0, 4 - peopleCount)
+
+  return (
+    <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 px-5 py-4">
+      <p className="text-sm font-medium text-primary">
+        Great start — Roots gets more useful as you add people. 🌱
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Add {remaining} more {remaining === 1 ? "person" : "people"} to see
+        your full relationship dashboard.
+      </p>
+      <Link
+        href="/people/new"
+        className="mt-3 inline-flex items-center text-xs font-medium text-primary hover:underline"
+      >
+        Add someone →
+      </Link>
+    </div>
+  )
+}
+
 export function DashboardSections({
   people,
   followUps,
@@ -330,8 +389,15 @@ export function DashboardSections({
   const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), followUps);
   const birthdays = getBirthdayReminders(people);
 
+  const isSparse =
+    people.length > 0 &&
+    people.length < 4 &&
+    overdue.length === 0 &&
+    dueThisWeek.length === 0;
+
   return (
     <>
+      {isSparse && <SparseDashboardBanner peopleCount={people.length} />}
       <MilestoneCelebration streak={streak} />
       {streakLost ? (
         <div className="mb-4">
