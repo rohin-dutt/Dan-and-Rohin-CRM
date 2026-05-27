@@ -96,9 +96,17 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     async function fetchPeople() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setFetchError("Not authenticated");
+        return;
+      }
       const { data, error } = await supabase
         .from("people")
         .select("id, name")
+        .eq("user_id", user.id)
         .order("name");
       if (error) {
         setFetchError("Failed to load people.");

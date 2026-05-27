@@ -138,12 +138,33 @@ function PeoplePageInner() {
     return map;
   }, [followUps]);
 
+  const followUpDateByPersonId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const fu of followUps) {
+      if (!fu.follow_up_needed || !fu.follow_up_date) continue;
+      const status = fu.follow_up_status ?? "open";
+      if (status === "done" || status === "snoozed") continue;
+      const existing = map.get(fu.person_id);
+      if (!existing || fu.follow_up_date < existing) {
+        map.set(fu.person_id, fu.follow_up_date);
+      }
+    }
+    return map;
+  }, [followUps]);
+
   const displayed = useMemo(() => {
     const normalizedQuery = normalizeContactText(query);
     let result = people;
 
     if (statusFilter !== "all") {
-      result = result.filter((person) => getRelationshipStatus(person) === statusFilter);
+      result = result.filter((person) => {
+        const followUpDate = followUpDateByPersonId.get(person.id) ?? null;
+        return (getRelationshipStatus as (p: Person, d: Date, f: string | null) => string)(
+          person,
+          new Date(),
+          followUpDate
+        ) === statusFilter;
+      });
     }
 
     if (tagFilter) {
@@ -204,7 +225,7 @@ function PeoplePageInner() {
     }
 
     return sorted;
-  }, [people, personTags, query, statusFilter, tagFilter, tagsById, sortFilter, followUps]);
+  }, [people, personTags, query, statusFilter, tagFilter, tagsById, sortFilter, followUps, followUpDateByPersonId]);
 
   async function handleExport() {
     setExporting(true);

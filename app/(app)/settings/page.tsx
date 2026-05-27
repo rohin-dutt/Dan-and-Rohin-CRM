@@ -186,17 +186,23 @@ export default function SettingsPage() {
 
   async function deleteTag(tagId: string) {
     setError(null);
+    const tag = tags.find((t) => t.id === tagId);
+    if (!tag) {
+      setError("Tag not found.");
+      return;
+    }
     const { error: deleteError } = await supabase
       .from("tags")
       .delete()
-      .eq("id", tagId);
+      .eq("id", tagId)
+      .eq("user_id", tag.user_id);
 
     if (deleteError) {
       setError(deleteError.message);
       return;
     }
 
-    setTags((prev) => prev.filter((tag) => tag.id !== tagId));
+    setTags((prev) => prev.filter((t) => t.id !== tagId));
     setConfirmDeleteTagId(null);
   }
 

@@ -11,6 +11,21 @@ import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
 
+function followUpStateDisplay(state: string): { label: string; preposition: string } {
+  switch (state) {
+    case "overdue":
+      return { label: "overdue", preposition: "since" };
+    case "due_today":
+      return { label: "due today", preposition: "" };
+    case "due":
+      return { label: "due", preposition: "on" };
+    case "snoozed":
+      return { label: "snoozed", preposition: "until" };
+    default:
+      return { label: state, preposition: "on" };
+  }
+}
+
 function formatGap(newerDate: string, olderDate: string): string {
   const days = Math.round(
     (new Date(newerDate).getTime() - new Date(olderDate).getTime()) /
@@ -274,6 +289,9 @@ export function InteractionTimeline({
           </div>
         ) : (
           interactions.flatMap((interaction, index) => {
+            const { label: fuLabel, preposition: fuPrep } = followUpStateDisplay(
+              getFollowUpState(interaction)
+            );
             const card = (
               <div
                 key={interaction.id}
@@ -409,8 +427,8 @@ export function InteractionTimeline({
                   {interaction.follow_up_needed && (
                     <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
                       <p className="font-medium">
-                        Follow-up {getFollowUpState(interaction)} by{" "}
-                        {formatDate(interaction.follow_up_date)}
+                        Follow-up {fuLabel}
+                        {fuPrep ? ` ${fuPrep} ${formatDate(interaction.follow_up_date)}` : ""}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button

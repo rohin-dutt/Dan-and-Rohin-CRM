@@ -10,12 +10,13 @@ import {
   type FollowUpInteraction,
 } from "./_components/dashboard-sections";
 import { supabase } from "@/lib/supabase";
-import type { Person } from "@/types/index";
+import type { Interaction, Person } from "@/types/index";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [people, setPeople] = useState<Person[]>([]);
   const [followUps, setFollowUps] = useState<FollowUpInteraction[]>([]);
+  const [allInteractions, setAllInteractions] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
@@ -117,6 +118,12 @@ export default function DashboardPage() {
             person_name: namesById.get(interaction.person_id) ?? "Unknown",
           }))
         );
+
+        const { data: allInteractionsData } = await supabase
+          .from("interactions")
+          .select("id, person_id")
+          .in("person_id", personIds);
+        setAllInteractions((allInteractionsData ?? []) as unknown as Interaction[]);
       }
 
       setLoading(false);
@@ -151,6 +158,7 @@ export default function DashboardPage() {
         <DashboardSections
           people={people}
           followUps={followUps}
+          allInteractions={allInteractions}
           streak={streak}
           streakLost={streakLost}
           previousStreak={previousStreak}

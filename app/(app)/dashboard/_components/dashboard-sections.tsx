@@ -313,6 +313,7 @@ function MilestonesSection({
 export function DashboardSections({
   people,
   followUps,
+  allInteractions,
   streak,
   streakLost,
   previousStreak,
@@ -320,6 +321,7 @@ export function DashboardSections({
 }: {
   people: Person[];
   followUps: FollowUpInteraction[];
+  allInteractions: Interaction[];
   streak: number;
   streakLost: boolean;
   previousStreak: number;
@@ -398,7 +400,7 @@ export function DashboardSections({
         )}
       </section>
 
-      <MilestonesSection people={people} interactions={followUps} />
+      <MilestonesSection people={people} interactions={allInteractions} />
     </>
   );
 }
