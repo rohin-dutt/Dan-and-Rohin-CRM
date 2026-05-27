@@ -196,6 +196,8 @@ export default function NewPersonPage() {
         company: getOptionalFormValue(formData, "company"),
         role: getOptionalFormValue(formData, "role"),
         location: getOptionalFormValue(formData, "location"),
+        latitude: (() => { const v = formData.get("latitude"); return v ? Number(v) : null; })(),
+        longitude: (() => { const v = formData.get("longitude"); return v ? Number(v) : null; })(),
         birthday: getOptionalFormValue(formData, "birthday"),
         how_met: getOptionalFormValue(formData, "how_met"),
         relationship_type: getOptionalFormValue(formData, "relationship_type"),

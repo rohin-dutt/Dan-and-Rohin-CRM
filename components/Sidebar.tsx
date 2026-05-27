@@ -15,6 +15,7 @@ const SIGNUP_URL = "https://useroots.app/auth/signup";
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "People", href: "/people" },
+  { label: "Your Roots", href: "/roots-map" },
   { label: "Settings", href: "/settings" },
 ];
 

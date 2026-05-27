@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
 import type { Person, Tag } from "@/types/index";
@@ -107,6 +107,67 @@ export function PersonForm(props: PersonFormProps) {
   const [selectedFreq, setSelectedFreq] = useState(() =>
     getClosestFreq(person?.contact_frequency_days ?? 30)
   );
+
+  const [locationName, setLocationName] = useState(person?.location ?? "");
+  const [latitude, setLatitude] = useState<number | null>(person?.latitude ?? null);
+  const [longitude, setLongitude] = useState<number | null>(person?.longitude ?? null);
+  const [locationQuery, setLocationQuery] = useState(person?.location ?? "");
+  const [locationResults, setLocationResults] = useState<
+    Array<{ place_name: string; center: [number, number] }>
+  >([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationRef = useRef<HTMLDivElement>(null);
+  const locationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
+        setShowLocationDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
+  function handleLocationQueryChange(value: string) {
+    setLocationQuery(value);
+    if (!value) {
+      setLocationName("");
+      setLatitude(null);
+      setLongitude(null);
+      setLocationResults([]);
+      setShowLocationDropdown(false);
+      return;
+    }
+    if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
+    locationDebounceRef.current = setTimeout(async () => {
+      setLocationLoading(true);
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value)}.json?types=place,region,country&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&limit=5`
+        );
+        if (!res.ok) throw new Error("Geocoding request failed");
+        const json = await res.json();
+        setLocationResults(json.features ?? []);
+        setShowLocationDropdown(true);
+      } catch {
+        setLocationResults([]);
+        setShowLocationDropdown(false);
+      } finally {
+        setLocationLoading(false);
+      }
+    }, 300);
+  }
+
+  function handleLocationSelect(result: { place_name: string; center: [number, number] }) {
+    setLocationName(result.place_name);
+    setLatitude(result.center[1]);
+    setLongitude(result.center[0]);
+    setLocationQuery(result.place_name);
+    setLocationResults([]);
+    setShowLocationDropdown(false);
+  }
 
   function handlePillClick(
     label: string,
@@ -267,6 +328,57 @@ export function PersonForm(props: PersonFormProps) {
           />
         </div>
 
+        {/* Location search with Mapbox geocoding */}
+        <div ref={locationRef} className="relative">
+          <label htmlFor="location_search" className={labelClass}>
+            Location
+          </label>
+          <div className="relative">
+            <input
+              id="location_search"
+              type="text"
+              value={locationQuery}
+              onChange={(e) => {
+                handleLocationQueryChange(e.target.value);
+                onDirty();
+              }}
+              placeholder="Search for a city..."
+              autoComplete="off"
+              className={inputClass}
+            />
+            {locationLoading && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                …
+              </span>
+            )}
+          </div>
+          {showLocationDropdown && locationResults.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card shadow-sm">
+              {locationResults.map((result) => (
+                <button
+                  key={result.place_name}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleLocationSelect(result);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  {result.place_name}
+                </button>
+              ))}
+            </div>
+          )}
+          {showLocationDropdown && !locationLoading && locationQuery && locationResults.length === 0 && (
+            <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-card px-3 py-2 shadow-sm">
+              <p className="text-sm text-muted-foreground">No results found</p>
+            </div>
+          )}
+          <input type="hidden" name="location" value={locationName} />
+          <input type="hidden" name="latitude" value={latitude ?? ""} />
+          <input type="hidden" name="longitude" value={longitude ?? ""} />
+        </div>
+
         {/* FIX 5: Contact frequency as human pills */}
         <div>
           <p className="mb-2 text-sm font-medium text-foreground">
@@ -348,23 +460,6 @@ export function PersonForm(props: PersonFormProps) {
                 defaultValue={person?.phone ?? ""}
                 className={inputClass}
               />
-            </div>
-            {/* FIX 6: Location with placeholder and note */}
-            <div className="md:col-span-2">
-              <label htmlFor="location" className={labelClass}>
-                Location
-              </label>
-              <input
-                id="location"
-                name="location"
-                type="text"
-                placeholder="City, Country"
-                defaultValue={person?.location ?? ""}
-                className={inputClass}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                City search coming soon.
-              </p>
             </div>
             <div>
               <label htmlFor="relationship_strength" className={labelClass}>

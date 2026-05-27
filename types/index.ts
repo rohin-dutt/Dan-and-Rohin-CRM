@@ -7,6 +7,8 @@ export type Person = {
   company: string | null;
   role: string | null;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   birthday: string | null;
   how_met: string | null;
   relationship_type: string | null;
