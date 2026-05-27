@@ -247,11 +247,13 @@ export function PeopleGrid({
   followUps,
   followUpsByPersonId,
   duplicateWarnings,
+  lastInteractions,
 }: {
   people: Person[];
   followUps: Interaction[];
   followUpsByPersonId: Map<string, string>;
   duplicateWarnings: Map<string, string>;
+  lastInteractions: Map<string, { type: string; date: string; notes: string | null }>;
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -260,6 +262,7 @@ export function PeopleGrid({
         const activeFollowUps = followUps.filter(
           (followUp) => followUp.person_id === person.id
         ).length;
+        const lastInteraction = lastInteractions.get(person.id);
 
         return (
           <div
@@ -307,6 +310,12 @@ export function PeopleGrid({
             <p className="mt-4 text-sm text-muted-foreground">
               Last talked: {formatDate(person.last_contacted_at)}
             </p>
+
+            {lastInteraction?.notes && (
+              <p className="mt-2 text-xs text-muted-foreground italic line-clamp-1">
+                &ldquo;{lastInteraction.notes}&rdquo;
+              </p>
+            )}
 
             <div className="mt-4 flex gap-2">
               <Link

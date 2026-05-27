@@ -32,6 +32,9 @@ function PeoplePageInner() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [personTags, setPersonTags] = useState<PersonTag[]>([]);
   const [followUps, setFollowUps] = useState<Interaction[]>([]);
+  const [lastInteractions, setLastInteractions] = useState<
+    Map<string, { type: string; date: string; notes: string | null }>
+  >(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -73,7 +76,7 @@ function PeoplePageInner() {
 
       if (fetchedPeople.length > 0) {
         const ids = fetchedPeople.map((person) => person.id);
-        const [personTagsRes, followUpsRes] = await Promise.all([
+        const [personTagsRes, followUpsRes, lastInteractionsRes] = await Promise.all([
           supabase.from("person_tags").select("*").in("person_id", ids),
           supabase
             .from("interactions")
@@ -81,12 +84,19 @@ function PeoplePageInner() {
             .in("person_id", ids)
             .eq("follow_up_needed", true)
             .neq("follow_up_status", "done"),
+          supabase
+            .from("interactions")
+            .select("person_id, type, date, notes")
+            .in("person_id", ids)
+            .order("date", { ascending: false })
+            .limit(500),
         ]);
 
-        if (personTagsRes.error || followUpsRes.error) {
+        if (personTagsRes.error || followUpsRes.error || lastInteractionsRes.error) {
           setError(
             personTagsRes.error?.message ??
               followUpsRes.error?.message ??
+              lastInteractionsRes.error?.message ??
               "Failed to load relationship metadata."
           );
           setLoading(false);
@@ -95,6 +105,18 @@ function PeoplePageInner() {
 
         setPersonTags(personTagsRes.data ?? []);
         setFollowUps(followUpsRes.data ?? []);
+
+        const lastInteractionMap = new Map<string, { type: string; date: string; notes: string | null }>();
+        for (const interaction of lastInteractionsRes.data ?? []) {
+          if (!lastInteractionMap.has(interaction.person_id)) {
+            lastInteractionMap.set(interaction.person_id, {
+              type: interaction.type,
+              date: interaction.date,
+              notes: interaction.notes,
+            });
+          }
+        }
+        setLastInteractions(lastInteractionMap);
       }
 
       setLoading(false);
@@ -299,6 +321,7 @@ function PeoplePageInner() {
           followUps={followUps}
           followUpsByPersonId={followUpsByPersonId}
           duplicateWarnings={duplicateWarnings}
+          lastInteractions={lastInteractions}
         />
       )}
     </AppLayout>
