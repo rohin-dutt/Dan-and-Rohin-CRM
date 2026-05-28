@@ -201,14 +201,63 @@ export function DeletePersonConfirmation({
   );
 }
 
+function QuickNoteForm({
+  onAddNote,
+  addingNote,
+}: {
+  onAddNote: (note: string) => Promise<void>;
+  addingNote: boolean;
+}) {
+  const [note, setNote] = useState("");
+
+  async function handleSubmit() {
+    if (!note.trim() || addingNote) return;
+    await onAddNote(note.trim());
+    setNote("");
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <textarea
+        rows={2}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="e.g. mentioned they're moving to Chicago..."
+        className="w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
+      />
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Cmd+Enter to save</p>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!note.trim() || addingNote}
+          className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition hover:bg-primary/80 disabled:opacity-50"
+        >
+          {addingNote ? "Saving..." : "Save note"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PersonSummary({
   person,
   personTags,
   interactions,
+  onAddNote,
+  addingNote,
 }: {
   person: Person;
   personTags: Tag[];
   interactions: Interaction[];
+  onAddNote: (note: string) => Promise<void>;
+  addingNote: boolean;
 }) {
   const latestInteraction = interactions[0];
   const activeFollowUps = interactions.filter(
@@ -314,10 +363,18 @@ export function PersonSummary({
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Notes</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground whitespace-pre-wrap">
           {person.notes ||
             "Add context, conversation threads, or anything useful for the next reach-out."}
         </p>
+      </section>
+
+      <section className="mt-6 border-t border-border pt-6">
+        <h2 className="text-base font-semibold text-foreground">Add a note</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Jot something down without logging a full interaction.
+        </p>
+        <QuickNoteForm onAddNote={onAddNote} addingNote={addingNote} />
       </section>
     </section>
   );

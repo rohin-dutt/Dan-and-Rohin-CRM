@@ -40,6 +40,7 @@ export default function PersonDetailPage() {
   const [deletingInteractionId, setDeletingInteractionId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [addingNote, setAddingNote] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -153,6 +154,39 @@ export default function PersonDetailPage() {
     }
 
     router.push("/people");
+  }
+
+  async function handleAddNote(note: string) {
+    if (!person) return;
+    setAddingNote(true);
+
+    const today = new Date();
+    const dateStr = today.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const noteWithDate = `[${dateStr}] ${note}`;
+    const updatedNotes = person.notes
+      ? `${person.notes}\n\n---\n\n${noteWithDate}`
+      : noteWithDate;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+      .from("people")
+      .update({ notes: updatedNotes })
+      .eq("id", person.id)
+      .eq("user_id", user?.id ?? "");
+
+    if (!error) {
+      setPerson((prev) => (prev ? { ...prev, notes: updatedNotes } : prev));
+    }
+
+    setAddingNote(false);
   }
 
   async function recalculateLastContacted() {
@@ -369,6 +403,8 @@ export default function PersonDetailPage() {
         person={person}
         personTags={personTags}
         interactions={interactions}
+        onAddNote={handleAddNote}
+        addingNote={addingNote}
       />
 
       <InteractionTimeline

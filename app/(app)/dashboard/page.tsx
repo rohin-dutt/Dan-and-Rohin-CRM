@@ -136,7 +136,7 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="mb-8">
         <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Dashboard
+          Home
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           Who needs your attention
