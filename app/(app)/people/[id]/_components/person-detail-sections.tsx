@@ -12,6 +12,14 @@ import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
 
+function FollowUpToast({ message }: { message: string }) {
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg animate-in fade-in">
+      {message}
+    </div>
+  );
+}
+
 function InteractionEditForm({
   interaction,
   onSubmit,
@@ -350,6 +358,15 @@ export function InteractionTimeline({
     status: Interaction["follow_up_status"]
   ) => void;
 }) {
+  const [toastMessage, setToastMessage] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
+  function triggerToast(message: string) {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
+  }
+
   return (
     <section className="mt-8">
       <div className="flex items-center justify-between">
@@ -460,19 +477,28 @@ export function InteractionTimeline({
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button
-                          onClick={() => onFollowUpStatus(interaction, "done")}
+                          onClick={() => {
+                            onFollowUpStatus(interaction, "done");
+                            triggerToast("Follow-up done ✓");
+                          }}
                           className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Mark done
                         </button>
                         <button
-                          onClick={() => onFollowUpStatus(interaction, "snoozed")}
+                          onClick={() => {
+                            onFollowUpStatus(interaction, "snoozed");
+                            triggerToast("Snoozed for 7 days");
+                          }}
                           className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Snooze 7 days
                         </button>
                         <button
-                          onClick={() => onFollowUpStatus(interaction, "open")}
+                          onClick={() => {
+                            onFollowUpStatus(interaction, "open");
+                            triggerToast("Follow-up reopened");
+                          }}
                           className="rounded-md bg-card px-3 py-1 text-xs font-medium text-foreground"
                         >
                           Reopen
@@ -499,6 +525,7 @@ export function InteractionTimeline({
           })
         )}
       </div>
+      {showToast && <FollowUpToast message={toastMessage} />}
     </section>
   );
 }

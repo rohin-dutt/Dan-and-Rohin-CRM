@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import AppLayout from "@/components/AppLayout";
-import { todayInputValue } from "@/lib/date-utils";
+import { formatDate, todayInputValue } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 import { updateStreakAfterAction } from "@/lib/crm-rules";
 import { supabase } from "@/lib/supabase";
@@ -20,6 +20,15 @@ export default function NewInteractionPage() {
   const [error, setError] = useState<string | null>(null);
   const [followUpNeeded, setFollowUpNeeded] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [openFollowUps, setOpenFollowUps] = useState<
+    Array<{
+      id: string;
+      follow_up_date: string | null;
+      notes: string | null;
+      type: string;
+    }>
+  >([]);
+  const [markFollowUpDone, setMarkFollowUpDone] = useState(true);
 
   useUnsavedChanges(dirty && !saving);
 
@@ -53,6 +62,17 @@ export default function NewInteractionPage() {
       }
 
       setPerson(data);
+
+      const followUpsResult = await supabase
+        .from("interactions")
+        .select("id, follow_up_date, notes, type")
+        .eq("person_id", params.id)
+        .eq("follow_up_needed", true)
+        .eq("follow_up_status", "open")
+        .gt("follow_up_date", todayInputValue())
+        .order("follow_up_date", { ascending: true });
+
+      setOpenFollowUps(followUpsResult.data ?? []);
     }
 
     loadPerson();
@@ -119,6 +139,19 @@ export default function NewInteractionPage() {
       setError(insertError.message ?? "Failed to save. Please try again.");
       setSaving(false);
       return;
+    }
+
+    if (markFollowUpDone && openFollowUps.length > 0) {
+      try {
+        const followUpIds = openFollowUps.map((fu) => fu.id);
+        await supabase
+          .from("interactions")
+          .update({ follow_up_status: "done" })
+          .in("id", followUpIds)
+          .eq("person_id", params.id);
+      } catch {
+        // interaction already saved — silently ignore follow-up update failure
+      }
     }
 
     await updateStreakAfterAction(supabase);
@@ -200,6 +233,29 @@ export default function NewInteractionPage() {
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+
+          {openFollowUps.length > 0 && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                You had a follow-up scheduled
+                {openFollowUps[0].follow_up_date
+                  ? ` for ${formatDate(openFollowUps[0].follow_up_date)}`
+                  : ""}
+                {openFollowUps[0].notes
+                  ? ` — "${openFollowUps[0].notes.length > 60 ? openFollowUps[0].notes.slice(0, 60) + "..." : openFollowUps[0].notes}"`
+                  : ""}
+              </p>
+              <label className="mt-2 flex items-center gap-2 text-sm text-amber-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={markFollowUpDone}
+                  onChange={(e) => setMarkFollowUpDone(e.target.checked)}
+                  className="h-4 w-4 rounded border-amber-300 text-primary focus:ring-primary"
+                />
+                Mark as done
+              </label>
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
             <input

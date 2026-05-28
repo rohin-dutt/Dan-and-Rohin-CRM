@@ -215,10 +215,14 @@ export function FirstRunEmptyState() {
   );
 }
 
-function FollowUpQueue({
+function ReachOutList({
   interactions,
+  overduePeople,
+  dueThisWeekPeople,
 }: {
   interactions: FollowUpInteraction[];
+  overduePeople: Person[];
+  dueThisWeekPeople: Person[];
 }) {
   const queue = getFollowUpQueue(interactions);
   const today = todayInputValue();
@@ -227,75 +231,143 @@ function FollowUpQueue({
   const splitDue = queue.due.map((item: FollowUpInteraction) => {
     const rawDate = item.follow_up_date;
     if (!rawDate) {
-      return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700" };
+      return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700", isCadence: false as const };
     }
     const dateStr =
       typeof rawDate === "string" && rawDate.includes("T") ? rawDate.slice(0, 10) : rawDate;
     const dueDate = new Date(dateStr + "T00:00:00");
     const days = Math.round((dueDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
     if (days > 7) {
-      return { ...item, state: "Coming Up", style: "bg-sky-100 text-sky-700" };
+      return { ...item, state: "Coming Up", style: "bg-sky-100 text-sky-700", isCadence: false as const };
     }
-    return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700" };
+    return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700", isCadence: false as const };
   });
+
+  const explicitPersonIds = new Set(
+    [...queue.overdue, ...queue.due_today, ...queue.due].map(
+      (item: FollowUpInteraction) => item.person_id
+    )
+  );
+
+  const cadenceOverdue = overduePeople
+    .filter((p) => !explicitPersonIds.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      person_id: p.id,
+      person_name: p.name,
+      type: "cadence" as const,
+      date: p.last_contacted_at ?? "",
+      state: "Overdue",
+      style: "bg-red-100 text-red-700",
+      isCadence: true as const,
+      follow_up_date: null as string | null,
+    }));
+
+  const cadenceDueThisWeek = dueThisWeekPeople
+    .filter((p) => !explicitPersonIds.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      person_id: p.id,
+      person_name: p.name,
+      type: "cadence" as const,
+      date: p.last_contacted_at ?? "",
+      state: "Due This Week",
+      style: "bg-amber-100 text-amber-700",
+      isCadence: true as const,
+      follow_up_date: null as string | null,
+    }));
+
+  const dueSoon = splitDue.filter((item) => item.state !== "Coming Up");
 
   const visible = [
     ...queue.overdue.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Overdue",
       style: "bg-red-100 text-red-700",
+      isCadence: false as const,
     })),
     ...queue.due_today.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Due today",
       style: "bg-red-100 text-red-700",
+      isCadence: false as const,
     })),
-    ...splitDue,
+    ...cadenceOverdue,
+    ...dueSoon,
+    ...cadenceDueThisWeek,
     ...queue.snoozed.map((item: FollowUpInteraction) => ({
       ...item,
       state: "Snoozed",
       style: "bg-muted text-muted-foreground",
+      isCadence: false as const,
     })),
-  ].slice(0, 6);
+  ].slice(0, 8);
 
   return (
     <section className="mt-10">
       <h2 className="text-lg font-semibold text-foreground">
-        Open follow-ups ({visible.length})
+        Reach out ({visible.length})
       </h2>
       {visible.length === 0 ? (
         <SectionEmptyState message="You're all caught up 🌱" />
       ) : (
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {visible.map((interaction) => (
-            <Link
-              key={interaction.id}
-              href={`/people/${interaction.person_id}`}
-              className="rounded-lg border border-border bg-card p-4 shadow-sm transition hover:border-primary/30"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-foreground">
-                    {interaction.person_name}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {interaction.type} on {formatDate(interaction.date)}
-                  </p>
+          {visible.map((item) =>
+            item.isCadence ? (
+              <Link
+                key={item.id}
+                href={`/people/${item.person_id}`}
+                className="rounded-lg border border-border bg-card p-4 shadow-sm transition hover:border-primary/30"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {item.person_name}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Last talked: {formatDate(item.date)}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      item.style
+                    )}
+                  >
+                    {item.state}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                    interaction.style
-                  )}
-                >
-                  {interaction.state}
-                </span>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Follow up: {formatDate(interaction.follow_up_date)}
-              </p>
-            </Link>
-          ))}
+              </Link>
+            ) : (
+              <Link
+                key={item.id}
+                href={`/people/${item.person_id}`}
+                className="rounded-lg border border-border bg-card p-4 shadow-sm transition hover:border-primary/30"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      {item.person_name}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {item.type} on {formatDate(item.date)}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      item.style
+                    )}
+                  >
+                    {item.state}
+                  </span>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Follow up: {formatDate(item.follow_up_date)}
+                </p>
+              </Link>
+            )
+          )}
         </div>
       )}
     </section>
@@ -429,7 +501,11 @@ export function DashboardSections({
         />
       </div>
 
-      <FollowUpQueue interactions={followUps} />
+      <ReachOutList
+        interactions={followUps}
+        overduePeople={overdue}
+        dueThisWeekPeople={dueThisWeek}
+      />
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-foreground">
