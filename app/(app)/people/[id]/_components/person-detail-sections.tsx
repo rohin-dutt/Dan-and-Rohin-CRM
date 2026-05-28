@@ -259,6 +259,7 @@ export function PersonSummary({
   onAddNote: (note: string) => Promise<void>;
   addingNote: boolean;
 }) {
+  const [showDetails, setShowDetails] = useState(false);
   const latestInteraction = interactions[0];
   const activeFollowUps = interactions.filter(
     (interaction) =>
@@ -304,7 +305,7 @@ export function PersonSummary({
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-4">
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-muted p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Next step
@@ -331,35 +332,42 @@ export function PersonSummary({
               : `${activeFollowUps.length} active`}
           </p>
         </div>
-        <div className="rounded-lg bg-muted p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Last Contacted
-          </p>
-          <p className="mt-2 font-semibold">{formatDate(person.last_contacted_at)}</p>
-        </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {[
+      {(() => {
+        const populatedFields = [
           ["Email", person.email],
           ["Phone", person.phone],
           ["Location", person.location],
-          ["Birthday", formatBirthdayDate(person.birthday)],
+          ["Birthday", person.birthday ? formatBirthdayDate(person.birthday) : null],
           ["Relationship Strength", person.relationship_strength],
           ["Preferred Contact", person.preferred_contact_method],
-          ["How often you connect", `Every ${person.contact_frequency_days} days`],
+          ["How often you connect", person.contact_frequency_days ? `Every ${person.contact_frequency_days} days` : null],
           ["How you met", person.how_met],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-muted p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {label}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-foreground">
-              {value || `Add ${String(label).toLowerCase()} details.`}
-            </p>
+        ].filter(([, value]) => value != null && value !== "");
+
+        return populatedFields.length > 0 ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showDetails ? "Hide details ▴" : `View details (${populatedFields.length}) ▾`}
+            </button>
+            {showDetails && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {populatedFields.map(([label, value]) => (
+                  <div key={label} className="rounded-lg bg-muted p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-sm leading-6 text-foreground">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        ) : null;
+      })()}
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Notes</h2>
@@ -367,14 +375,9 @@ export function PersonSummary({
           {person.notes ||
             "Add context, conversation threads, or anything useful for the next reach-out."}
         </p>
-      </section>
-
-      <section className="mt-6 border-t border-border pt-6">
-        <h2 className="text-base font-semibold text-foreground">Add a note</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Jot something down without logging a full interaction.
-        </p>
-        <QuickNoteForm onAddNote={onAddNote} addingNote={addingNote} />
+        <div className="mt-4">
+          <QuickNoteForm onAddNote={onAddNote} addingNote={addingNote} />
+        </div>
       </section>
     </section>
   );
