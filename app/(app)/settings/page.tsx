@@ -141,11 +141,14 @@ export default function SettingsPage() {
     const formData = new FormData(e.currentTarget);
     const reminderDays = Number(formData.get("reminder_frequency_days")) || 7;
 
+    const emailRemindersEnabled =
+      formData.get("email_reminders_enabled") === "on";
+
     const { error: updateError } = await supabase
       .from("settings")
       .update({
         reminder_frequency_days: reminderDays,
-        email_reminders_enabled: false,
+        email_reminders_enabled: emailRemindersEnabled,
       })
       .eq("id", settings.id);
 
@@ -153,7 +156,13 @@ export default function SettingsPage() {
       setError(updateError.message ?? "Failed to save.");
     } else {
       setSettings((prev) =>
-        prev ? { ...prev, reminder_frequency_days: reminderDays } : prev
+        prev
+          ? {
+              ...prev,
+              reminder_frequency_days: reminderDays,
+              email_reminders_enabled: emailRemindersEnabled,
+            }
+          : prev
       );
       setSaved(true);
     }

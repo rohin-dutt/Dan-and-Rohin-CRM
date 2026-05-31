@@ -37,7 +37,22 @@ export function SettingsForm({
           className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Used for in-app dashboard reminders. Email delivery is not enabled in this repo.
+          How often Roots checks if you should reach out to someone.
+        </p>
+        <div className="mt-5 flex items-center gap-3">
+          <input
+            id="email_reminders_enabled"
+            name="email_reminders_enabled"
+            type="checkbox"
+            defaultChecked={settings?.email_reminders_enabled ?? false}
+            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+          />
+          <label htmlFor="email_reminders_enabled" className="text-sm font-medium text-foreground">
+            Send me a weekly email digest
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Every Sunday evening — who to reach out to this week and upcoming birthdays.
         </p>
         <button
           type="submit"
