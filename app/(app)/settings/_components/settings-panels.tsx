@@ -535,11 +535,14 @@ export function AccountTab({ onLogout }: { onLogout: () => void }) {
 
 export function BillingTab() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="mb-2 text-base font-semibold text-foreground">Free plan</h2>
-      <p className="text-sm text-muted-foreground">
-        You&apos;re on the free plan. Paid plans with additional features are coming soon.
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+      <h2 className="text-base font-semibold text-foreground">Billing</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Roots is free during beta. No credit card required.
       </p>
-    </section>
+      <p className="mt-1 text-sm text-muted-foreground">
+        We&apos;ll let you know before anything changes.
+      </p>
+    </div>
   );
 }

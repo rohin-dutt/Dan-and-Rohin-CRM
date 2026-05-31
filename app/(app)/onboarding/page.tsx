@@ -224,6 +224,10 @@ export default function OnboardingPage() {
             </p>
           </div>
 
+          <p className="mt-4 text-xs text-muted-foreground">
+            We&apos;ll send you a weekly email with who to reach out to. You can turn this off anytime in Settings.
+          </p>
+
           <div className="space-y-3">
             <button
               onClick={() => setStep(2)}
