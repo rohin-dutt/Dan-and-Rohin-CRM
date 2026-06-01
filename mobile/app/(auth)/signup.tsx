@@ -7,47 +7,72 @@ import { Button } from "../../components/Button"
 import { TextField } from "../../components/TextField"
 import { ErrorBanner } from "../../components/ErrorBanner"
 
-export default function LoginScreen() {
+export default function SignupScreen() {
   const router = useRouter()
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  async function handleSignIn() {
+  async function handleSignUp() {
     setError("")
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: {
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+        },
+      },
     })
     setLoading(false)
     if (error) {
       setError(error.message)
     } else {
-      router.replace("/(app)/dashboard")
+      router.replace("/(app)/onboarding")
     }
   }
 
   return (
     <Screen>
-      <View style={{ alignItems: "center", marginTop: 64, marginBottom: 40 }}>
-        <Text style={{ fontSize: 32, fontFamily: "Georgia" }}>🌱 Roots</Text>
-      </View>
-
       <Text
         style={{
           fontSize: 24,
           fontWeight: "700",
           color: "#1C1917",
+          marginTop: 64,
           marginBottom: 24,
           fontFamily: "Georgia",
         }}
       >
-        Welcome back
+        Create your account
       </Text>
 
       <ErrorBanner message={error} />
+
+      <TextField
+        label="First name"
+        value={firstName}
+        onChangeText={setFirstName}
+        placeholder="Jane"
+        autoCapitalize="words"
+        autoComplete="given-name"
+        textContentType="givenName"
+      />
+
+      <TextField
+        label="Last name"
+        value={lastName}
+        onChangeText={setLastName}
+        placeholder="Smith"
+        autoCapitalize="words"
+        autoComplete="family-name"
+        textContentType="familyName"
+      />
 
       <TextField
         label="Email"
@@ -67,28 +92,21 @@ export default function LoginScreen() {
         placeholder="••••••••"
         secureTextEntry
         autoCapitalize="none"
-        autoComplete="password"
-        textContentType="password"
+        autoComplete="new-password"
+        textContentType="newPassword"
       />
 
       <View style={{ marginTop: 8, marginBottom: 24 }}>
-        <Button title="Sign in" onPress={handleSignIn} loading={loading} />
+        <Button title="Create account" onPress={handleSignUp} loading={loading} />
       </View>
 
       <TouchableOpacity
-        onPress={() => router.push("/(auth)/forgot-password")}
-        style={{ alignItems: "center", marginBottom: 16 }}
-      >
-        <Text style={{ color: "#7C9A7E", fontSize: 14 }}>Forgot password?</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => router.push("/(auth)/signup")}
+        onPress={() => router.push("/(auth)/login")}
         style={{ alignItems: "center" }}
       >
         <Text style={{ color: "#6B7280", fontSize: 14 }}>
-          Don't have an account?{" "}
-          <Text style={{ color: "#7C9A7E", fontWeight: "600" }}>Sign up</Text>
+          Already have an account?{" "}
+          <Text style={{ color: "#7C9A7E", fontWeight: "600" }}>Sign in</Text>
         </Text>
       </TouchableOpacity>
     </Screen>
