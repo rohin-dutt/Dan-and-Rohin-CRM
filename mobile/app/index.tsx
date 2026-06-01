@@ -1,22 +1,33 @@
-import { Redirect } from "expo-router"
 import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase"
+import { useRouter } from "expo-router"
+import { supabase } from "@/lib/supabase"
 
 export default function Index() {
-  const [session, setSession] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    async function redirect() {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        router.replace("/(auth)/login")
+        return
+      }
+
+      const { count } = await supabase
+        .from("people")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", session.user.id)
+
+      if (count === 0) {
+        router.replace("/(app)/onboarding")
+      } else {
+        router.replace("/(app)/(tabs)/dashboard")
+      }
+    }
+    redirect()
   }, [])
 
-  if (loading) return null
-
-  if (session) {
-    return <Redirect href="/(app)/dashboard" />
-  }
-  return <Redirect href="/(auth)/login" />
+  return null
 }

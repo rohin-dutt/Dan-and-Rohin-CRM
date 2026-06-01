@@ -1,6 +1,6 @@
 import { Slot, useRouter, useSegments } from "expo-router"
 import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase"
+import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import "../global.css"
 
@@ -33,7 +33,7 @@ export default function RootLayout() {
     if (!session && !inAuthGroup) {
       router.replace("/(auth)/login")
     } else if (session && inAuthGroup) {
-      router.replace("/(app)/dashboard")
+      router.replace("/(app)/(tabs)/dashboard")
     }
   }, [session, loading, segments])
 

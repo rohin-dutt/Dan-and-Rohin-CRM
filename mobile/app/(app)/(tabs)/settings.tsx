@@ -1,8 +1,8 @@
 import { View, Text, TouchableOpacity, Alert } from "react-native"
 import { useRouter } from "expo-router"
-import { supabase } from "../../lib/supabase"
-import { Screen } from "../../components/Screen"
-import { colors } from "../../constants/theme"
+import { supabase } from "@/lib/supabase"
+import { Screen } from "@/components/Screen"
+import { colors } from "@/constants/theme"
 
 export default function SettingsScreen() {
   const router = useRouter()

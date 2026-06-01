@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/*": ["./*"],
       "@roots/shared": ["../packages/shared/index.ts"]
     }
   }
