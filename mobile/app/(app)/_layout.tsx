@@ -1,5 +1,4 @@
 import { Stack } from "expo-router"
-import { colors } from "@/constants/theme"
 
 export default function AppLayout() {
   return (
@@ -12,6 +11,9 @@ export default function AppLayout() {
           gestureEnabled: false,
         }}
       />
+      <Stack.Screen name="people/[id]" />
+      <Stack.Screen name="people/new" />
+      <Stack.Screen name="people/[id]/log" />
     </Stack>
   )
 }
