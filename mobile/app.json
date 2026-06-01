@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Roots",
+    "slug": "roots",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "roots",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F0EBE1"
+    },
+    "ios": {
+      "bundleIdentifier": "com.roots.crm",
+      "supportsTablet": false,
+      "buildNumber": "20260601"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Roots needs access to your contacts so you can import the people you want to stay close to."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7C9A7E"
+        }
+      ]
+    ]
+  }
+}
