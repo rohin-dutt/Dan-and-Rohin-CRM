@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react"
 import { View, Text, TouchableOpacity } from "react-native"
-import { useFocusEffect } from "expo-router"
+import { useFocusEffect, useRouter } from "expo-router"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
@@ -58,6 +58,7 @@ function StatCard({
 }
 
 export default function DashboardScreen() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [firstName, setFirstName] = useState("")
   const [streak, setStreak] = useState(0)
@@ -124,9 +125,7 @@ export default function DashboardScreen() {
           title="Welcome to Roots"
           body="Add your first person to get started."
           actionLabel="Add someone"
-          onAction={() => {
-            // navigation wired in Phase 7
-          }}
+          onAction={() => router.push("/people/new")}
         />
       </Screen>
     )
@@ -195,17 +194,23 @@ export default function DashboardScreen() {
             {reachOut.map((person) => {
               const isOverdue = overdue.some((p) => p.id === person.id)
               return (
-                <Card key={person.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ fontSize: 15, fontWeight: "600", color: "#1C1917" }}>
-                      {person.name}
-                    </Text>
-                    <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                      Last talked: {formatDate(person.last_contacted_at)}
-                    </Text>
-                  </View>
-                  <StatusBadge status={isOverdue ? "overdue" : "due_this_week"} />
-                </Card>
+                <TouchableOpacity
+                  key={person.id}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/people/${person.id}`)}
+                >
+                  <Card style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ fontSize: 15, fontWeight: "600", color: "#1C1917" }}>
+                        {person.name}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+                        Last talked: {formatDate(person.last_contacted_at)}
+                      </Text>
+                    </View>
+                    <StatusBadge status={isOverdue ? "overdue" : "due_this_week"} />
+                  </Card>
+                </TouchableOpacity>
               )
             })}
           </View>

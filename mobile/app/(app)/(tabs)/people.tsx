@@ -5,9 +5,9 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  Alert,
+  ScrollView,
 } from "react-native"
-import { useFocusEffect } from "expo-router"
+import { useFocusEffect, useRouter } from "expo-router"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
@@ -67,10 +67,37 @@ function PersonCard({ person, onPress }: { person: Person; onPress: () => void }
   )
 }
 
+type SortKey = "last_contacted" | "name" | "recently_added"
+
+const SORT_OPTIONS: { label: string; value: SortKey }[] = [
+  { label: "Last contacted", value: "last_contacted" },
+  { label: "Name A–Z", value: "name" },
+  { label: "Recently added", value: "recently_added" },
+]
+
+function sortPeople(people: Person[], sortBy: SortKey): Person[] {
+  const copy = [...people]
+  if (sortBy === "name") {
+    return copy.sort((a, b) => a.name.localeCompare(b.name))
+  }
+  if (sortBy === "recently_added") {
+    return copy.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+  // last_contacted: most recent first, nulls last
+  return copy.sort((a, b) => {
+    if (!a.last_contacted_at && !b.last_contacted_at) return 0
+    if (!a.last_contacted_at) return 1
+    if (!b.last_contacted_at) return -1
+    return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
+  })
+}
+
 export default function PeopleScreen() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [people, setPeople] = useState<Person[]>([])
   const [query, setQuery] = useState("")
+  const [sortBy, setSortBy] = useState<SortKey>("last_contacted")
 
   const fetchPeople = useCallback(async () => {
     setLoading(true)
@@ -94,16 +121,19 @@ export default function PeopleScreen() {
     }, [fetchPeople])
   )
 
-  const filtered = query.trim()
-    ? people.filter((p) => {
-        const q = query.toLowerCase()
-        return (
-          p.name.toLowerCase().includes(q) ||
-          (p.company ?? "").toLowerCase().includes(q) ||
-          (p.notes ?? "").toLowerCase().includes(q)
-        )
-      })
-    : people
+  const filtered = sortPeople(
+    query.trim()
+      ? people.filter((p) => {
+          const q = query.toLowerCase()
+          return (
+            p.name.toLowerCase().includes(q) ||
+            (p.company ?? "").toLowerCase().includes(q) ||
+            (p.location ?? "").toLowerCase().includes(q)
+          )
+        })
+      : people,
+    sortBy
+  )
 
   if (loading) return <LoadingState />
 
@@ -121,7 +151,7 @@ export default function PeopleScreen() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => Alert.alert("Add someone", "Navigation coming in Phase 7")}
+            onPress={() => router.push("/people/new")}
             style={{
               backgroundColor: "#7C9A7E",
               borderRadius: 8,
@@ -136,7 +166,7 @@ export default function PeopleScreen() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search by name, company, or notes…"
+          placeholder="Search by name, company, or location…"
           placeholderTextColor="#9CA3AF"
           style={{
             height: 40,
@@ -150,6 +180,37 @@ export default function PeopleScreen() {
             marginTop: 12,
           }}
         />
+
+        {/* Sort pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 10 }}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {SORT_OPTIONS.map(({ label, value }) => (
+            <TouchableOpacity
+              key={value}
+              onPress={() => setSortBy(value)}
+              style={{
+                borderRadius: 999,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                backgroundColor: sortBy === value ? "#7C9A7E" : "#FFFFFF",
+                borderWidth: 1,
+                borderColor: sortBy === value ? "#7C9A7E" : "#E5E0D8",
+              }}
+            >
+              <Text style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: sortBy === value ? "#FFFFFF" : "#6B7280",
+              }}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* List */}
@@ -158,7 +219,7 @@ export default function PeopleScreen() {
           title={query ? "No results" : "No people yet"}
           body={query ? "Try a different search." : "Add your first person to get started."}
           actionLabel={!query ? "Add someone" : undefined}
-          onAction={!query ? () => Alert.alert("Add someone", "Navigation coming in Phase 7") : undefined}
+          onAction={!query ? () => router.push("/people/new") : undefined}
         />
       ) : (
         <FlatList
@@ -167,9 +228,7 @@ export default function PeopleScreen() {
           renderItem={({ item }) => (
             <PersonCard
               person={item}
-              onPress={() => {
-                // navigation wired in Phase 7
-              }}
+              onPress={() => router.push(`/people/${item.id}`)}
             />
           )}
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}

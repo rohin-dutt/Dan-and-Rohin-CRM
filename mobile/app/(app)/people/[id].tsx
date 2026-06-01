@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  FlatList,
 } from "react-native"
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router"
 import { supabase } from "@/lib/supabase"
@@ -16,6 +15,7 @@ import {
   formatDate,
   getNextDueDays,
   pluralize,
+  getFollowUpState,
 } from "@roots/shared"
 import type { Person, Interaction, Tag } from "@/types"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -45,9 +45,41 @@ function TagPill({ tag }: { tag: Tag }) {
   )
 }
 
-function InteractionRow({ interaction }: { interaction: Interaction }) {
+function followUpStateLabel(interaction: Interaction): string {
+  const state = getFollowUpState(interaction)
+  const date = interaction.follow_up_date
+  const snoozedUntil = interaction.follow_up_snoozed_until
+  if (state === "overdue") return `Overdue since ${formatDate(date)}`
+  if (state === "due_today") return "Due today"
+  if (state === "due") return `Due on ${formatDate(date)}`
+  if (state === "snoozed") return `Snoozed until ${formatDate(snoozedUntil)}`
+  return ""
+}
+
+function InteractionRow({
+  interaction,
+  onMarkDone,
+  onSnooze,
+}: {
+  interaction: Interaction
+  onMarkDone: () => void
+  onSnooze: () => void
+}) {
+  const state = getFollowUpState(interaction)
   const hasActiveFollowUp =
+    interaction.follow_up_needed &&
+    interaction.follow_up_status !== "done" &&
+    interaction.follow_up_status !== "snoozed"
+  const hasAnyFollowUp =
     interaction.follow_up_needed && interaction.follow_up_status !== "done"
+
+  const stateColor =
+    state === "overdue" || state === "due_today"
+      ? { bg: "#FEE2E2", text: "#DC2626" }
+      : state === "snoozed"
+      ? { bg: "#F3F4F6", text: "#6B7280" }
+      : { bg: "#FEF3C7", text: "#D97706" }
+
   return (
     <View style={{
       paddingVertical: 12,
@@ -65,18 +97,48 @@ function InteractionRow({ interaction }: { interaction: Interaction }) {
           {interaction.notes}
         </Text>
       ) : null}
-      {hasActiveFollowUp && (
+      {hasAnyFollowUp && (
         <View style={{
           marginTop: 6,
           alignSelf: "flex-start",
-          backgroundColor: "#FEF3C7",
+          backgroundColor: stateColor.bg,
           borderRadius: 999,
           paddingHorizontal: 8,
           paddingVertical: 2,
         }}>
-          <Text style={{ fontSize: 11, fontWeight: "600", color: "#D97706" }}>
-            Follow-up {interaction.follow_up_date ? `by ${formatDate(interaction.follow_up_date)}` : "open"}
+          <Text style={{ fontSize: 11, fontWeight: "600", color: stateColor.text }}>
+            {followUpStateLabel(interaction)}
           </Text>
+        </View>
+      )}
+      {hasActiveFollowUp && (
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+          <TouchableOpacity
+            onPress={onMarkDone}
+            style={{
+              borderRadius: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              backgroundColor: "#DCFCE7",
+              borderWidth: 1,
+              borderColor: "#86EFAC",
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#16A34A" }}>Mark done</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onSnooze}
+            style={{
+              borderRadius: 6,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              backgroundColor: "#F3F4F6",
+              borderWidth: 1,
+              borderColor: "#D1D5DB",
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>Snooze 7 days</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -135,6 +197,62 @@ export default function PersonDetailScreen() {
     }, [fetchData])
   )
 
+  async function handleMarkDone(interactionId: string) {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase
+      .from("interactions")
+      .update({ follow_up_status: "done" })
+      .eq("id", interactionId)
+    Alert.alert("Done", "Follow-up marked as done.")
+    fetchData()
+  }
+
+  async function handleSnooze(interactionId: string) {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    const snoozedUntil = d.toISOString().slice(0, 10)
+    await supabase
+      .from("interactions")
+      .update({ follow_up_status: "snoozed", follow_up_snoozed_until: snoozedUntil })
+      .eq("id", interactionId)
+    Alert.alert("Snoozed", `Follow-up snoozed until ${snoozedUntil}.`)
+    fetchData()
+  }
+
+  async function handleDelete() {
+    if (!person || !id) return
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase
+      .from("people")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", session.user.id)
+    router.back()
+  }
+
+  function showMenu() {
+    if (!person) return
+    Alert.alert(person.name, undefined, [
+      { text: "Edit", onPress: () => router.push(`/people/${id}/edit`) },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          Alert.alert(
+            `Delete ${person.name}?`,
+            "This will permanently delete this person and all their history.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Delete", style: "destructive", onPress: handleDelete },
+            ]
+          ),
+      },
+      { text: "Cancel", style: "cancel" },
+    ])
+  }
+
   if (loading) return <LoadingState />
 
   if (notFound || !person) {
@@ -167,10 +285,15 @@ export default function PersonDetailScreen() {
       style={{ flex: 1, backgroundColor: "#F0EBE1" }}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
     >
-      {/* Back button */}
-      <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16, marginTop: 8 }}>
-        <Text style={{ fontSize: 15, color: "#7C9A7E", fontWeight: "600" }}>← People</Text>
-      </TouchableOpacity>
+      {/* Header row: back + menu */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16, marginTop: 8 }}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={{ fontSize: 15, color: "#7C9A7E", fontWeight: "600" }}>← People</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={showMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={{ fontSize: 22, color: "#6B7280", fontWeight: "600" }}>⋯</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Name + subtitle */}
       <Text style={{ fontSize: 28, fontWeight: "700", color: "#1C1917", fontFamily: "Georgia", marginBottom: 4 }}>
@@ -249,7 +372,7 @@ export default function PersonDetailScreen() {
       <View style={{ marginBottom: 28 }}>
         <Button
           title="Log a chat"
-          onPress={() => Alert.alert("Log a chat", "Navigation coming in Phase 7")}
+          onPress={() => router.push(`/people/${id}/log`)}
         />
       </View>
 
@@ -264,7 +387,12 @@ export default function PersonDetailScreen() {
       ) : (
         <Card style={{ padding: 0, paddingHorizontal: 16 }}>
           {interactions.map((interaction) => (
-            <InteractionRow key={interaction.id} interaction={interaction} />
+            <InteractionRow
+              key={interaction.id}
+              interaction={interaction}
+              onMarkDone={() => handleMarkDone(interaction.id)}
+              onSnooze={() => handleSnooze(interaction.id)}
+            />
           ))}
         </Card>
       )}
