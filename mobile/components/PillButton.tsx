@@ -1,35 +1,24 @@
-import { TouchableOpacity, Text } from "react-native"
+import { Text, TouchableOpacity } from "react-native"
 
-export function PillButton({
-  label,
-  selected,
-  onPress,
-  selectedColor = "#7C9A7E",
-}: {
+type PillButtonProps = {
   label: string
   selected: boolean
   onPress: () => void
-  selectedColor?: string
-}) {
+}
+
+export function PillButton({ label, selected, onPress }: PillButtonProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      style={{
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: selected ? selectedColor : "#E5E0D8",
-        backgroundColor: selected ? selectedColor : "#FFFFFF",
-        marginRight: 8,
-        marginBottom: 8,
-      }}
+      className={`rounded-full border px-4 py-1.5 ${
+        selected
+          ? "bg-sage border-sage"
+          : "bg-white border-gray-200"
+      }`}
     >
-      <Text style={{
-        fontSize: 13,
-        fontWeight: "500",
-        color: selected ? "#FFFFFF" : "#1C1917",
-      }}>
+      <Text
+        className={`text-sm font-medium ${selected ? "text-white" : "text-warm-black"}`}
+      >
         {label}
       </Text>
     </TouchableOpacity>

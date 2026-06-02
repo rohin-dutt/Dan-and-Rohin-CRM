@@ -1,353 +1,345 @@
-import { useState, useEffect } from "react"
-import {
-  View,
-  Text,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableOpacity,
-} from "react-native"
-import { useLocalSearchParams, useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { useEffect, useState } from "react"
+import { Text, TouchableOpacity, View } from "react-native"
+import { useRouter, useLocalSearchParams } from "expo-router"
+import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
-import { ErrorBanner } from "@/components/ErrorBanner"
-import { LoadingState } from "@/components/LoadingState"
 import { TagPicker } from "@/components/TagPicker"
-import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
+import { LoadingState } from "@/components/LoadingState"
+import { ErrorBanner } from "@/components/ErrorBanner"
+import { supabase } from "@/lib/supabase"
 import { colors } from "@/constants/theme"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 import type { Person, Tag } from "@/types"
 
+const CATEGORIES = [
+  { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
+  { label: "Family", tagName: "Family", tagColor: "#2563EB" },
+  { label: "Professional", tagName: "Colleague", tagColor: "#D97706" },
+] as const
+
+type CategoryLabel = (typeof CATEGORIES)[number]["label"]
+
+async function getOrCreateTag(
+  userId: string,
+  name: string,
+  color: string,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from("tags")
+    .select("id")
+    .eq("user_id", userId)
+    .ilike("name", name)
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  const { data: created } = await supabase
+    .from("tags")
+    .insert({ user_id: userId, name, color })
+    .select("id")
+    .single()
+
+  return created?.id ?? null
+}
+
 export default function EditPersonScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
+  const { id } = useLocalSearchParams<{ id: string }>()
 
   const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [userId, setUserId] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [allTags, setAllTags] = useState<Tag[]>([])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [name, setName] = useState("")
+  const [category, setCategory] = useState<CategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
   const [birthday, setBirthday] = useState("")
-  const [relationship, setRelationship] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [howMet, setHowMet] = useState("")
+  const [frequencyDays, setFrequencyDays] = useState(30)
   const [location, setLocation] = useState("")
-  const [selectedFreq, setSelectedFreq] = useState(30)
-
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-  const [allTags, setAllTags] = useState<Tag[]>([])
-
-  const isProfessional = selectedCategory === "Professional"
-  const isFamily = selectedCategory === "Family"
-  const showBirthday = selectedCategory === "Friend" || isFamily
+  const [notes, setNotes] = useState("")
 
   useEffect(() => {
-    async function loadData() {
-      if (!id) return
-      setLoading(true)
+    async function load() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
         if (!session) return
-        setUserId(session.user.id)
 
-        const [personRes, personTagsRes, allTagsRes] = await Promise.all([
-          supabase.from("people").select("*").eq("id", id).eq("user_id", session.user.id).single(),
-          supabase.from("person_tags").select("tag_id, tags(*)").eq("person_id", id),
-          supabase.from("tags").select("*").eq("user_id", session.user.id).order("name"),
+        const [personRes, tagsRes, personTagsRes] = await Promise.all([
+          supabase.from("people").select("*").eq("id", id).single(),
+          supabase.from("tags").select("*").eq("user_id", session.user.id),
+          supabase.from("person_tags").select("tag_id").eq("person_id", id),
         ])
 
-        if (personRes.error || !personRes.data) {
-          setNotFound(true)
-          return
-        }
+        if (personRes.error) throw personRes.error
+        const p: Person = personRes.data
 
-        const person = personRes.data as Person
-        const nameParts = person.name.split(" ")
-        setFirstName(nameParts[0] ?? "")
-        setLastName(nameParts.slice(1).join(" "))
-        setCompany(person.company ?? "")
-        setRole(person.role ?? "")
-        setBirthday(person.birthday ?? "")
-        setRelationship(person.relationship_type ?? "")
-        setHowMet(person.how_met ?? "")
-        setLocation(person.location ?? "")
-        setSelectedFreq(person.contact_frequency_days ?? 30)
+        setName(p.name)
+        setCompany(p.company ?? "")
+        setRole(p.role ?? "")
+        setBirthday(p.birthday ?? "")
+        setEmail(p.email ?? "")
+        setPhone(p.phone ?? "")
+        setHowMet(p.how_met ?? "")
+        setFrequencyDays(p.contact_frequency_days ?? 30)
+        setLocation(p.location ?? "")
+        setNotes(p.notes ?? "")
 
-        // Infer category from tags
-        const tagData: Tag[] = (personTagsRes.data ?? [])
-          .map((pt: { tags: unknown }) => pt.tags)
-          .filter(Boolean) as Tag[]
-        const tagIds = tagData.map((t) => t.id)
-        setSelectedTagIds(tagIds)
+        const cat = CATEGORIES.find((c) => c.label === p.relationship_type)
+        if (cat) setCategory(cat.label)
 
-        const tags = (allTagsRes.data as Tag[]) ?? []
-        setAllTags(tags)
-
-        // Pre-select category pill if a matching tag exists
-        const categoryMatch = ONBOARDING_CATEGORY_PILLS.find((pill) =>
-          tagData.some((t) => t.name === pill.tagName)
-        )
-        if (categoryMatch) setSelectedCategory(categoryMatch.label)
+        setAllTags(tagsRes.data ?? [])
+        setSelectedTagIds((personTagsRes.data ?? []).map((pt) => pt.tag_id))
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load person")
       } finally {
         setLoading(false)
       }
     }
-    loadData()
+    load()
   }, [id])
 
+  const isProfessional = category === "Professional"
+  const isFriendOrFamily = category === "Friend" || category === "Family"
+
   async function handleSave() {
-    const trimmedFirst = firstName.trim()
-    if (!trimmedFirst) {
-      setFormError("First name is required.")
+    if (!name.trim()) {
+      setError("Name is required")
       return
     }
+
     setSaving(true)
-    setFormError(null)
+    setError(null)
 
-    const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(" ")
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) throw new Error("Not authenticated")
 
-    const { error: updateError } = await supabase
-      .from("people")
-      .update({
-        name,
-        how_met: howMet.trim() || null,
-        contact_frequency_days: selectedFreq,
-        company: isProfessional && company.trim() ? company.trim() : null,
-        role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: showBirthday && birthday ? birthday : null,
-        relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
-        location: location.trim() || null,
-      })
-      .eq("id", id)
-      .eq("user_id", userId)
+      const { error: updateErr } = await supabase
+        .from("people")
+        .update({
+          name: name.trim(),
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+          company: company.trim() || null,
+          role: role.trim() || null,
+          birthday: birthday.trim() || null,
+          how_met: howMet.trim() || null,
+          location: location.trim() || null,
+          notes: notes.trim() || null,
+          contact_frequency_days: frequencyDays,
+          relationship_type: category ?? null,
+        })
+        .eq("id", id)
 
-    if (updateError) {
-      setFormError(updateError.message ?? "Failed to save. Please try again.")
+      if (updateErr) throw updateErr
+
+      // If a category tag is selected, ensure it's in the selectedTagIds
+      let finalTagIds = [...selectedTagIds]
+      if (category) {
+        const cat = CATEGORIES.find((c) => c.label === category)
+        if (cat) {
+          const tagId = await getOrCreateTag(session.user.id, cat.tagName, cat.tagColor)
+          if (tagId && !finalTagIds.includes(tagId)) {
+            finalTagIds = [...finalTagIds, tagId]
+          }
+        }
+      }
+
+      // Replace all person_tags
+      await supabase.from("person_tags").delete().eq("person_id", id)
+      if (finalTagIds.length > 0) {
+        await supabase.from("person_tags").insert(
+          finalTagIds.map((tagId) => ({ person_id: id, tag_id: tagId })),
+        )
+      }
+
+      router.back()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save changes")
+    } finally {
       setSaving(false)
-      return
     }
+  }
 
-    // Save tags via RPC
-    const { error: tagsError } = await supabase.rpc("replace_person_tags", {
-      p_person_id: id,
-      p_tag_ids: selectedTagIds,
-    })
+  async function handleCreateTag(tagName: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session) return
 
-    if (tagsError) {
-      setFormError(tagsError.message ?? "Saved, but failed to update tags.")
-      setSaving(false)
-      return
+    const { data } = await supabase
+      .from("tags")
+      .insert({ user_id: session.user.id, name: tagName, color: colors.sage })
+      .select("*")
+      .single()
+
+    if (data) {
+      setAllTags((prev) => [...prev, data])
+      setSelectedTagIds((prev) => [...prev, data.id])
     }
-
-    setSaving(false)
-    router.back()
   }
 
   if (loading) return <LoadingState />
 
-  if (notFound) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.cream, paddingTop: insets.top, padding: 24 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 15, color: colors.sage, fontWeight: "600" }}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 16, color: colors.muted }}>Person not found.</Text>
-      </View>
-    )
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.cream }}
-        contentContainerStyle={{
-          paddingTop: insets.top + 8,
-          paddingBottom: insets.bottom + 48,
-          paddingHorizontal: 24,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={{ fontSize: 15, color: colors.sage, fontWeight: "600" }}>← Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            <Text style={{ fontSize: 15, color: colors.sage, fontWeight: "700" }}>
-              {saving ? "Saving…" : "Save"}
-            </Text>
-          </TouchableOpacity>
+    <Screen>
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
+          <Text className="text-sage text-sm font-semibold">Cancel</Text>
+        </TouchableOpacity>
+        <Text className="text-base font-semibold text-warm-black">Edit person</Text>
+        <View style={{ width: 60 }} />
+      </View>
+
+      <View className="px-5 pb-8">
+        {error != null && <ErrorBanner message={error} />}
+
+        <TextField
+          label="Name *"
+          value={name}
+          onChangeText={setName}
+          placeholder="Full name"
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+
+        {/* Category */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">Category</Text>
+          <View className="flex-row gap-2">
+            {CATEGORIES.map((cat) => (
+              <PillButton
+                key={cat.label}
+                label={cat.label}
+                selected={category === cat.label}
+                onPress={() => setCategory(category === cat.label ? null : cat.label)}
+              />
+            ))}
+          </View>
         </View>
 
-        <Text style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: colors.warmBlack,
-          fontFamily: "Georgia",
-          marginBottom: 24,
-        }}>
-          Edit
-        </Text>
+        {isProfessional && (
+          <>
+            <TextField
+              label="Company"
+              value={company}
+              onChangeText={setCompany}
+              placeholder="Company name"
+              returnKeyType="next"
+            />
+            <TextField
+              label="Role"
+              value={role}
+              onChangeText={setRole}
+              placeholder="Job title"
+              returnKeyType="next"
+            />
+          </>
+        )}
 
-        <View style={{
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          elevation: 2,
-        }}>
-          {formError && <ErrorBanner message={formError} />}
+        {isFriendOrFamily && (
+          <TextField
+            label="Birthday"
+            value={birthday}
+            onChangeText={setBirthday}
+            placeholder="YYYY-MM-DD"
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="next"
+          />
+        )}
 
-          {/* Name row */}
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label="First name *"
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="Alex"
-                autoCapitalize="words"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label="Last name"
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Smith"
-                autoCapitalize="words"
-              />
-            </View>
-          </View>
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="email@example.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+        />
 
-          {/* Relationship type */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            Relationship type
+        <TextField
+          label="Phone"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="+1 (555) 000-0000"
+          keyboardType="phone-pad"
+          returnKeyType="next"
+        />
+
+        <TextField
+          label="How did you meet?"
+          value={howMet}
+          onChangeText={setHowMet}
+          placeholder="At a conference, through a friend…"
+          returnKeyType="next"
+        />
+
+        {/* Frequency */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">
+            How often should you stay in touch?
           </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 16 }}>
-            {ONBOARDING_CATEGORY_PILLS.map(({ label, tagColor }) => (
+          <View className="flex-row flex-wrap gap-2">
+            {ONBOARDING_FREQ_OPTIONS.map((opt) => (
               <PillButton
-                key={label}
-                label={label}
-                selected={selectedCategory === label}
-                onPress={() => setSelectedCategory(selectedCategory === label ? "" : label)}
-                selectedColor={tagColor}
+                key={opt.value}
+                label={opt.label}
+                selected={frequencyDays === opt.value}
+                onPress={() => setFrequencyDays(opt.value)}
               />
             ))}
           </View>
+        </View>
 
-          {/* Professional: Company + Role */}
-          {isProfessional && (
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label="Company"
-                  value={company}
-                  onChangeText={setCompany}
-                  placeholder="Acme Corp"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label="Role"
-                  value={role}
-                  onChangeText={setRole}
-                  placeholder="Engineer"
-                />
-              </View>
-            </View>
-          )}
+        <TextField
+          label="Location"
+          value={location}
+          onChangeText={setLocation}
+          placeholder="City, country"
+          returnKeyType="next"
+        />
 
-          {/* Friend or Family: Birthday */}
-          {showBirthday && (
-            <TextField
-              label="Birthday"
-              value={birthday}
-              onChangeText={setBirthday}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-            />
-          )}
+        <TextField
+          label="Notes"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Anything else to remember…"
+          multiline
+          numberOfLines={3}
+          returnKeyType="default"
+        />
 
-          {/* Family: Relationship label */}
-          {isFamily && (
-            <TextField
-              label="Relationship"
-              value={relationship}
-              onChangeText={setRelationship}
-              placeholder="parent, sibling…"
-              autoCapitalize="none"
-            />
-          )}
-
-          {/* How did you meet */}
-          <TextField
-            label="How did you meet?"
-            value={howMet}
-            onChangeText={setHowMet}
-            placeholder="College, work, mutual friends…"
-            autoCapitalize="sentences"
-          />
-
-          {/* Location */}
-          <TextField
-            label="Location"
-            value={location}
-            onChangeText={setLocation}
-            placeholder="City, state…"
-            autoCapitalize="words"
-          />
-
-          {/* Contact frequency */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            Stay in touch
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 20 }}>
-            {ONBOARDING_FREQ_OPTIONS.map(({ label, value }) => (
-              <PillButton
-                key={value}
-                label={label}
-                selected={selectedFreq === value}
-                onPress={() => setSelectedFreq(value)}
-              />
-            ))}
-          </View>
-
-          {/* Tags */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            Tags
-          </Text>
+        {/* Tags */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">Tags</Text>
           <TagPicker
+            tags={allTags}
             selectedTagIds={selectedTagIds}
-            allTags={allTags}
-            onTagsChange={setSelectedTagIds}
-            userId={userId}
+            onToggle={(tagId) =>
+              setSelectedTagIds((prev) =>
+                prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
+              )
+            }
+            onCreateTag={handleCreateTag}
           />
-
-          <View style={{ marginTop: 20 }}>
-            <Button
-              title={saving ? "Saving…" : "Save"}
-              onPress={handleSave}
-              disabled={saving}
-              loading={saving}
-            />
-          </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <Button title="Save changes" onPress={handleSave} loading={saving} />
+      </View>
+    </Screen>
   )
 }

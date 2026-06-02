@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],
+  content: [
+    "./app/**/*.{js,jsx,ts,tsx}",
+    "./components/**/*.{js,jsx,ts,tsx}"
+  ],
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
@@ -9,10 +12,6 @@ module.exports = {
         sage: "#7C9A7E",
         terracotta: "#C17A5A",
         "warm-black": "#1C1917",
-      },
-      fontFamily: {
-        sans: ["DM Sans", "system-ui"],
-        serif: ["Lora", "Georgia"],
       },
     },
   },

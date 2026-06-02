@@ -1,279 +1,257 @@
 import { useState } from "react"
-import {
-  View,
-  Text,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableOpacity,
-} from "react-native"
+import { ScrollView, Text, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import { colors } from "@/constants/theme"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { supabase } from "@/lib/supabase"
+import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
+
+const CATEGORIES = [
+  { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
+  { label: "Family", tagName: "Family", tagColor: "#2563EB" },
+  { label: "Professional", tagName: "Colleague", tagColor: "#D97706" },
+] as const
+
+type CategoryLabel = (typeof CATEGORIES)[number]["label"]
+
+async function getOrCreateTag(
+  userId: string,
+  name: string,
+  color: string,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from("tags")
+    .select("id")
+    .eq("user_id", userId)
+    .ilike("name", name)
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  const { data: created } = await supabase
+    .from("tags")
+    .insert({ user_id: userId, name, color })
+    .select("id")
+    .single()
+
+  return created?.id ?? null
+}
 
 export default function NewPersonScreen() {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("")
+  const [name, setName] = useState("")
+  const [category, setCategory] = useState<CategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
   const [birthday, setBirthday] = useState("")
-  const [relationship, setRelationship] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [howMet, setHowMet] = useState("")
+  const [frequencyDays, setFrequencyDays] = useState(30)
   const [location, setLocation] = useState("")
-  const [selectedFreq, setSelectedFreq] = useState(30)
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [notes, setNotes] = useState("")
 
-  const isProfessional = selectedCategory === "Professional"
-  const isFamily = selectedCategory === "Family"
-  const showBirthday = selectedCategory === "Friend" || isFamily
+  const isProfessional = category === "Professional"
+  const isFriendOrFamily = category === "Friend" || category === "Family"
 
   async function handleSave() {
-    const trimmedFirst = firstName.trim()
-    if (!trimmedFirst) {
-      setFormError("First name is required.")
+    if (!name.trim()) {
+      setError("Name is required")
       return
     }
 
     setSaving(true)
-    setFormError(null)
+    setError(null)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setSaving(false)
-      return
-    }
-    const userId = session.user.id
-    const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(" ")
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) throw new Error("Not authenticated")
 
-    const { data, error: insertError } = await supabase
-      .from("people")
-      .insert({
-        user_id: userId,
-        name,
-        how_met: howMet.trim() || null,
-        contact_frequency_days: selectedFreq,
-        company: isProfessional && company.trim() ? company.trim() : null,
-        role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: showBirthday && birthday ? birthday : null,
-        relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
-        location: location.trim() || null,
-      })
-      .select()
-      .single()
+      const userId = session.user.id
 
-    if (insertError || !data) {
-      setFormError(insertError?.message ?? "Failed to save. Please try again.")
-      setSaving(false)
-      return
-    }
+      const { data: person, error: insertErr } = await supabase
+        .from("people")
+        .insert({
+          user_id: userId,
+          name: name.trim(),
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+          company: company.trim() || null,
+          role: role.trim() || null,
+          birthday: birthday.trim() || null,
+          how_met: howMet.trim() || null,
+          location: location.trim() || null,
+          notes: notes.trim() || null,
+          contact_frequency_days: frequencyDays,
+          relationship_type: category ?? null,
+        })
+        .select("id")
+        .single()
 
-    // Best-effort: attach category tag
-    if (selectedCategory) {
-      const catPill = ONBOARDING_CATEGORY_PILLS.find((p) => p.label === selectedCategory)
-      if (catPill) {
-        const { data: existingArr } = await supabase
-          .from("tags")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("name", catPill.tagName)
-          .limit(1)
+      if (insertErr) throw insertErr
 
-        let tagId: string | null = existingArr?.[0]?.id ?? null
-
-        if (!tagId) {
-          const { data: newTag } = await supabase
-            .from("tags")
-            .insert({ user_id: userId, name: catPill.tagName, color: catPill.tagColor })
-            .select("id")
-            .single()
-          tagId = newTag?.id ?? null
-        }
-
-        if (tagId) {
-          await supabase.from("person_tags").insert({ person_id: data.id, tag_id: tagId })
+      if (category && person) {
+        const cat = CATEGORIES.find((c) => c.label === category)
+        if (cat) {
+          const tagId = await getOrCreateTag(userId, cat.tagName, cat.tagColor)
+          if (tagId) {
+            await supabase
+              .from("person_tags")
+              .insert({ person_id: person.id, tag_id: tagId })
+          }
         }
       }
-    }
 
-    setSaving(false)
-    router.back()
+      router.back()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save person")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.cream }}
-        contentContainerStyle={{
-          paddingTop: insets.top + 8,
-          paddingBottom: insets.bottom + 48,
-          paddingHorizontal: 24,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 15, color: colors.sage, fontWeight: "600" }}>← Back</Text>
+    <Screen>
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
+          <Text className="text-sage text-sm font-semibold">Cancel</Text>
         </TouchableOpacity>
+        <Text className="text-base font-semibold text-warm-black">Add person</Text>
+        <View style={{ width: 60 }} />
+      </View>
 
-        <Text style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: colors.warmBlack,
-          fontFamily: "Georgia",
-          marginBottom: 24,
-        }}>
-          Add someone new
-        </Text>
+      <View className="px-5 pb-8">
+        {error != null && <ErrorBanner message={error} />}
 
-        <View style={{
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          elevation: 2,
-        }}>
-          {formError && <ErrorBanner message={formError} />}
+        <TextField
+          label="Name *"
+          value={name}
+          onChangeText={setName}
+          placeholder="Full name"
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
 
-          {/* Name row */}
-          <View style={{ flexDirection: "row", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label="First name *"
-                value={firstName}
-                onChangeText={setFirstName}
-                placeholder="Alex"
-                autoCapitalize="words"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TextField
-                label="Last name"
-                value={lastName}
-                onChangeText={setLastName}
-                placeholder="Smith"
-                autoCapitalize="words"
-              />
-            </View>
-          </View>
-
-          {/* Relationship type */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            Relationship type
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 16 }}>
-            {ONBOARDING_CATEGORY_PILLS.map(({ label, tagColor }) => (
+        {/* Category */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">Category</Text>
+          <View className="flex-row gap-2">
+            {CATEGORIES.map((cat) => (
               <PillButton
-                key={label}
-                label={label}
-                selected={selectedCategory === label}
-                onPress={() => setSelectedCategory(selectedCategory === label ? "" : label)}
-                selectedColor={tagColor}
+                key={cat.label}
+                label={cat.label}
+                selected={category === cat.label}
+                onPress={() => setCategory(category === cat.label ? null : cat.label)}
               />
             ))}
           </View>
-
-          {/* Professional: Company + Role */}
-          {isProfessional && (
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label="Company"
-                  value={company}
-                  onChangeText={setCompany}
-                  placeholder="Acme Corp"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <TextField
-                  label="Role"
-                  value={role}
-                  onChangeText={setRole}
-                  placeholder="Engineer"
-                />
-              </View>
-            </View>
-          )}
-
-          {/* Friend or Family: Birthday */}
-          {showBirthday && (
-            <TextField
-              label="Birthday"
-              value={birthday}
-              onChangeText={setBirthday}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-            />
-          )}
-
-          {/* Family: Relationship label */}
-          {isFamily && (
-            <TextField
-              label="Relationship"
-              value={relationship}
-              onChangeText={setRelationship}
-              placeholder="parent, sibling…"
-              autoCapitalize="none"
-            />
-          )}
-
-          {/* How did you meet */}
-          <TextField
-            label="How did you meet?"
-            value={howMet}
-            onChangeText={setHowMet}
-            placeholder="College, work, mutual friends…"
-            autoCapitalize="sentences"
-          />
-
-          {/* Location */}
-          <TextField
-            label="Location"
-            value={location}
-            onChangeText={setLocation}
-            placeholder="City, state…"
-            autoCapitalize="words"
-          />
-
-          {/* Contact frequency */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            Stay in touch
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 20 }}>
-            {ONBOARDING_FREQ_OPTIONS.map(({ label, value }) => (
-              <PillButton
-                key={value}
-                label={label}
-                selected={selectedFreq === value}
-                onPress={() => setSelectedFreq(value)}
-              />
-            ))}
-          </View>
-
-          <Button
-            title={saving ? "Saving…" : "Save"}
-            onPress={handleSave}
-            disabled={saving}
-            loading={saving}
-          />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        {/* Conditional: Professional fields */}
+        {isProfessional && (
+          <>
+            <TextField
+              label="Company"
+              value={company}
+              onChangeText={setCompany}
+              placeholder="Company name"
+              returnKeyType="next"
+            />
+            <TextField
+              label="Role"
+              value={role}
+              onChangeText={setRole}
+              placeholder="Job title"
+              returnKeyType="next"
+            />
+          </>
+        )}
+
+        {/* Conditional: Friend/Family birthday */}
+        {isFriendOrFamily && (
+          <TextField
+            label="Birthday"
+            value={birthday}
+            onChangeText={setBirthday}
+            placeholder="YYYY-MM-DD"
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="next"
+          />
+        )}
+
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="email@example.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+        />
+
+        <TextField
+          label="Phone"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="+1 (555) 000-0000"
+          keyboardType="phone-pad"
+          returnKeyType="next"
+        />
+
+        <TextField
+          label="How did you meet?"
+          value={howMet}
+          onChangeText={setHowMet}
+          placeholder="At a conference, through a friend…"
+          returnKeyType="next"
+        />
+
+        {/* Frequency */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">
+            How often should you stay in touch?
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {ONBOARDING_FREQ_OPTIONS.map((opt) => (
+              <PillButton
+                key={opt.value}
+                label={opt.label}
+                selected={frequencyDays === opt.value}
+                onPress={() => setFrequencyDays(opt.value)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <TextField
+          label="Location"
+          value={location}
+          onChangeText={setLocation}
+          placeholder="City, country"
+          returnKeyType="next"
+        />
+
+        <TextField
+          label="Notes"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Anything else to remember…"
+          multiline
+          numberOfLines={3}
+          returnKeyType="default"
+        />
+
+        <Button title="Add person" onPress={handleSave} loading={saving} />
+      </View>
+    </Screen>
   )
 }

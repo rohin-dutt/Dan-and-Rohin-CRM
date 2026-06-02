@@ -1,58 +1,25 @@
-import { View, Text, TouchableOpacity } from "react-native"
+import { Text, TouchableOpacity, View } from "react-native"
 
-export function EmptyState({
-  title,
-  body,
-  actionLabel,
-  onAction,
-}: {
+type EmptyStateProps = {
   title: string
-  body: string
+  description?: string
   actionLabel?: string
   onAction?: () => void
-}) {
+}
+
+export function EmptyState({ title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
-    <View style={{
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 32,
-    }}>
-      <Text style={{
-        fontSize: 17,
-        fontWeight: "600",
-        color: "#1C1917",
-        textAlign: "center",
-        marginBottom: 8,
-      }}>
-        {title}
-      </Text>
-      <Text style={{
-        fontSize: 14,
-        color: "#6B7280",
-        textAlign: "center",
-        lineHeight: 20,
-        marginBottom: 24,
-      }}>
-        {body}
-      </Text>
+    <View className="flex-1 items-center justify-center px-8 py-16">
+      <Text className="text-lg font-semibold text-warm-black text-center mb-2">{title}</Text>
+      {description && (
+        <Text className="text-sm text-gray-500 text-center mb-6">{description}</Text>
+      )}
       {actionLabel && onAction && (
         <TouchableOpacity
           onPress={onAction}
-          style={{
-            backgroundColor: "#7C9A7E",
-            borderRadius: 8,
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-          }}
+          className="bg-sage px-6 py-3 rounded-xl"
         >
-          <Text style={{
-            color: "#FFFFFF",
-            fontSize: 14,
-            fontWeight: "600",
-          }}>
-            {actionLabel}
-          </Text>
+          <Text className="text-white text-sm font-semibold">{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>

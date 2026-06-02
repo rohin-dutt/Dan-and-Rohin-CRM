@@ -1,23 +1,23 @@
 import { useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
-import { supabase } from "../../lib/supabase"
-import { Screen } from "../../components/Screen"
-import { Button } from "../../components/Button"
-import { TextField } from "../../components/TextField"
-import { ErrorBanner } from "../../components/ErrorBanner"
+import { Text, TouchableOpacity, View } from "react-native"
+import { supabase } from "@/lib/supabase"
+import { Screen } from "@/components/Screen"
+import { Button } from "@/components/Button"
+import { TextField } from "@/components/TextField"
+import { ErrorBanner } from "@/components/ErrorBanner"
 
 export default function ForgotPasswordScreen() {
   const router = useRouter()
   const [email, setEmail] = useState("")
-  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
 
-  async function handleSendReset() {
-    setError("")
+  async function handleReset() {
+    setError(null)
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: "roots://update-password",
     })
     setLoading(false)
@@ -30,52 +30,38 @@ export default function ForgotPasswordScreen() {
 
   return (
     <Screen>
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: "#1C1917",
-          marginTop: 64,
-          marginBottom: 24,
-          fontFamily: "Georgia",
-        }}
-      >
-        Reset your password
-      </Text>
+      <View className="flex-1 justify-center px-6 py-12">
+        <TouchableOpacity onPress={() => router.back()} className="mb-6">
+          <Text className="text-sage text-sm">← Back</Text>
+        </TouchableOpacity>
 
-      <ErrorBanner message={error} />
+        <Text className="text-3xl font-bold text-warm-black mb-2">Reset password</Text>
+        <Text className="text-base text-gray-500 mb-8">
+          We'll send a reset link to your email.
+        </Text>
 
-      {sent ? (
-        <View style={{ marginBottom: 24 }}>
-          <Text style={{ fontSize: 15, color: "#1C1917", lineHeight: 22 }}>
-            Check your email for a reset link.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <TextField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
+        {error && <ErrorBanner message={error} />}
 
-          <View style={{ marginTop: 8, marginBottom: 24 }}>
-            <Button title="Send reset link" onPress={handleSendReset} loading={loading} />
+        {sent ? (
+          <View className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <Text className="text-green-700 text-sm font-medium">
+              Check your email for a reset link.
+            </Text>
           </View>
-        </>
-      )}
-
-      <TouchableOpacity
-        onPress={() => router.push("/(auth)/login")}
-        style={{ alignItems: "center" }}
-      >
-        <Text style={{ color: "#7C9A7E", fontSize: 14 }}>Back to sign in</Text>
-      </TouchableOpacity>
+        ) : (
+          <>
+            <TextField
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+            <Button title="Send Reset Link" onPress={handleReset} loading={loading} />
+          </>
+        )}
+      </View>
     </Screen>
   )
 }

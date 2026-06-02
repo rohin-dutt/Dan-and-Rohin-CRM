@@ -1,19 +1,13 @@
-import { View, Text } from "react-native"
+import { Text, View } from "react-native"
 
-export function ErrorBanner({ message }: { message: string }) {
-  if (!message) return null
+type ErrorBannerProps = {
+  message: string
+}
+
+export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
-    <View
-      style={{
-        backgroundColor: "#FEF2F2",
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: "#FECACA",
-      }}
-    >
-      <Text style={{ color: "#DC2626", fontSize: 14 }}>{message}</Text>
+    <View className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+      <Text className="text-sm text-red-700">{message}</Text>
     </View>
   )
 }

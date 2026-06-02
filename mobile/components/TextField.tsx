@@ -1,35 +1,22 @@
-import { View, Text, TextInput, TextInputProps } from "react-native"
+import { Text, TextInput, TextInputProps, View } from "react-native"
 
-export function TextField({
-  label,
-  error,
-  ...props
-}: TextInputProps & {
+type TextFieldProps = TextInputProps & {
   label: string
-  error?: string
-}) {
+  error?: string | null
+}
+
+export function TextField({ label, error, ...props }: TextFieldProps) {
   return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 13, fontWeight: "500", color: "#1C1917", marginBottom: 6 }}>
-        {label}
-      </Text>
+    <View className="mb-4">
+      <Text className="text-sm font-medium text-warm-black mb-1">{label}</Text>
       <TextInput
-        style={{
-          height: 44,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: error ? "#DC2626" : "#E5E0D8",
-          backgroundColor: "#FFFFFF",
-          paddingHorizontal: 12,
-          fontSize: 15,
-          color: "#1C1917",
-        }}
-        placeholderTextColor="#9CA3AF"
         {...props}
+        className={`border rounded-xl px-3 py-3 text-sm bg-white text-warm-black ${
+          error ? "border-red-400" : "border-gray-200"
+        }`}
+        placeholderTextColor="#9CA3AF"
       />
-      {error && (
-        <Text style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>{error}</Text>
-      )}
+      {error && <Text className="text-xs text-red-500 mt-1">{error}</Text>}
     </View>
   )
 }

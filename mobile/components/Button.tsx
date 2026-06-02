@@ -1,38 +1,30 @@
-import { TouchableOpacity, Text, ActivityIndicator } from "react-native"
+import { ActivityIndicator, Text, TouchableOpacity } from "react-native"
+import { colors } from "@/constants/theme"
 
-export function Button({
-  title,
-  onPress,
-  loading = false,
-  disabled = false,
-  variant = "primary",
-}: {
+type ButtonProps = {
   title: string
   onPress: () => void
   loading?: boolean
-  disabled?: boolean
   variant?: "primary" | "secondary"
-}) {
+  disabled?: boolean
+}
+
+export function Button({ title, onPress, loading, variant = "primary", disabled }: ButtonProps) {
   const isPrimary = variant === "primary"
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      style={{
-        height: 48,
-        borderRadius: 8,
-        backgroundColor: isPrimary ? "#7C9A7E" : "transparent",
-        borderWidth: isPrimary ? 0 : 1,
-        borderColor: "#E5E0D8",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: disabled || loading ? 0.5 : 1,
-      }}
+      className={`w-full rounded-xl py-3.5 items-center justify-center ${
+        isPrimary ? "bg-sage" : "bg-white border border-gray-200"
+      } ${disabled || loading ? "opacity-50" : ""}`}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? "#fff" : "#7C9A7E"} />
+        <ActivityIndicator color={isPrimary ? "#fff" : colors.sage} />
       ) : (
-        <Text style={{ color: isPrimary ? "#fff" : "#1C1917", fontSize: 15, fontWeight: "600" }}>
+        <Text
+          className={`text-sm font-semibold ${isPrimary ? "text-white" : "text-warm-black"}`}
+        >
           {title}
         </Text>
       )}

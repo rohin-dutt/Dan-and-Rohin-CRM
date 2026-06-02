@@ -15,21 +15,17 @@ export default function RootLayout() {
       setSession(session)
       setLoading(false)
     })
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
-
     return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
     if (loading) return
-
     const inAuthGroup = segments[0] === "(auth)"
-
     if (!session && !inAuthGroup) {
       router.replace("/(auth)/login")
     } else if (session && inAuthGroup) {
@@ -38,6 +34,5 @@ export default function RootLayout() {
   }, [session, loading, segments])
 
   if (loading) return null
-
   return <Slot />
 }

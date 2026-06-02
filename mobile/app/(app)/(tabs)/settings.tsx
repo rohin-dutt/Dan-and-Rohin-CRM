@@ -1,102 +1,45 @@
-import { useState, useEffect, useRef } from "react"
-import { View, Text, TouchableOpacity, Alert, Switch, Linking } from "react-native"
-import { useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { useEffect, useState } from "react"
+import { Alert, Linking, Switch, Text, TouchableOpacity, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
+import { LoadingState } from "@/components/LoadingState"
+import { ErrorBanner } from "@/components/ErrorBanner"
+import { supabase } from "@/lib/supabase"
 import { colors } from "@/constants/theme"
 import type { Settings } from "@/types"
 
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <Text style={{
-      fontSize: 12,
-      fontWeight: "700",
-      color: colors.muted,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginTop: 24,
-      marginBottom: 8,
-    }}>
-      {title}
-    </Text>
-  )
-}
-
-function Row({
-  label,
-  labelColor,
-  onPress,
-  right,
-}: {
-  label: string
-  labelColor?: string
-  onPress?: () => void
-  right?: React.ReactNode
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={onPress ? 0.6 : 1}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}
-    >
-      <Text style={{ fontSize: 15, color: labelColor ?? colors.warmBlack }}>{label}</Text>
-      {right ?? (onPress ? <Text style={{ fontSize: 15, color: colors.muted }}>›</Text> : null)}
-    </TouchableOpacity>
-  )
-}
-
 export default function SettingsScreen() {
-  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
-  const [emailReminders, setEmailReminders] = useState(false)
-  const [loadingSettings, setLoadingSettings] = useState(true)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
-    async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      setEmail(session.user.email ?? "")
+    async function load() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session) return
+        setEmail(session.user.email ?? "")
 
-      const { data } = await supabase
-        .from("settings")
-        .select("email_reminders_enabled")
-        .eq("user_id", session.user.id)
-        .single()
-
-      if (data) {
-        setEmailReminders((data as Pick<Settings, "email_reminders_enabled">).email_reminders_enabled)
+        const { data } = await supabase
+          .from("settings")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .single()
+        setSettings(data ?? null)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load settings")
+      } finally {
+        setLoading(false)
       }
-      setLoadingSettings(false)
     }
-    loadData()
+    load()
   }, [])
 
-  async function saveEmailReminders(value: boolean) {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    await supabase
-      .from("settings")
-      .update({ email_reminders_enabled: value })
-      .eq("user_id", session.user.id)
-  }
-
-  function handleToggleEmailReminders(value: boolean) {
-    setEmailReminders(value)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => saveEmailReminders(value), 500)
-  }
-
-  async function handleLogout() {
+  async function handleSignOut() {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -104,66 +47,100 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           await supabase.auth.signOut()
-          router.replace("/(auth)/login")
         },
       },
     ])
   }
 
+  async function toggleEmailReminders(value: boolean) {
+    if (!settings) return
+    setToggling(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) return
+      const { error: err } = await supabase
+        .from("settings")
+        .update({ email_reminders_enabled: value })
+        .eq("user_id", session.user.id)
+      if (err) throw err
+      setSettings({ ...settings, email_reminders_enabled: value })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update settings")
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  if (loading) return <LoadingState />
+
   return (
-    <Screen scroll>
-      <Text style={{
-        fontSize: 26,
-        fontWeight: "700",
-        color: colors.warmBlack,
-        fontFamily: "Georgia",
-        marginTop: 8,
-        marginBottom: 4,
-      }}>
-        Settings
-      </Text>
+    <Screen>
+      <View className="px-5 pt-6 pb-8">
+        <Text className="text-2xl font-bold text-warm-black mb-6">Settings</Text>
 
-      {/* Account */}
-      <SectionHeader title="Account" />
-      <Card style={{ padding: 0, paddingHorizontal: 16 }}>
-        <Row label={email || "…"} />
-        <Row
-          label="Sign out"
-          labelColor={colors.error}
-          onPress={handleLogout}
-        />
-      </Card>
+        {error && <ErrorBanner message={error} />}
 
-      {/* Notifications */}
-      <SectionHeader title="Notifications" />
-      <Card style={{ padding: 0, paddingHorizontal: 16 }}>
-        <Row
-          label="Weekly email digest"
-          right={
+        {/* Account */}
+        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Account
+        </Text>
+        <Card className="mb-6">
+          <Text className="text-sm text-warm-black">{email}</Text>
+          <TouchableOpacity onPress={handleSignOut} className="mt-4">
+            <Text className="text-sm font-semibold text-red-500">Sign out</Text>
+          </TouchableOpacity>
+        </Card>
+
+        {/* Notifications */}
+        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Notifications
+        </Text>
+        <Card className="mb-6">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-4">
+              <Text className="text-sm font-medium text-warm-black">Weekly email digest</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">
+                Get a weekly summary of who to reach out to
+              </Text>
+            </View>
             <Switch
-              value={emailReminders}
-              onValueChange={handleToggleEmailReminders}
+              value={settings?.email_reminders_enabled ?? false}
+              onValueChange={toggleEmailReminders}
+              disabled={toggling || !settings}
               trackColor={{ false: colors.border, true: colors.sage }}
               thumbColor="#FFFFFF"
-              disabled={loadingSettings}
             />
-          }
-        />
-      </Card>
+          </View>
+        </Card>
 
-      {/* About */}
-      <SectionHeader title="About" />
-      <Card style={{ padding: 0, paddingHorizontal: 16 }}>
-        <Row
-          label="Privacy Policy"
-          onPress={() => Linking.openURL("https://useroots.app/privacy")}
-        />
-        <Row
-          label="Terms of Service"
-          onPress={() => Linking.openURL("https://useroots.app/terms")}
-        />
-        <Row label="Version 1.0.0" />
-      </Card>
+        {/* About */}
+        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          About
+        </Text>
+        <Card>
+          <TouchableOpacity
+            onPress={() => Linking.openURL("https://tryrootsapp.com/privacy")}
+            className="py-1"
+          >
+            <Text className="text-sm font-medium text-warm-black">Privacy Policy</Text>
+          </TouchableOpacity>
+
+          <View className="border-t border-gray-100 my-3" />
+
+          <TouchableOpacity
+            onPress={() => Linking.openURL("https://tryrootsapp.com/terms")}
+            className="py-1"
+          >
+            <Text className="text-sm font-medium text-warm-black">Terms of Service</Text>
+          </TouchableOpacity>
+
+          <View className="border-t border-gray-100 my-3" />
+
+          <Text className="text-xs text-gray-400">Version 1.0.0</Text>
+        </Card>
+      </View>
     </Screen>
   )
 }

@@ -1,115 +1,60 @@
-import { useState, useCallback } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native"
-import { useFocusEffect, useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { useCallback, useState } from "react"
+import { FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { useRouter, useFocusEffect } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
-import { LoadingState } from "@/components/LoadingState"
 import { EmptyState } from "@/components/EmptyState"
-import { getRelationshipStatus, formatDate } from "@roots/shared"
+import { LoadingState } from "@/components/LoadingState"
+import { ErrorBanner } from "@/components/ErrorBanner"
+import { PillButton } from "@/components/PillButton"
+import { supabase } from "@/lib/supabase"
 import type { Person } from "@/types"
-
-const STATUS_LABELS: Record<string, string> = {
-  overdue: "Overdue",
-  due_this_week: "Due This Week",
-  recent: "Recently Talked",
-  neglected: "Neglected",
-  coming_up: "Coming Up",
-}
-
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  overdue: { bg: "#FEE2E2", text: "#DC2626" },
-  due_this_week: { bg: "#FEF3C7", text: "#D97706" },
-  recent: { bg: "#DCFCE7", text: "#16A34A" },
-  neglected: { bg: "#F3F4F6", text: "#6B7280" },
-  coming_up: { bg: "#E0F2FE", text: "#0284C7" },
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors = STATUS_COLORS[status] ?? STATUS_COLORS.coming_up
-  const label = STATUS_LABELS[status] ?? status
-  return (
-    <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: colors.bg }}>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: colors.text }}>{label}</Text>
-    </View>
-  )
-}
-
-function PersonCard({ person, onPress }: { person: Person; onPress: () => void }) {
-  const status = getRelationshipStatus(person)
-  const subtitle =
-    person.role && person.company
-      ? `${person.role} at ${person.company}`
-      : person.role ?? person.company ?? "No details yet"
-
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <Card style={{ marginBottom: 10 }}>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#1C1917" }}>{person.name}</Text>
-            <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{subtitle}</Text>
-            <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 4 }}>
-              Last talked: {formatDate(person.last_contacted_at)}
-            </Text>
-          </View>
-          <StatusBadge status={status} />
-        </View>
-      </Card>
-    </TouchableOpacity>
-  )
-}
+import { getRelationshipStatus, formatDate } from "@roots/shared"
 
 type SortKey = "last_contacted" | "name" | "recently_added"
 
-const SORT_OPTIONS: { label: string; value: SortKey }[] = [
-  { label: "Last contacted", value: "last_contacted" },
-  { label: "Name A–Z", value: "name" },
-  { label: "Recently added", value: "recently_added" },
-]
+const STATUS_CONFIG: Record<string, { label: string; bgClass: string; textClass: string }> = {
+  overdue: { label: "Overdue", bgClass: "bg-red-50", textClass: "text-red-600" },
+  due_this_week: { label: "Due soon", bgClass: "bg-amber-50", textClass: "text-amber-700" },
+  recent: { label: "Recent", bgClass: "bg-green-50", textClass: "text-green-700" },
+  neglected: { label: "Neglected", bgClass: "bg-gray-100", textClass: "text-gray-600" },
+  coming_up: { label: "Coming up", bgClass: "bg-blue-50", textClass: "text-blue-600" },
+}
 
-function sortPeople(people: Person[], sortBy: SortKey): Person[] {
-  const copy = [...people]
-  if (sortBy === "name") {
-    return copy.sort((a, b) => a.name.localeCompare(b.name))
-  }
-  if (sortBy === "recently_added") {
-    return copy.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }
-  // last_contacted: most recent first, nulls last
-  return copy.sort((a, b) => {
-    if (!a.last_contacted_at && !b.last_contacted_at) return 0
-    if (!a.last_contacted_at) return 1
-    if (!b.last_contacted_at) return -1
-    return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
-  })
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.coming_up
+  return (
+    <View className={`rounded-full px-2.5 py-0.5 ${cfg.bgClass}`}>
+      <Text className={`text-xs font-medium ${cfg.textClass}`}>{cfg.label}</Text>
+    </View>
+  )
 }
 
 export default function PeopleScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
-  const [query, setQuery] = useState("")
-  const [sortBy, setSortBy] = useState<SortKey>("last_contacted")
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<SortKey>("last_contacted")
 
-  const fetchPeople = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      setError(null)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!session) return
-      const { data } = await supabase
+
+      const { data, error: err } = await supabase
         .from("people")
         .select("*")
         .eq("user_id", session.user.id)
-        .order("name", { ascending: true })
-      setPeople((data as Person[]) ?? [])
+
+      if (err) throw err
+      setPeople(data ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load people")
     } finally {
       setLoading(false)
     }
@@ -117,121 +62,122 @@ export default function PeopleScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchPeople()
-    }, [fetchPeople])
-  )
-
-  const filtered = sortPeople(
-    query.trim()
-      ? people.filter((p) => {
-          const q = query.toLowerCase()
-          return (
-            p.name.toLowerCase().includes(q) ||
-            (p.company ?? "").toLowerCase().includes(q) ||
-            (p.location ?? "").toLowerCase().includes(q)
-          )
-        })
-      : people,
-    sortBy
+      setLoading(true)
+      load()
+    }, [load]),
   )
 
   if (loading) return <LoadingState />
 
+  const filtered = people.filter((p) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(q) ||
+      (p.company ?? "").toLowerCase().includes(q) ||
+      (p.location ?? "").toLowerCase().includes(q)
+    )
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "name") return a.name.localeCompare(b.name)
+    if (sort === "recently_added") {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+    if (!a.last_contacted_at && !b.last_contacted_at) return 0
+    if (!a.last_contacted_at) return 1
+    if (!b.last_contacted_at) return -1
+    return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
+  })
+
   return (
-    <Screen scroll={false} padding={false}>
-      {/* Header */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <View>
-            <Text style={{ fontSize: 26, fontWeight: "700", color: "#1C1917", fontFamily: "Georgia" }}>
-              Your people
-            </Text>
-            <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>
-              {people.length} {people.length === 1 ? "person" : "people"}
-            </Text>
-          </View>
+    <Screen scrollable={false}>
+      <View className="px-5 pt-6 pb-2">
+        <View className="flex-row items-center justify-between mb-4">
+          <Text className="text-2xl font-bold text-warm-black">
+            Your people{people.length > 0 ? ` (${people.length})` : ""}
+          </Text>
           <TouchableOpacity
             onPress={() => router.push("/people/new")}
-            style={{
-              backgroundColor: "#7C9A7E",
-              borderRadius: 8,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-            }}
+            className="bg-sage rounded-xl px-4 py-2"
           >
-            <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>+ Add</Text>
+            <Text className="text-white text-sm font-semibold">+ Add</Text>
           </TouchableOpacity>
         </View>
 
+        {error && <ErrorBanner message={error} />}
+
         <TextInput
-          value={query}
-          onChangeText={setQuery}
+          value={search}
+          onChangeText={setSearch}
           placeholder="Search by name, company, or location…"
+          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white mb-3 text-warm-black"
           placeholderTextColor="#9CA3AF"
-          style={{
-            height: 40,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: "#E5E0D8",
-            backgroundColor: "#FFFFFF",
-            paddingHorizontal: 12,
-            fontSize: 14,
-            color: "#1C1917",
-            marginTop: 12,
-          }}
         />
 
-        {/* Sort pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 10 }}
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {SORT_OPTIONS.map(({ label, value }) => (
-            <TouchableOpacity
-              key={value}
-              onPress={() => setSortBy(value)}
-              style={{
-                borderRadius: 999,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                backgroundColor: sortBy === value ? "#7C9A7E" : "#FFFFFF",
-                borderWidth: 1,
-                borderColor: sortBy === value ? "#7C9A7E" : "#E5E0D8",
-              }}
-            >
-              <Text style={{
-                fontSize: 13,
-                fontWeight: "600",
-                color: sortBy === value ? "#FFFFFF" : "#6B7280",
-              }}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View className="flex-row flex-wrap gap-2 mb-3">
+          <PillButton
+            label="Last contacted"
+            selected={sort === "last_contacted"}
+            onPress={() => setSort("last_contacted")}
+          />
+          <PillButton
+            label="Name A-Z"
+            selected={sort === "name"}
+            onPress={() => setSort("name")}
+          />
+          <PillButton
+            label="Recently added"
+            selected={sort === "recently_added"}
+            onPress={() => setSort("recently_added")}
+          />
+        </View>
       </View>
 
-      {/* List */}
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <EmptyState
-          title={query ? "No results" : "No people yet"}
-          body={query ? "Try a different search." : "Add your first person to get started."}
-          actionLabel={!query ? "Add someone" : undefined}
-          onAction={!query ? () => router.push("/people/new") : undefined}
+          title={search.trim() ? "No results" : "No people yet"}
+          description={
+            search.trim()
+              ? "Try a different search."
+              : "Add someone you want to stay in touch with."
+          }
+          actionLabel={!search.trim() ? "Add someone" : undefined}
+          onAction={!search.trim() ? () => router.push("/people/new") : undefined}
         />
       ) : (
         <FlatList
-          data={filtered}
+          data={sorted}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PersonCard
-              person={item}
-              onPress={() => router.push(`/people/${item.id}`)}
-            />
-          )}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => {
+            const status = getRelationshipStatus(item)
+            return (
+              <TouchableOpacity
+                onPress={() => router.push(`/people/${item.id}`)}
+                activeOpacity={0.7}
+              >
+                <Card className="mb-3">
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1 mr-3">
+                      <Text className="text-sm font-semibold text-warm-black">{item.name}</Text>
+                      {(item.role != null || item.company != null) && (
+                        <Text className="text-xs text-gray-500 mt-0.5">
+                          {[item.role, item.company].filter(Boolean).join(" · ")}
+                        </Text>
+                      )}
+                      <Text className="text-xs text-gray-400 mt-1">
+                        Last: {formatDate(item.last_contacted_at)}
+                      </Text>
+                    </View>
+                    <StatusBadge status={status} />
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            )
+          }}
         />
       )}
     </Screen>

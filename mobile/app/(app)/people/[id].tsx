@@ -1,191 +1,44 @@
-import { useState, useCallback } from "react"
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from "react-native"
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { useCallback, useState } from "react"
+import { Alert, Text, TouchableOpacity, View } from "react-native"
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router"
+import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
-import { LoadingState } from "@/components/LoadingState"
 import { Button } from "@/components/Button"
-import {
-  formatDate,
-  getNextDueDays,
-  pluralize,
-  getFollowUpState,
-} from "@roots/shared"
+import { LoadingState } from "@/components/LoadingState"
+import { ErrorBanner } from "@/components/ErrorBanner"
+import { supabase } from "@/lib/supabase"
 import type { Person, Interaction, Tag } from "@/types"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
-
-function nextActionText(person: Person): string {
-  const days = getNextDueDays(person)
-  if (days === null) return "Log the first interaction"
-  if (days < 0) return `Reach out now, overdue by ${pluralize(Math.abs(days), "day")}`
-  if (days === 0) return "Reach out today"
-  return `Reach out in ${pluralize(days, "day")}`
-}
-
-function TagPill({ tag }: { tag: Tag }) {
-  return (
-    <View style={{
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      backgroundColor: tag.color + "33",
-      borderWidth: 1,
-      borderColor: tag.color,
-      marginRight: 6,
-      marginBottom: 6,
-    }}>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: tag.color }}>{tag.name}</Text>
-    </View>
-  )
-}
-
-function followUpStateLabel(interaction: Interaction): string {
-  const state = getFollowUpState(interaction)
-  const date = interaction.follow_up_date
-  const snoozedUntil = interaction.follow_up_snoozed_until
-  if (state === "overdue") return `Overdue since ${formatDate(date)}`
-  if (state === "due_today") return "Due today"
-  if (state === "due") return `Due on ${formatDate(date)}`
-  if (state === "snoozed") return `Snoozed until ${formatDate(snoozedUntil)}`
-  return ""
-}
-
-function InteractionRow({
-  interaction,
-  onMarkDone,
-  onSnooze,
-}: {
-  interaction: Interaction
-  onMarkDone: () => void
-  onSnooze: () => void
-}) {
-  const state = getFollowUpState(interaction)
-  const hasActiveFollowUp =
-    interaction.follow_up_needed &&
-    interaction.follow_up_status !== "done" &&
-    interaction.follow_up_status !== "snoozed"
-  const hasAnyFollowUp =
-    interaction.follow_up_needed && interaction.follow_up_status !== "done"
-
-  const stateColor =
-    state === "overdue" || state === "due_today"
-      ? { bg: "#FEE2E2", text: "#DC2626" }
-      : state === "snoozed"
-      ? { bg: "#F3F4F6", text: "#6B7280" }
-      : { bg: "#FEF3C7", text: "#D97706" }
-
-  return (
-    <View style={{
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: "#E5E0D8",
-    }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#1C1917" }}>
-          {interaction.type}
-        </Text>
-        <Text style={{ fontSize: 12, color: "#9CA3AF" }}>{formatDate(interaction.date)}</Text>
-      </View>
-      {interaction.notes ? (
-        <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 4 }} numberOfLines={2}>
-          {interaction.notes}
-        </Text>
-      ) : null}
-      {hasAnyFollowUp && (
-        <View style={{
-          marginTop: 6,
-          alignSelf: "flex-start",
-          backgroundColor: stateColor.bg,
-          borderRadius: 999,
-          paddingHorizontal: 8,
-          paddingVertical: 2,
-        }}>
-          <Text style={{ fontSize: 11, fontWeight: "600", color: stateColor.text }}>
-            {followUpStateLabel(interaction)}
-          </Text>
-        </View>
-      )}
-      {hasActiveFollowUp && (
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-          <TouchableOpacity
-            onPress={onMarkDone}
-            style={{
-              borderRadius: 6,
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              backgroundColor: "#DCFCE7",
-              borderWidth: 1,
-              borderColor: "#86EFAC",
-            }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#16A34A" }}>Mark done</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={onSnooze}
-            style={{
-              borderRadius: 6,
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              backgroundColor: "#F3F4F6",
-              borderWidth: 1,
-              borderColor: "#D1D5DB",
-            }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>Snooze 7 days</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  )
-}
+import { formatDate, formatShortDate, getNextDueDays, getFollowUpState } from "@roots/shared"
 
 export default function PersonDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
-
+  const { id } = useLocalSearchParams<{ id: string }>()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [person, setPerson] = useState<Person | null>(null)
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [detailsExpanded, setDetailsExpanded] = useState(false)
-  const [notFound, setNotFound] = useState(false)
 
-  const fetchData = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
+  const load = useCallback(async () => {
     try {
-      const [personRes, interactionsRes, personTagsRes] = await Promise.all([
+      setError(null)
+      const [personRes, interactionsRes, tagsRes] = await Promise.all([
         supabase.from("people").select("*").eq("id", id).single(),
         supabase
           .from("interactions")
           .select("*")
           .eq("person_id", id)
           .order("date", { ascending: false }),
-        supabase
-          .from("person_tags")
-          .select("tag_id, tags(*)")
-          .eq("person_id", id),
+        supabase.from("person_tags").select("tag_id, tags(*)").eq("person_id", id),
       ])
-
-      if (personRes.error || !personRes.data) {
-        setNotFound(true)
-        return
-      }
-
-      setPerson(personRes.data as Person)
-      setInteractions((interactionsRes.data as Interaction[]) ?? [])
-
-      const tagData: Tag[] = (personTagsRes.data ?? [])
-        .map((pt: { tags: unknown }) => pt.tags)
-        .filter(Boolean) as Tag[]
-      setTags(tagData)
+      if (personRes.error) throw personRes.error
+      setPerson(personRes.data)
+      setInteractions(interactionsRes.data ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setTags((tagsRes.data ?? []).map((pt: any) => pt.tags).filter(Boolean))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load person")
     } finally {
       setLoading(false)
     }
@@ -193,209 +46,235 @@ export default function PersonDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData()
-    }, [fetchData])
+      setLoading(true)
+      load()
+    }, [load]),
   )
 
-  async function handleMarkDone(interactionId: string) {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    await supabase
-      .from("interactions")
-      .update({ follow_up_status: "done" })
-      .eq("id", interactionId)
-    Alert.alert("Done", "Follow-up marked as done.")
-    fetchData()
-  }
-
-  async function handleSnooze(interactionId: string) {
-    const d = new Date()
-    d.setDate(d.getDate() + 7)
-    const snoozedUntil = d.toISOString().slice(0, 10)
-    await supabase
-      .from("interactions")
-      .update({ follow_up_status: "snoozed", follow_up_snoozed_until: snoozedUntil })
-      .eq("id", interactionId)
-    Alert.alert("Snoozed", `Follow-up snoozed until ${snoozedUntil}.`)
-    fetchData()
-  }
-
-  async function handleDelete() {
-    if (!person || !id) return
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    await supabase
-      .from("people")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", session.user.id)
-    router.back()
-  }
-
   function showMenu() {
-    if (!person) return
-    Alert.alert(person.name, undefined, [
+    Alert.alert(person?.name ?? "Options", undefined, [
       { text: "Edit", onPress: () => router.push(`/people/${id}/edit`) },
       {
         text: "Delete",
         style: "destructive",
         onPress: () =>
-          Alert.alert(
-            `Delete ${person.name}?`,
-            "This will permanently delete this person and all their history.",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: handleDelete },
-            ]
-          ),
+          Alert.alert("Delete person", `Delete ${person?.name}? This cannot be undone.`, [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: async () => {
+                await supabase.from("people").delete().eq("id", id)
+                router.back()
+              },
+            },
+          ]),
       },
       { text: "Cancel", style: "cancel" },
     ])
   }
 
+  async function markFollowUpDone(interactionId: string) {
+    await supabase
+      .from("interactions")
+      .update({ follow_up_status: "done" })
+      .eq("id", interactionId)
+    load()
+  }
+
+  async function snoozeFollowUp(interactionId: string) {
+    const snoozeDate = new Date()
+    snoozeDate.setDate(snoozeDate.getDate() + 7)
+    const snoozedUntil = snoozeDate.toISOString().split("T")[0]
+    await supabase
+      .from("interactions")
+      .update({ follow_up_status: "snoozed", follow_up_snoozed_until: snoozedUntil })
+      .eq("id", interactionId)
+    load()
+  }
+
   if (loading) return <LoadingState />
 
-  if (notFound || !person) {
+  if (!person) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#F0EBE1", paddingTop: insets.top, padding: 24 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 15, color: "#7C9A7E", fontWeight: "600" }}>← People</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 16, color: "#6B7280" }}>Person not found.</Text>
-      </View>
+      <Screen>
+        <ErrorBanner message={error ?? "Person not found"} />
+      </Screen>
     )
   }
 
-  const lastInteraction = interactions[0] ?? null
-  const activeFollowUps = interactions.filter(
-    (i) => i.follow_up_needed && i.follow_up_status !== "done"
+  const nextDueDays = getNextDueDays(person)
+  const openFollowUps = interactions.filter(
+    (i) => i.follow_up_needed && getFollowUpState(i) !== "done",
   )
 
-  const detailFields: { label: string; value: string | null | undefined }[] = [
-    { label: "Location", value: person.location },
-    { label: "Birthday", value: person.birthday ? formatDate(person.birthday) : null },
-    { label: "How we met", value: person.how_met },
-    { label: "Email", value: person.email },
-    { label: "Phone", value: person.phone },
-    { label: "Relationship type", value: person.relationship_type },
-  ].filter((f) => f.value)
+  const detailFields = [
+    person.email != null && { label: "Email", value: person.email },
+    person.phone != null && { label: "Phone", value: person.phone },
+    person.birthday != null && { label: "Birthday", value: formatDate(person.birthday) },
+    person.how_met != null && { label: "How met", value: person.how_met },
+    person.location != null && { label: "Location", value: person.location },
+  ].filter((f): f is { label: string; value: string } => Boolean(f))
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: "#F0EBE1" }}
-      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}
-    >
-      {/* Header row: back + menu */}
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16, marginTop: 8 }}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ fontSize: 15, color: "#7C9A7E", fontWeight: "600" }}>← People</Text>
+    <Screen>
+      {/* Header row */}
+      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
+          <Text className="text-sage text-sm font-semibold">← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={showMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={{ fontSize: 22, color: "#6B7280", fontWeight: "600" }}>⋯</Text>
+        <TouchableOpacity onPress={showMenu} className="py-1 pl-3">
+          <Text className="text-2xl text-warm-black leading-none">⋯</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Name + subtitle */}
-      <Text style={{ fontSize: 28, fontWeight: "700", color: "#1C1917", fontFamily: "Georgia", marginBottom: 4 }}>
-        {person.name}
-      </Text>
-      {(person.role || person.company) && (
-        <Text style={{ fontSize: 15, color: "#6B7280", marginBottom: 12 }}>
-          {[person.role, person.company].filter(Boolean).join(" at ")}
-        </Text>
-      )}
+      <View className="px-5 pb-8">
+        {error != null && <ErrorBanner message={error} />}
 
-      {/* Tags */}
-      {tags.length > 0 && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 16 }}>
-          {tags.map((tag) => <TagPill key={tag.id} tag={tag} />)}
+        {/* Name + role/company */}
+        <Text className="text-2xl font-bold text-warm-black mb-1">{person.name}</Text>
+        {(person.role != null || person.company != null) && (
+          <Text className="text-sm text-gray-500 mb-3">
+            {[person.role, person.company].filter(Boolean).join(" · ")}
+          </Text>
+        )}
+
+        {/* Tags */}
+        {tags.length > 0 && (
+          <View className="flex-row flex-wrap gap-2 mb-4">
+            {tags.map((tag) => (
+              <View
+                key={tag.id}
+                className="rounded-full bg-green-50 border border-green-200 px-3 py-1"
+              >
+                <Text className="text-xs font-medium text-green-700">{tag.name}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Stat cards */}
+        <View className="flex-row gap-3 mb-5">
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
+              {nextDueDays === null
+                ? "—"
+                : nextDueDays < 0
+                  ? `${Math.abs(nextDueDays)}d ago`
+                  : `In ${nextDueDays}d`}
+            </Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Next step</Text>
+          </View>
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
+              {formatShortDate(person.last_contacted_at)}
+            </Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Last chat</Text>
+          </View>
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-sm font-bold text-warm-black">{openFollowUps.length}</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Follow-ups</Text>
+          </View>
         </View>
-      )}
 
-      {/* Stat cards */}
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 20 }}>
-        <Card style={{ flex: 1, alignItems: "center", paddingVertical: 12 }}>
-          <Text style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>Next step</Text>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: "#1C1917", textAlign: "center" }}>
-            {nextActionText(person)}
-          </Text>
-        </Card>
-        <Card style={{ flex: 1, alignItems: "center", paddingVertical: 12 }}>
-          <Text style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>Last chat</Text>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: "#1C1917", textAlign: "center" }}>
-            {lastInteraction
-              ? `${lastInteraction.type} · ${formatDate(lastInteraction.date)}`
-              : "None yet"}
-          </Text>
-        </Card>
-        <Card style={{ flex: 1, alignItems: "center", paddingVertical: 12 }}>
-          <Text style={{ fontSize: 11, color: "#6B7280", marginBottom: 4 }}>Follow-ups</Text>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: "#1C1917" }}>
-            {activeFollowUps.length}
-          </Text>
-        </Card>
-      </View>
-
-      {/* View details toggle */}
-      {detailFields.length > 0 && (
-        <TouchableOpacity
-          onPress={() => setDetailsExpanded((v) => !v)}
-          style={{ marginBottom: 12 }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#7C9A7E" }}>
-            {detailsExpanded ? "Hide details ↑" : "View details ↓"}
-          </Text>
-        </TouchableOpacity>
-      )}
-      {detailsExpanded && (
-        <Card style={{ marginBottom: 16, gap: 10 }}>
-          {detailFields.map(({ label, value }) => (
-            <View key={label}>
-              <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "600" }}>{label.toUpperCase()}</Text>
-              <Text style={{ fontSize: 14, color: "#1C1917", marginTop: 2 }}>{value}</Text>
-            </View>
-          ))}
-        </Card>
-      )}
-
-      {/* Notes */}
-      {person.notes ? (
-        <Card style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: "#6B7280", marginBottom: 6 }}>
-            NOTES
-          </Text>
-          <Text style={{ fontSize: 14, color: "#1C1917", lineHeight: 20 }}>{person.notes}</Text>
-        </Card>
-      ) : null}
-
-      {/* Log a chat button */}
-      <View style={{ marginBottom: 28 }}>
+        {/* Log a chat */}
         <Button
           title="Log a chat"
           onPress={() => router.push(`/people/${id}/log`)}
+          variant="primary"
         />
-      </View>
 
-      {/* Interaction history */}
-      <Text style={{ fontSize: 17, fontWeight: "700", color: "#1C1917", marginBottom: 12 }}>
-        Your history
-      </Text>
-      {interactions.length === 0 ? (
-        <Text style={{ fontSize: 14, color: "#9CA3AF", fontStyle: "italic" }}>
-          No history yet — log your first conversation
-        </Text>
-      ) : (
-        <Card style={{ padding: 0, paddingHorizontal: 16 }}>
-          {interactions.map((interaction) => (
-            <InteractionRow
-              key={interaction.id}
-              interaction={interaction}
-              onMarkDone={() => handleMarkDone(interaction.id)}
-              onSnooze={() => handleSnooze(interaction.id)}
-            />
-          ))}
-        </Card>
-      )}
-    </ScrollView>
+        {/* Collapsible details */}
+        {detailFields.length > 0 && (
+          <>
+            <TouchableOpacity
+              onPress={() => setDetailsExpanded((v) => !v)}
+              className="mt-5 mb-2 flex-row items-center justify-between"
+            >
+              <Text className="text-sm font-semibold text-warm-black">Details</Text>
+              <Text className="text-xs text-gray-500">{detailsExpanded ? "Hide ▲" : "Show ▼"}</Text>
+            </TouchableOpacity>
+            {detailsExpanded && (
+              <Card className="mb-2">
+                {detailFields.map((field, i) => (
+                  <View key={field.label} className={i > 0 ? "mt-3 pt-3 border-t border-gray-100" : ""}>
+                    <Text className="text-xs text-gray-400">{field.label}</Text>
+                    <Text className="text-sm text-warm-black mt-0.5">{field.value}</Text>
+                  </View>
+                ))}
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Notes */}
+        {person.notes != null && (
+          <View className="mt-4">
+            <Text className="text-sm font-semibold text-warm-black mb-2">Notes</Text>
+            <Card>
+              <Text className="text-sm text-warm-black">{person.notes}</Text>
+            </Card>
+          </View>
+        )}
+
+        {/* Open follow-ups */}
+        {openFollowUps.length > 0 && (
+          <View className="mt-5">
+            <Text className="text-sm font-semibold text-warm-black mb-2">Follow-ups</Text>
+            {openFollowUps.map((fu) => (
+              <Card key={fu.id} className="mb-2">
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 mr-3">
+                    <Text className="text-sm font-medium text-warm-black">{fu.type}</Text>
+                    {fu.follow_up_date != null && (
+                      <Text className="text-xs text-gray-500 mt-0.5">
+                        {formatDate(fu.follow_up_date)}
+                      </Text>
+                    )}
+                  </View>
+                  <View className="flex-row gap-2">
+                    <TouchableOpacity
+                      onPress={() => snoozeFollowUp(fu.id)}
+                      className="bg-gray-100 rounded-lg px-2.5 py-1.5"
+                    >
+                      <Text className="text-xs text-gray-600">Snooze 7d</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => markFollowUpDone(fu.id)}
+                      className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5"
+                    >
+                      <Text className="text-xs font-semibold text-green-700">Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Card>
+            ))}
+          </View>
+        )}
+
+        {/* Interaction history */}
+        {interactions.length > 0 && (
+          <View className="mt-5">
+            <Text className="text-sm font-semibold text-warm-black mb-2">Your history</Text>
+            {interactions.map((interaction) => (
+              <Card key={interaction.id} className="mb-2">
+                <View className="flex-row items-center gap-2 mb-1">
+                  <Text className="text-xs font-semibold text-sage">{interaction.type}</Text>
+                  <Text className="text-xs text-gray-400">{formatDate(interaction.date)}</Text>
+                  {interaction.follow_up_needed && interaction.follow_up_status !== "done" && (
+                    <View className="rounded-full bg-amber-50 px-2 py-0.5">
+                      <Text className="text-xs text-amber-700">Follow-up</Text>
+                    </View>
+                  )}
+                </View>
+                {interaction.notes != null && (
+                  <Text className="text-sm text-warm-black">{interaction.notes}</Text>
+                )}
+              </Card>
+            ))}
+          </View>
+        )}
+      </View>
+    </Screen>
   )
 }

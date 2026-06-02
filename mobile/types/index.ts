@@ -1,7 +1,1 @@
-export type {
-  Person,
-  Interaction,
-  Tag,
-  PersonTag,
-  Settings,
-} from "@roots/shared"
+export type { Person, Interaction, Tag, PersonTag, Settings } from "@roots/shared"

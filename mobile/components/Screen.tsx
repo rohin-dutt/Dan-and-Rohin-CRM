@@ -1,29 +1,28 @@
 import { ScrollView, View } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { SafeAreaView } from "react-native-safe-area-context"
 
-export function Screen({
-  children,
-  scroll = true,
-  padding = true,
-}: {
+type ScreenProps = {
   children: React.ReactNode
-  scroll?: boolean
-  padding?: boolean
-}) {
-  const insets = useSafeAreaInsets()
-  const style = {
-    flex: 1,
-    backgroundColor: "#F0EBE1",
-    paddingTop: insets.top,
-    paddingBottom: insets.bottom,
-    paddingHorizontal: padding ? 24 : 0,
-  }
-  if (scroll) {
+  scrollable?: boolean
+}
+
+export function Screen({ children, scrollable = true }: ScreenProps) {
+  if (!scrollable) {
     return (
-      <ScrollView style={style} keyboardShouldPersistTaps="handled">
-        {children}
-      </ScrollView>
+      <SafeAreaView className="flex-1 bg-cream">
+        <View className="flex-1">{children}</View>
+      </SafeAreaView>
     )
   }
-  return <View style={style}>{children}</View>
+  return (
+    <SafeAreaView className="flex-1 bg-cream">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </SafeAreaView>
+  )
 }

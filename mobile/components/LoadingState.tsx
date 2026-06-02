@@ -1,14 +1,10 @@
-import { View, ActivityIndicator } from "react-native"
+import { ActivityIndicator, View } from "react-native"
+import { colors } from "@/constants/theme"
 
 export function LoadingState() {
   return (
-    <View style={{
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "#F0EBE1",
-    }}>
-      <ActivityIndicator color="#7C9A7E" size="large" />
+    <View className="flex-1 bg-cream items-center justify-center">
+      <ActivityIndicator size="large" color={colors.sage} />
     </View>
   )
 }

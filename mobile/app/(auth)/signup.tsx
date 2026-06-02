@@ -1,11 +1,11 @@
 import { useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
-import { supabase } from "../../lib/supabase"
-import { Screen } from "../../components/Screen"
-import { Button } from "../../components/Button"
-import { TextField } from "../../components/TextField"
-import { ErrorBanner } from "../../components/ErrorBanner"
+import { Text, TouchableOpacity, View } from "react-native"
+import { supabase } from "@/lib/supabase"
+import { Screen } from "@/components/Screen"
+import { Button } from "@/components/Button"
+import { TextField } from "@/components/TextField"
+import { ErrorBanner } from "@/components/ErrorBanner"
 
 export default function SignupScreen() {
   const router = useRouter()
@@ -13,20 +13,21 @@ export default function SignupScreen() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSignUp() {
-    setError("")
+    setError(null)
+    if (!firstName.trim()) {
+      setError("First name is required")
+      return
+    }
     setLoading(true)
     const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+      email,
       password,
       options: {
-        data: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-        },
+        data: { first_name: firstName, last_name: lastName },
       },
     })
     setLoading(false)
@@ -39,76 +40,42 @@ export default function SignupScreen() {
 
   return (
     <Screen>
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: "#1C1917",
-          marginTop: 64,
-          marginBottom: 24,
-          fontFamily: "Georgia",
-        }}
-      >
-        Create your account
-      </Text>
+      <View className="flex-1 justify-center px-6 py-12">
+        <Text className="text-3xl font-bold text-warm-black mb-2">Create account</Text>
+        <Text className="text-base text-gray-500 mb-8">Join Roots</Text>
 
-      <ErrorBanner message={error} />
+        {error && <ErrorBanner message={error} />}
 
-      <TextField
-        label="First name"
-        value={firstName}
-        onChangeText={setFirstName}
-        placeholder="Jane"
-        autoCapitalize="words"
-        autoComplete="given-name"
-        textContentType="givenName"
-      />
+        <TextField label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" />
+        <TextField label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" />
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+        />
 
-      <TextField
-        label="Last name"
-        value={lastName}
-        onChangeText={setLastName}
-        placeholder="Smith"
-        autoCapitalize="words"
-        autoComplete="family-name"
-        textContentType="familyName"
-      />
+        <Button title="Create Account" onPress={handleSignUp} loading={loading} />
 
-      <TextField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-        textContentType="emailAddress"
-      />
-
-      <TextField
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        placeholder="••••••••"
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="new-password"
-        textContentType="newPassword"
-      />
-
-      <View style={{ marginTop: 8, marginBottom: 24 }}>
-        <Button title="Create account" onPress={handleSignUp} loading={loading} />
+        <TouchableOpacity
+          onPress={() => router.push("/(auth)/login")}
+          className="mt-4 items-center"
+        >
+          <Text className="text-gray-500 text-sm">
+            Already have an account?{" "}
+            <Text className="text-sage font-medium">Sign in</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        onPress={() => router.push("/(auth)/login")}
-        style={{ alignItems: "center" }}
-      >
-        <Text style={{ color: "#6B7280", fontSize: 14 }}>
-          Already have an account?{" "}
-          <Text style={{ color: "#7C9A7E", fontWeight: "600" }}>Sign in</Text>
-        </Text>
-      </TouchableOpacity>
     </Screen>
   )
 }

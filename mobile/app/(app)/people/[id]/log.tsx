@@ -1,110 +1,82 @@
 import { useState } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Switch,
-  TouchableOpacity,
-} from "react-native"
-import { useLocalSearchParams, useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { Switch, Text, TouchableOpacity, View } from "react-native"
+import { useRouter, useLocalSearchParams } from "expo-router"
+import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
+import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { supabase } from "@/lib/supabase"
 import { colors } from "@/constants/theme"
-import { INTERACTION_TYPES, todayInputValue, updateStreakAfterAction } from "@roots/shared"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
 
 export default function LogInteractionScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
-  const insets = useSafeAreaInsets()
+  const { id } = useLocalSearchParams<{ id: string }>()
 
-  const [interactionType, setInteractionType] = useState("Call")
-  const [date, setDate] = useState(todayInputValue())
-  const [notes, setNotes] = useState("")
-  const [followUpEnabled, setFollowUpEnabled] = useState(false)
-  const [followUpDate, setFollowUpDate] = useState(todayInputValue())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [interactionType, setInteractionType] = useState(INTERACTION_TYPES[0])
+  const [date, setDate] = useState(todayInputValue())
+  const [notes, setNotes] = useState("")
+  const [followUpEnabled, setFollowUpEnabled] = useState(false)
+  const [followUpDate, setFollowUpDate] = useState("")
+
   async function handleSave() {
-    if (!id) return
-    setSaving(true)
-    setError(null)
-
-    const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
-      p_person_id: id,
-      p_type: interactionType,
-      p_date: date,
-      p_notes: notes.trim() || null,
-      p_follow_up_needed: followUpEnabled,
-      p_follow_up_date: followUpEnabled ? followUpDate : null,
-      p_follow_up_status: followUpEnabled ? "open" : "done",
-    })
-
-    if (rpcError) {
-      setError(rpcError.message ?? "Failed to save. Please try again.")
-      setSaving(false)
+    if (!date.trim()) {
+      setError("Date is required")
       return
     }
 
-    await updateStreakAfterAction(supabase as unknown as Parameters<typeof updateStreakAfterAction>[0])
-    setSaving(false)
-    // Go back twice: past log screen, back to person detail
-    router.back()
-    router.back()
+    setSaving(true)
+    setError(null)
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) throw new Error("Not authenticated")
+
+      const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
+        p_person_id: id,
+        p_type: interactionType,
+        p_date: date.trim(),
+        p_notes: notes.trim() || null,
+        p_follow_up_needed: followUpEnabled,
+        p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
+      })
+
+      if (rpcError) throw rpcError
+
+      await updateStreakAfterAction(supabase)
+
+      router.back()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to log interaction")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.cream }}
-        contentContainerStyle={{
-          paddingTop: insets.top + 8,
-          paddingBottom: insets.bottom + 48,
-          paddingHorizontal: 24,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 15, color: colors.sage, fontWeight: "600" }}>← Back</Text>
+    <Screen>
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
+          <Text className="text-sage text-sm font-semibold">Cancel</Text>
         </TouchableOpacity>
+        <Text className="text-base font-semibold text-warm-black">Log a chat</Text>
+        <View style={{ width: 60 }} />
+      </View>
 
-        <Text style={{
-          fontSize: 24,
-          fontWeight: "700",
-          color: colors.warmBlack,
-          fontFamily: "Georgia",
-          marginBottom: 24,
-        }}>
-          Log a chat
-        </Text>
+      <View className="px-5 pb-8">
+        {error != null && <ErrorBanner message={error} />}
 
-        <View style={{
-          backgroundColor: colors.card,
-          borderRadius: 12,
-          padding: 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          elevation: 2,
-        }}>
-          {error && <ErrorBanner message={error} />}
-
-          {/* Interaction type */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 8 }}>
-            How did you connect?
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 20 }}>
+        {/* Interaction type */}
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-warm-black mb-2">Type</Text>
+          <View className="flex-row flex-wrap gap-2">
             {INTERACTION_TYPES.map((type) => (
               <PillButton
                 key={type}
@@ -114,66 +86,36 @@ export default function LogInteractionScreen() {
               />
             ))}
           </View>
+        </View>
 
-          {/* Date */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 6 }}>
-            When?
-          </Text>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
-            placeholderTextColor="#9CA3AF"
-            style={{
-              height: 44,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.card,
-              paddingHorizontal: 12,
-              fontSize: 15,
-              color: colors.warmBlack,
-              marginBottom: 16,
-            }}
-          />
+        <TextField
+          label="Date"
+          value={date}
+          onChangeText={setDate}
+          placeholder="YYYY-MM-DD"
+          keyboardType="numbers-and-punctuation"
+          returnKeyType="next"
+        />
 
-          {/* Notes */}
-          <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 6 }}>
-            Notes (optional)
-          </Text>
-          <TextInput
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="What did you talk about?"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={3}
-            style={{
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.card,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              fontSize: 15,
-              color: colors.warmBlack,
-              marginBottom: 20,
-              minHeight: 80,
-              textAlignVertical: "top",
-            }}
-          />
+        <TextField
+          label="Notes"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="What did you talk about?"
+          multiline
+          numberOfLines={4}
+          returnKeyType="default"
+        />
 
-          {/* Follow-up toggle */}
-          <View style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: followUpEnabled ? 16 : 24,
-          }}>
-            <Text style={{ fontSize: 14, fontWeight: "500", color: colors.warmBlack }}>
-              Want to follow up?
-            </Text>
+        {/* Follow-up toggle */}
+        <View className="mb-4">
+          <View className="flex-row items-center justify-between py-2">
+            <View className="flex-1 mr-4">
+              <Text className="text-sm font-medium text-warm-black">Set a follow-up</Text>
+              <Text className="text-xs text-gray-500 mt-0.5">
+                Remind yourself to follow up with this person
+              </Text>
+            </View>
             <Switch
               value={followUpEnabled}
               onValueChange={setFollowUpEnabled}
@@ -182,48 +124,20 @@ export default function LogInteractionScreen() {
             />
           </View>
 
-          {/* Follow-up date */}
           {followUpEnabled && (
-            <>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: colors.warmBlack, marginBottom: 6 }}>
-                Remind me on
-              </Text>
-              <TextInput
-                value={followUpDate}
-                onChangeText={setFollowUpDate}
-                placeholder="YYYY-MM-DD"
-                keyboardType="numbers-and-punctuation"
-                placeholderTextColor="#9CA3AF"
-                style={{
-                  height: 44,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.card,
-                  paddingHorizontal: 12,
-                  fontSize: 15,
-                  color: colors.warmBlack,
-                  marginBottom: 24,
-                }}
-              />
-            </>
+            <TextField
+              label="Follow-up date"
+              value={followUpDate}
+              onChangeText={setFollowUpDate}
+              placeholder="YYYY-MM-DD"
+              keyboardType="numbers-and-punctuation"
+              returnKeyType="done"
+            />
           )}
-
-          <Button
-            title={saving ? "Saving…" : "Save"}
-            onPress={handleSave}
-            disabled={saving}
-            loading={saving}
-          />
-
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ alignItems: "center", marginTop: 14 }}
-          >
-            <Text style={{ fontSize: 14, color: colors.muted }}>Cancel</Text>
-          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <Button title="Save" onPress={handleSave} loading={saving} />
+      </View>
+    </Screen>
   )
 }

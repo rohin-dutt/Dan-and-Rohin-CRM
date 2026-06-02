@@ -6,17 +6,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.cream,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
+        tabBarStyle: { backgroundColor: colors.cream },
         tabBarActiveTintColor: colors.sage,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "500",
-        },
       }}
     >
       <Tabs.Screen name="dashboard" options={{ title: "Home" }} />

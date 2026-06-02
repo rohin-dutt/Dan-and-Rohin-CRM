@@ -8,8 +8,3 @@ export const colors = {
   card: "#FFFFFF",
   error: "#DC2626",
 }
-
-export const fonts = {
-  serif: "Georgia",
-  sans: "System",
-}

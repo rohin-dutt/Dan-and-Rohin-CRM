@@ -1,110 +1,85 @@
-import { useState, useCallback } from "react"
-import { View, Text, TouchableOpacity } from "react-native"
-import { useFocusEffect, useRouter } from "expo-router"
-import { supabase } from "@/lib/supabase"
+import { useCallback, useState } from "react"
+import { Text, TouchableOpacity, View } from "react-native"
+import { useRouter, useFocusEffect } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
-import { LoadingState } from "@/components/LoadingState"
 import { EmptyState } from "@/components/EmptyState"
+import { LoadingState } from "@/components/LoadingState"
+import { ErrorBanner } from "@/components/ErrorBanner"
+import { supabase } from "@/lib/supabase"
+import type { Person, Interaction, Settings } from "@/types"
 import {
   categorizePeople,
   getBirthdayReminders,
-  formatDate,
+  getNextDueDays,
+  pluralize,
 } from "@roots/shared"
-import type { Person, Interaction, Settings } from "@/types"
 
 function getGreeting(firstName: string): string {
   const hour = new Date().getHours()
-  const timeGreet =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
-  return firstName ? `${timeGreet}, ${firstName}` : timeGreet
+  const time = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
+  return `${time}, ${firstName}`
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const isOverdue = status === "overdue"
+function SparseDashboardBanner({ count }: { count: number }) {
   return (
-    <View style={{
-      borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      backgroundColor: isOverdue ? "#FEE2E2" : "#FEF3C7",
-    }}>
-      <Text style={{
-        fontSize: 11,
-        fontWeight: "600",
-        color: isOverdue ? "#DC2626" : "#D97706",
-      }}>
-        {isOverdue ? "Overdue" : "Due Soon"}
+    <View className="mb-4 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+      <Text className="text-sm font-semibold text-sage mb-1">Building your network</Text>
+      <Text className="text-xs text-gray-500">
+        You have {count} {count === 1 ? "person" : "people"} added. Keep going — the more you add,
+        the better Roots works for you.
       </Text>
     </View>
-  )
-}
-
-function StatCard({
-  label,
-  count,
-  tintColor,
-}: {
-  label: string
-  count: number
-  tintColor: string
-}) {
-  return (
-    <Card style={{ flex: 1, alignItems: "center", paddingVertical: 14, backgroundColor: tintColor }}>
-      <Text style={{ fontSize: 28, fontWeight: "700", color: "#1C1917" }}>{count}</Text>
-      <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2, textAlign: "center" }}>{label}</Text>
-    </Card>
   )
 }
 
 export default function DashboardScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [firstName, setFirstName] = useState("")
-  const [streak, setStreak] = useState(0)
-  const [overdue, setOverdue] = useState<Person[]>([])
-  const [dueThisWeek, setDueThisWeek] = useState<Person[]>([])
-  const [comingUp, setComingUp] = useState<Person[]>([])
-  const [reachOut, setReachOut] = useState<Person[]>([])
-  const [birthdays, setBirthdays] = useState<{ person: Person; daysUntil: number }[]>([])
-  const [totalPeople, setTotalPeople] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [people, setPeople] = useState<Person[]>([])
+  const [interactions, setInteractions] = useState<Interaction[]>([])
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [firstName, setFirstName] = useState("there")
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      setError(null)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!session) return
 
       const userId = session.user.id
-      const meta = session.user.user_metadata as { first_name?: string; name?: string } | null
-      const first = meta?.first_name ?? meta?.name?.split(" ")[0] ?? ""
-      setFirstName(first)
+      const meta = session.user.user_metadata
+      const fullName: string = meta?.full_name || meta?.name || ""
+      const derived = fullName.split(" ")[0] || session.user.email?.split("@")[0] || "there"
+      setFirstName(derived)
 
-      const [peopleRes, interactionsRes, settingsRes] = await Promise.all([
+      const [peopleRes, settingsRes] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", userId),
-        supabase
-          .from("interactions")
-          .select("*")
-          .eq("follow_up_needed", true)
-          .neq("follow_up_status", "done"),
-        supabase.from("settings").select("current_streak").eq("user_id", userId).single(),
+        supabase.from("settings").select("*").eq("user_id", userId).single(),
       ])
 
-      const people: Person[] = peopleRes.data ?? []
-      const interactions: Interaction[] = interactionsRes.data ?? []
-      const settings = settingsRes.data as Settings | null
+      if (peopleRes.error) throw peopleRes.error
+      const loaded = peopleRes.data ?? []
+      setPeople(loaded)
+      setSettings(settingsRes.data ?? null)
 
-      setTotalPeople(people.length)
-      setStreak(settings?.current_streak ?? 0)
-
-      const categories = categorizePeople(people, new Date(), interactions)
-      setOverdue(categories.overdue)
-      setDueThisWeek(categories.dueThisWeek)
-      setComingUp(categories.comingUp)
-      setReachOut([...categories.overdue, ...categories.dueThisWeek])
-
-      const upcoming = getBirthdayReminders(people, new Date(), 30)
-      setBirthdays(upcoming)
+      if (loaded.length > 0) {
+        const { data: ints } = await supabase
+          .from("interactions")
+          .select("*")
+          .in(
+            "person_id",
+            loaded.map((p) => p.id),
+          )
+        setInteractions(ints ?? [])
+      } else {
+        setInteractions([])
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load dashboard")
     } finally {
       setLoading(false)
     }
@@ -112,18 +87,22 @@ export default function DashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData()
-    }, [fetchData])
+      setLoading(true)
+      load()
+    }, [load]),
   )
 
   if (loading) return <LoadingState />
 
-  if (totalPeople === 0) {
+  if (people.length === 0) {
     return (
-      <Screen scroll={false}>
+      <Screen>
+        <View className="px-5 pt-6 pb-2">
+          <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
+        </View>
         <EmptyState
-          title="Welcome to Roots"
-          body="Add your first person to get started."
+          title="No people yet"
+          description="Add someone you want to stay in touch with to get started."
           actionLabel="Add someone"
           onAction={() => router.push("/people/new")}
         />
@@ -131,112 +110,116 @@ export default function DashboardScreen() {
     )
   }
 
-  const isSparse = totalPeople <= 3 && overdue.length === 0 && dueThisWeek.length === 0
+  const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), interactions)
+  const birthdays = getBirthdayReminders(people)
+  const reachOut = [...overdue, ...dueThisWeek].slice(0, 5)
+  const streak = settings?.current_streak ?? 0
 
   return (
-    <Screen scroll>
-      {/* Header */}
-      <View style={{ marginBottom: 20, marginTop: 8 }}>
-        <Text style={{ fontSize: 26, fontWeight: "700", color: "#1C1917", fontFamily: "Georgia" }}>
-          Home
-        </Text>
-        <Text style={{ fontSize: 15, color: "#6B7280", marginTop: 2 }}>
-          {getGreeting(firstName)}
-        </Text>
-        {streak > 0 && (
-          <View style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginTop: 8,
-            alignSelf: "flex-start",
-            backgroundColor: "#FEF3C7",
-            borderRadius: 999,
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-          }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#D97706" }}>
-              🔥 {streak} day streak
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Sparse banner */}
-      {isSparse && (
-        <View style={{
-          backgroundColor: "#F0FDF4",
-          borderRadius: 10,
-          padding: 14,
-          marginBottom: 20,
-          borderWidth: 1,
-          borderColor: "#BBF7D0",
-        }}>
-          <Text style={{ fontSize: 13, color: "#15803D", lineHeight: 18 }}>
-            Great start — Roots gets more useful as you add people. 🌱
-          </Text>
+    <Screen>
+      <View className="px-5 pt-6 pb-2">
+        <View className="flex-row items-center justify-between mb-1">
+          <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
+          {streak > 0 && (
+            <View className="bg-orange-50 border border-orange-200 rounded-full px-3 py-1">
+              <Text className="text-xs font-semibold text-terracotta">🔥 {streak} day streak</Text>
+            </View>
+          )}
         </View>
-      )}
-
-      {/* Stat cards */}
-      <View style={{ flexDirection: "row", gap: 8, marginBottom: 24 }}>
-        <StatCard label="Overdue" count={overdue.length} tintColor="#FEF2F2" />
-        <StatCard label="Due This Week" count={dueThisWeek.length} tintColor="#FFFBEB" />
-        <StatCard label="Coming Up" count={comingUp.length} tintColor="#F0F9FF" />
       </View>
 
-      {/* Reach out section */}
-      {reachOut.length > 0 && (
-        <View style={{ marginBottom: 24 }}>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: "#1C1917", marginBottom: 12 }}>
-            Reach out
-          </Text>
-          <View style={{ gap: 10 }}>
+      <View className="px-5 mt-4">
+        {people.length >= 1 && people.length <= 3 && (
+          <SparseDashboardBanner count={people.length} />
+        )}
+
+        {error && <ErrorBanner message={error} />}
+
+        {/* Stat cards */}
+        <View className="flex-row gap-3 mb-6">
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-2xl font-bold text-terracotta">{overdue.length}</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Overdue</Text>
+          </View>
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-2xl font-bold text-sage">{dueThisWeek.length}</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Due this week</Text>
+          </View>
+          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-2xl font-bold text-warm-black">{comingUp.length}</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Coming up</Text>
+          </View>
+        </View>
+
+        {/* Reach out */}
+        {reachOut.length > 0 && (
+          <View className="mb-6">
+            <Text className="text-base font-semibold text-warm-black mb-3">Reach out</Text>
             {reachOut.map((person) => {
-              const isOverdue = overdue.some((p) => p.id === person.id)
+              const days = getNextDueDays(person)
+              const isOverdue = days !== null && days < 0
               return (
                 <TouchableOpacity
                   key={person.id}
-                  activeOpacity={0.7}
                   onPress={() => router.push(`/people/${person.id}`)}
+                  activeOpacity={0.7}
                 >
-                  <Card style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={{ fontSize: 15, fontWeight: "600", color: "#1C1917" }}>
-                        {person.name}
-                      </Text>
-                      <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-                        Last talked: {formatDate(person.last_contacted_at)}
-                      </Text>
+                  <Card className="mb-2">
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1 mr-3">
+                        <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
+                        {person.company != null && (
+                          <Text className="text-xs text-gray-500 mt-0.5">{person.company}</Text>
+                        )}
+                      </View>
+                      <View
+                        className={`rounded-full px-2.5 py-1 ${
+                          isOverdue ? "bg-red-50" : "bg-amber-50"
+                        }`}
+                      >
+                        <Text
+                          className={`text-xs font-medium ${
+                            isOverdue ? "text-red-600" : "text-amber-700"
+                          }`}
+                        >
+                          {isOverdue
+                            ? `${pluralize(Math.abs(days!), "day")} overdue`
+                            : `Due in ${pluralize(days!, "day")}`}
+                        </Text>
+                      </View>
                     </View>
-                    <StatusBadge status={isOverdue ? "overdue" : "due_this_week"} />
                   </Card>
                 </TouchableOpacity>
               )
             })}
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Birthdays section */}
-      {birthdays.length > 0 && (
-        <View style={{ marginBottom: 24 }}>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: "#1C1917", marginBottom: 12 }}>
-            Upcoming birthdays
-          </Text>
-          <View style={{ gap: 10 }}>
+        {/* Birthdays */}
+        {birthdays.length > 0 && (
+          <View className="mb-6">
+            <Text className="text-base font-semibold text-warm-black mb-3">
+              Upcoming birthdays
+            </Text>
             {birthdays.map(({ person, daysUntil }) => (
-              <Card key={person.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: "#1C1917" }}>
-                  {person.name}
-                </Text>
-                <Text style={{ fontSize: 13, color: "#6B7280" }}>
-                  {daysUntil === 0 ? "Today 🎂" : `in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`}
-                </Text>
-              </Card>
+              <TouchableOpacity
+                key={person.id}
+                onPress={() => router.push(`/people/${person.id}`)}
+                activeOpacity={0.7}
+              >
+                <Card className="mb-2">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
+                    <Text className="text-xs text-gray-500">
+                      {daysUntil === 0 ? "Today! 🎂" : `In ${pluralize(daysUntil, "day")}`}
+                    </Text>
+                  </View>
+                </Card>
+              </TouchableOpacity>
             ))}
           </View>
-        </View>
-      )}
+        )}
+      </View>
     </Screen>
   )
 }
