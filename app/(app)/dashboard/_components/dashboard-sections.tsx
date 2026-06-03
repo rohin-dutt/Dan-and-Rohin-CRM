@@ -13,7 +13,7 @@ import {
   getTotalContacts,
   getTotalInteractions,
   pluralize,
-} from "@/lib/crm-rules";
+} from "@roots/shared";
 import { formatBirthdayDate, formatDate, todayInputValue } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import type { Interaction, Person } from "@/types/index";
@@ -224,11 +224,17 @@ function ReachOutList({
   overduePeople: Person[];
   dueThisWeekPeople: Person[];
 }) {
-  const queue = getFollowUpQueue(interactions);
+  const queue = getFollowUpQueue(interactions) as {
+    overdue: FollowUpInteraction[];
+    due_today: FollowUpInteraction[];
+    due: FollowUpInteraction[];
+    snoozed: FollowUpInteraction[];
+    done: FollowUpInteraction[];
+  };
   const today = todayInputValue();
   const todayDate = new Date(today + "T00:00:00");
 
-  const splitDue = queue.due.map((item: FollowUpInteraction) => {
+  const splitDue = queue.due.map((item) => {
     const rawDate = item.follow_up_date;
     if (!rawDate) {
       return { ...item, state: "Due Soon", style: "bg-amber-100 text-amber-700", isCadence: false as const };
@@ -245,7 +251,7 @@ function ReachOutList({
 
   const explicitPersonIds = new Set(
     [...queue.overdue, ...queue.due_today, ...queue.due].map(
-      (item: FollowUpInteraction) => item.person_id
+      (item) => item.person_id
     )
   );
 
@@ -280,13 +286,13 @@ function ReachOutList({
   const dueSoon = splitDue.filter((item) => item.state !== "Coming Up");
 
   const visible = [
-    ...queue.overdue.map((item: FollowUpInteraction) => ({
+    ...queue.overdue.map((item) => ({
       ...item,
       state: "Overdue",
       style: "bg-red-100 text-red-700",
       isCadence: false as const,
     })),
-    ...queue.due_today.map((item: FollowUpInteraction) => ({
+    ...queue.due_today.map((item) => ({
       ...item,
       state: "Due today",
       style: "bg-red-100 text-red-700",

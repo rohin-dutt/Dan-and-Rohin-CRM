@@ -7,7 +7,7 @@ import {
   getFollowUpState,
   getNextDueDays,
   pluralize,
-} from "@/lib/crm-rules";
+} from "@roots/shared";
 import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 import type { Interaction, Person, Tag } from "@/types/index";

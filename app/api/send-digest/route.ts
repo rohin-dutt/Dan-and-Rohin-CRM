@@ -1,10 +1,8 @@
 import { Resend } from "resend"
 import { createServiceRoleClient } from "@/lib/trusted-api-auth"
 import { weeklyDigestEmail } from "@/lib/email-templates"
-import { getBirthdayReminders, categorizePeople } from "@/lib/crm-rules"
+import { getBirthdayReminders, categorizePeople } from "@roots/shared"
 import { apiError } from "@/lib/api-errors"
-
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization")
@@ -14,6 +12,12 @@ export async function POST(request: Request) {
     return apiError("Unauthorized", 401)
   }
 
+  const resendApiKey = process.env.RESEND_API_KEY
+  if (!resendApiKey) {
+    return apiError("Missing RESEND_API_KEY.", 500)
+  }
+
+  const resend = new Resend(resendApiKey)
   const supabase = createServiceRoleClient()
 
   const { data: settings, error: settingsError } = await supabase

@@ -4,6 +4,7 @@
     "slug": "roots",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
     "scheme": "roots",
     "icon": "./assets/icon.png",
     "splash": {
@@ -14,7 +15,16 @@
     "ios": {
       "bundleIdentifier": "com.roots.crm",
       "supportsTablet": false,
-      "buildNumber": "20260601"
+      "buildNumber": "2026060201",
+      "infoPlist": {
+        "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
+        "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up and birthday reminders."
+      },
+      "privacyManifests": {
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": []
+      }
     },
     "assetBundlePatterns": ["**/*"],
     "plugins": [

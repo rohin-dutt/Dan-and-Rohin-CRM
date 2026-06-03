@@ -13,6 +13,7 @@ export default function AppLayout() {
       />
       <Stack.Screen name="people/[id]" />
       <Stack.Screen name="people/new" />
+      <Stack.Screen name="people/import-contacts" />
       <Stack.Screen name="people/[id]/edit" />
       <Stack.Screen name="people/[id]/log" />
     </Stack>

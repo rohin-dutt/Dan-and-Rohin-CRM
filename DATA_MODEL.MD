@@ -132,6 +132,11 @@ bodies, or raw contact payloads.
 - `recalculate_person_last_contacted(person_id)` derives `last_contacted_at` from the latest interaction after edits/deletes.
 - `replace_person_tags(person_id, tag_ids)` replaces tag assignments in one database transaction after confirming the person and every tag belong to the authenticated user.
 - `merge_tags(source_tag_id, target_tag_id)` moves assignments to the target tag and deletes the source tag.
+- `restore_crm_snapshot(payload jsonb, replace_existing boolean)` imports or
+  restore/replaces a validated CRM snapshot in one database transaction. It
+  runs as `security invoker`, requires `auth.uid()`, forces imported people and
+  tags to the authenticated owner, validates interaction and tag-assignment
+  relationships, and rejects unknown or inaccessible cross-user references.
 
 ## RLS Ownership
 
@@ -146,3 +151,11 @@ bodies, or raw contact payloads.
 - The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration, person-tag ownership hardening migration, and restored user-owned cascade constraints applied.
 - The local migration `20260514171147_reconcile_target_schema_drift.sql` reconciles older target-project drift in nullability, defaults, `people.last_contacted_at`, check constraints, and tag-name uniqueness. Apply it to the linked project only as an intentional database release step after reviewing existing data.
 - The local migration `20260516170000_mobile_notification_readiness.sql` adds mobile push token storage, push notification settings fields, and privacy-safe notification delivery logging/idempotency records for the Roots iOS app.
+- The local migration `20260602170834_restore_crm_snapshot.sql` adds the
+  transactional restore/import RPC for mobile and web trusted restore flows.
+  It was applied to the linked Supabase project `ojebeswabngvcktqsduc` through
+  Supabase MCP on June 2, 2026. The linked project accepted the function as
+  `security invoker`, and an unauthenticated SQL-console call rejected with
+  `Unauthorized.` as expected. Supabase MCP recorded the remote migration
+  history row as `20260602172604_restore_crm_snapshot`; the checked-in local
+  migration file remains `20260602170834_restore_crm_snapshot.sql`.

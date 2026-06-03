@@ -259,73 +259,21 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("You must be logged in.");
 
-      if (replaceExisting) {
-        const { error: peopleDeleteError } = await supabase
-          .from("people")
-          .delete()
-          .eq("user_id", user.id);
-        if (peopleDeleteError) throw peopleDeleteError;
+      const response = await fetch("/api/import/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload,
+          replace_existing: replaceExisting,
+        }),
+      });
+      const result = await response.json().catch(() => null);
 
-        const { error: tagDeleteError } = await supabase
-          .from("tags")
-          .delete()
-          .eq("user_id", user.id);
-        if (tagDeleteError) throw tagDeleteError;
-      }
-
-      const importedTags = (payload.tags ?? []).map((tag) => ({
-        id: tag.id,
-        user_id: user.id,
-        name: tag.name,
-        color: tag.color,
-      }));
-      const importedPeople = (payload.people ?? []).map((person) => ({
-        ...person,
-        user_id: user.id,
-      }));
-      const importedInteractions = payload.interactions ?? [];
-      const importedPersonTags = payload.person_tags ?? [];
-      const importedPersonIds = new Set(importedPeople.map((person) => person.id));
-      const importedTagIds = new Set(importedTags.map((tag) => tag.id));
-      const tagIdsByPersonId = importedPersonTags.reduce<Record<string, string[]>>(
-        (groups, personTag) => {
-          if (
-            !importedPersonIds.has(personTag.person_id) ||
-            !importedTagIds.has(personTag.tag_id)
-          ) {
-            return groups;
-          }
-
-          groups[personTag.person_id] = [
-            ...(groups[personTag.person_id] ?? []),
-            personTag.tag_id,
-          ];
-          return groups;
-        },
-        {}
-      );
-
-      if (importedTags.length > 0) {
-        const { error: tagsError } = await supabase.from("tags").upsert(importedTags);
-        if (tagsError) throw tagsError;
-      }
-      if (importedPeople.length > 0) {
-        const { error: peopleError } = await supabase.from("people").upsert(importedPeople);
-        if (peopleError) throw peopleError;
-      }
-      if (importedInteractions.length > 0) {
-        const { error: interactionsError } = await supabase
-          .from("interactions")
-          .upsert(importedInteractions);
-        if (interactionsError) throw interactionsError;
-      }
-      for (const [personId, tagIds] of Object.entries(tagIdsByPersonId)) {
-        const { error: personTagsError } = await supabase.rpc("replace_person_tags", {
-          p_person_id: personId,
-          p_tag_ids: Array.from(new Set(tagIds)),
-        });
-
-        if (personTagsError) throw personTagsError;
+      if (!response.ok) {
+        throw new Error(
+          result?.error?.message ??
+            (replaceExisting ? "Restore failed." : "Import failed.")
+        );
       }
 
       setImportMessage(
@@ -352,7 +300,7 @@ export default function SettingsPage() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(data?.error ?? "Export failed.");
+        throw new Error(data?.error?.message ?? "Export failed.");
       }
 
       const blob = new Blob([JSON.stringify(data, null, 2)], {

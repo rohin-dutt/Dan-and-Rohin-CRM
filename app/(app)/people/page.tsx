@@ -14,7 +14,7 @@ import {
   findDuplicateContacts,
   getRelationshipStatus,
   normalizeContactText,
-} from "@/lib/crm-rules";
+} from "@roots/shared";
 import { supabase } from "@/lib/supabase";
 import type { Interaction, Person, PersonTag, Tag } from "@/types/index";
 

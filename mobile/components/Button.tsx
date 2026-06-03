@@ -15,7 +15,9 @@ export function Button({ title, onPress, loading, variant = "primary", disabled 
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      className={`w-full rounded-xl py-3.5 items-center justify-center ${
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      className={`w-full min-h-11 rounded-xl py-3.5 items-center justify-center ${
         isPrimary ? "bg-sage" : "bg-white border border-gray-200"
       } ${disabled || loading ? "opacity-50" : ""}`}
     >

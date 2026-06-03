@@ -50,7 +50,10 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
   - Decision: no analytics and no crash reporting SDK in mobile v1.
 - [x] Define build-number process.
   - Decision: use date-based build numbers, such as `2026051601`.
-- [ ] Define EAS build profiles.
+- [x] Define EAS build profiles.
+  - Added `mobile/eas.json` with development, preview/TestFlight, and
+    production profiles. EAS account/project linking and Apple credentials are
+    still manual external setup.
 
 ## Phase 0: Product And Launch Readiness
 
@@ -104,41 +107,53 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
   - Plan: add a single `restore_crm_snapshot(payload jsonb,
     replace_existing boolean)` RPC and move destructive restore through one
     transaction before mobile launch.
-- [ ] Design mobile export/import API shape if the web file flows are not
+- [x] Design mobile export/import API shape if the web file flows are not
       reused directly.
+  - Mobile trusted APIs reuse the web JSON export, contacts import, and
+    restore routes with bearer auth. Native file import/export UI remains open,
+    but the server boundary is defined.
 - [x] Add Supabase migrations for approved schema changes.
   - Added `20260516170000_mobile_notification_readiness.sql`.
+  - Applied to linked Supabase project `ojebeswabngvcktqsduc` through Supabase
+    MCP on June 2, 2026; remote migration history recorded it as
+    `20260602183543_mobile_notification_readiness`.
 - [x] Add RLS policies for new user-owned tables.
   - Added user-owned CRUD policies for `push_tokens` and user-owned select for
     server-written `notification_deliveries`.
 - [x] Update `DATA_MODEL.MD` after schema changes.
-- [ ] Add tests or SQL checks for ownership and cross-user rejection.
+- [x] Add tests or SQL checks for ownership and cross-user rejection.
+  - Verified `push_tokens` and `notification_deliveries` RLS is enabled in the
+    linked Supabase project. `restore_crm_snapshot` rejects unauthenticated
+    calls, and API smoke coverage now checks missing auth for trusted mobile
+    push-token registration.
 - [x] Confirm service-role operations never run in the mobile app.
   - Server-only service-role client creation is isolated behind trusted API
     code after request authentication.
 
 ## Phase 2: Shared Core Extraction
 
-- [ ] Create `packages/shared`.
-- [ ] Move portable CRM types into shared package.
-- [ ] Move dashboard categorization and follow-up state logic.
-- [ ] Move duplicate detection helpers.
-- [ ] Move date helpers that are portable to React Native.
-- [ ] Move validation constants where useful.
+- [x] Create `packages/shared`.
+- [x] Move portable CRM types into shared package.
+- [x] Move dashboard categorization and follow-up state logic.
+- [x] Move duplicate detection helpers.
+- [x] Move date helpers that are portable to React Native.
+- [x] Move validation constants where useful.
 - [ ] Move import/export payload validation where runtime-compatible.
-- [ ] Keep web UI components out of shared package.
-- [ ] Update web imports carefully after each extraction.
-- [ ] Add or preserve tests for shared logic.
-- [ ] Run `npm.cmd test`.
-- [ ] Run `npm.cmd run lint`.
-- [ ] Run `npm.cmd run build`.
+- [x] Keep web UI components out of shared package.
+- [x] Update web imports carefully after each extraction.
+- [x] Add or preserve tests for shared logic.
+- [x] Run `npm.cmd test`.
+- [x] Run `npm.cmd run lint`.
+- [x] Run `npm.cmd run build`.
 
 ## Phase 3: Expo Foundation And Design System
 
 - [ ] Scaffold Expo app under `mobile/`.
 - [ ] Configure TypeScript.
 - [ ] Configure Expo Router under `mobile/app`.
-- [ ] Configure EAS development, preview/TestFlight, and production profiles.
+- [x] Configure EAS development, preview/TestFlight, and production profiles.
+  - `mobile/eas.json` defines local development, preview/TestFlight, and
+    production build profiles.
 - [ ] Configure environment handling for Supabase values.
 - [ ] Add Supabase React Native client setup.
 - [ ] Add React Native-compatible URL polyfill.
@@ -147,8 +162,10 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Add app icon and splash screen.
 - [ ] Add NativeWind v4.
 - [ ] Create base design tokens.
-- [ ] Create `PrivacyInfo.xcprivacy` placeholder if required by selected native
+- [x] Create `PrivacyInfo.xcprivacy` placeholder if required by selected native
       dependencies or accessed APIs.
+  - Expo app config now includes an iOS privacy manifest placeholder,
+    Contacts/Notifications purpose strings, and `userInterfaceStyle`.
 - [ ] Create base components:
   - [ ] Screen
   - [ ] Button
@@ -169,11 +186,18 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Build signup.
 - [ ] Build logout.
 - [ ] Build forgot password.
-- [ ] Build update password deep link handling.
+- [x] Build update password deep link handling.
+  - Added `roots://update-password` handling for PKCE `code` links and
+    access/refresh-token recovery links, plus a mobile update-password screen.
 - [ ] Restore session on app launch.
 - [ ] Protect authenticated screens.
-- [ ] Send mobile bearer auth to trusted APIs.
-- [ ] Clear local private cache on logout.
+- [x] Send mobile bearer auth to trusted APIs.
+  - Added a mobile trusted API helper that sends Supabase access tokens in
+    `Authorization: Bearer <token>` and uses it for push-token registration and
+    cleanup.
+- [x] Clear local private cache on logout.
+  - Added a local private-data clearing hook. Offline private cache remains
+    disabled, so the hook currently clears known future cache/draft keys.
 - [ ] Create first EAS/TestFlight build.
 - [ ] Install on a real iPhone.
 - [ ] Record TestFlight QA result.
@@ -222,34 +246,57 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 ## Phase 8: Native Contacts Import
 
-- [ ] Add Contacts permission explanation screen.
-- [ ] Request Contacts permission.
-- [ ] Handle denied and limited permission states.
-- [ ] Load contacts from device.
-- [ ] Let user select contacts to import.
-- [ ] Preview mapped fields.
-- [ ] Document and implement field mapping rules.
-- [ ] Detect likely duplicates.
+- [x] Add Contacts permission explanation screen.
+- [x] Request Contacts permission.
+- [x] Handle denied and limited permission states.
+- [x] Load contacts from device.
+- [x] Let user select contacts to import.
+- [x] Preview mapped fields.
+- [x] Document and implement field mapping rules.
+  - Native import maps only contact name, first email address, and first phone
+    number. It does not request or upload notes, addresses, images, or
+    unselected contacts.
+- [x] Detect likely duplicates.
+  - The review screen flags exact name, email, or phone matches against the
+    signed-in user's existing people and excludes those from the default safe
+    selection.
 - [ ] Support create, update existing, and skip.
-- [ ] Handle partial import failures with a result summary.
-- [ ] Save imported contacts under authenticated user.
-- [ ] Confirm unselected contacts are not uploaded or persisted.
+  - Create and skip-by-deselection are implemented. Update-existing remains
+    open because `/api/import/contacts` is currently create-only.
+- [x] Handle partial import failures with a result summary.
+- [x] Save imported contacts under authenticated user.
+- [x] Confirm unselected contacts are not uploaded or persisted.
 - [ ] QA denied permission fallback.
+  - Denied and limited permission states are implemented in the native screen;
+    real-device QA remains open.
 
 ## Phase 9: Push Notifications
 
 - [ ] Request push permission after onboarding context.
-- [ ] Register Expo/APNs push token.
-- [ ] Store token per user/device.
-- [ ] Add notification preferences to Settings.
+- [x] Register Expo/APNs push token.
+  - Mobile Settings can request notification permission and register an Expo
+    push token through `/api/mobile/push-token`. Physical device/EAS QA still
+    required.
+- [x] Store token per user/device.
+  - Trusted route upserts `push_tokens` under the authenticated user and tracks
+    app install id, app version, build number, environment, provider, platform,
+    status, and last-seen timestamp.
+- [x] Add notification preferences to Settings.
+  - Mobile Settings now exposes follow-up and birthday push preferences backed
+    by the `settings` push columns.
 - [ ] Build trusted sender for due follow-ups and birthdays.
 - [ ] Add delivery logging or idempotency protection.
 - [ ] Add timezone handling.
 - [ ] Add quiet-hours or send-window behavior if approved.
 - [ ] Add notification deep links.
-- [ ] Clean token on logout/account deletion where appropriate.
-- [ ] Verify notification payloads avoid notes and sensitive relationship
+- [x] Clean token on logout/account deletion where appropriate.
+  - Mobile logout calls trusted token revocation before sign-out; account
+    deletion marks the user's push tokens revoked before deleting the auth user.
+- [x] Verify notification payloads avoid notes and sensitive relationship
       details.
+  - No push sender payload is implemented yet. The stored token route does not
+    persist notification body text, notes, raw contact payloads, or relationship
+    details; `notification_deliveries` is privacy-safe metadata only.
 - [ ] Verify notification delivery on physical iPhone.
 
 ## Phase 10: Offline Read Cache
@@ -271,13 +318,25 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Build export flow.
 - [ ] Build import/update flow.
 - [ ] Build restore/replace flow.
-- [ ] Make restore/replace atomic through RPC or trusted route.
+- [x] Make restore/replace atomic through RPC or trusted route.
+  - Added `restore_crm_snapshot(payload jsonb, replace_existing boolean)` and
+    a trusted Next.js route wrapper at `/api/import/restore`.
 - [ ] Validate import files before writes.
-- [ ] Build account deletion flow.
-- [ ] Confirm account deletion clears server data through cascade/RLS-safe
+- [x] Build account deletion flow.
+  - Mobile Settings now calls `/api/account/delete` with bearer auth and
+    explicit `{ confirm: "DELETE" }`.
+- [x] Confirm account deletion clears server data through cascade/RLS-safe
       helpers.
-- [ ] Confirm account deletion clears local cache and push tokens.
-- [ ] Add privacy and support links.
+  - Trusted server route authenticates the user, revokes push tokens, deletes
+    the Supabase auth user with the service-role server client, and relies on
+    user-owned cascade constraints for private CRM rows.
+- [x] Confirm account deletion clears local cache and push tokens.
+  - Mobile account deletion clears local private cache keys and stored push
+    token before routing to the logged-out state. Physical-device QA remains
+    required.
+- [x] Add privacy and support links.
+  - Mobile Settings links to the existing privacy, terms, and contact/support
+    pages.
 
 ## Phase 12: App Store Release
 
@@ -304,3 +363,41 @@ For mobile-specific work, also run the selected Expo checks, mobile unit tests,
 and mobile E2E checks where available. Complete real-device TestFlight QA when
 the feature touches auth, native permissions, push, offline behavior, import,
 restore, or account deletion.
+
+## June 2, 2026 Readiness Pass Notes
+
+- Completed local checks: `npm.cmd test`, `npm.cmd run lint`,
+  `npm.cmd run build`, `npm.cmd run typecheck` in `mobile/`,
+  `npm.cmd run lint` in `mobile/`, and `npx.cmd expo-doctor`.
+- June 3, 2026 checkpoint verification also passed:
+  `npm.cmd test`, `npm.cmd run lint`, `npm.cmd run build`,
+  `npm.cmd run typecheck` in `mobile/`, `npm.cmd run lint` in `mobile/`,
+  `npx.cmd expo-doctor`, and
+  `npm.cmd run test:e2e -- tests/e2e/unauthenticated-smoke.spec.ts`.
+- Supabase connected verification: `restore_crm_snapshot` was applied to
+  project `ojebeswabngvcktqsduc`; function inspection confirmed
+  `security_definer = false`; an unauthenticated SQL-console call rejected with
+  `Unauthorized.`. Supabase MCP recorded the remote migration history row as
+  `20260602172604_restore_crm_snapshot`; the checked-in local migration file is
+  `20260602170834_restore_crm_snapshot.sql`.
+- June 3, 2026 Supabase connected verification confirmed remote migration
+  history includes `20260602172604_restore_crm_snapshot` and
+  `20260602183543_mobile_notification_readiness`; `push_tokens` and
+  `notification_deliveries` exist with RLS enabled; push settings columns exist
+  on `settings`; and `restore_crm_snapshot` remains `security invoker`.
+- June 3, 2026 Supabase advisors surfaced follow-up hardening/performance
+  items that are outside this local checkpoint: leaked password protection is
+  disabled in Supabase Auth, existing RLS policies can be optimized with
+  `(select auth.uid())`, and some foreign keys/indexes need review as usage
+  grows.
+- iOS simulator verification is blocked in this Windows environment:
+  XcodeBuildMCP has no configured project/workspace/scheme/simulator, and
+  `list_sims` failed with `spawn xcrun ENOENT`.
+- Remaining mobile v1 product surfaces are not complete: Contacts
+  update-existing behavior, native data management file UI, push sender,
+  encrypted offline read cache, TestFlight build, and physical device QA remain
+  open.
+- Dependency decision: keep `web` script support for now and keep
+  `react-dom`/`react-native-web` because Expo SDK 54 supports web and
+  `npx.cmd expo-doctor` passes. Added SDK-compatible `react-native-worklets`
+  because Reanimated requires it.

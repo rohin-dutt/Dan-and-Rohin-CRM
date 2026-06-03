@@ -15,6 +15,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmationSent, setConfirmationSent] = useState(false)
 
   async function handleSignUp() {
     setError(null)
@@ -23,7 +24,7 @@ export default function SignupScreen() {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -33,6 +34,8 @@ export default function SignupScreen() {
     setLoading(false)
     if (error) {
       setError(error.message)
+    } else if (!data.session) {
+      setConfirmationSent(true)
     } else {
       router.replace("/(app)/onboarding")
     }
@@ -45,6 +48,13 @@ export default function SignupScreen() {
         <Text className="text-base text-gray-500 mb-8">Join Roots</Text>
 
         {error && <ErrorBanner message={error} />}
+        {confirmationSent && (
+          <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+            <Text className="text-green-700 text-sm font-medium">
+              Check your email to confirm your account before signing in.
+            </Text>
+          </View>
+        )}
 
         <TextField label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" />
         <TextField label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" />

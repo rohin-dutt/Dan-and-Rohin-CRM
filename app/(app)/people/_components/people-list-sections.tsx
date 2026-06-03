@@ -6,7 +6,7 @@ import {
   getNextDueDays,
   getRelationshipStatus,
   pluralize,
-} from "@/lib/crm-rules";
+} from "@roots/shared";
 import { formatDate } from "@/lib/date-utils";
 import type { Interaction, Person, Tag } from "@/types/index";
 
@@ -44,8 +44,9 @@ function statusBadge(person: Person, activeFollowUpDate: string | null = null) {
     };
   }
   if (status === "due_this_week") {
+    const daysUntilDue = nextDueDays ?? 0;
     return {
-      label: nextDueDays === 0 ? "Due today" : `Due in ${pluralize(nextDueDays, "day")}`,
+      label: daysUntilDue === 0 ? "Due today" : `Due in ${pluralize(daysUntilDue, "day")}`,
       className: "bg-amber-100 text-amber-700",
     };
   }
