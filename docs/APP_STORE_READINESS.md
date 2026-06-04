@@ -36,10 +36,10 @@ provisioning if a stronger brand or company identifier is chosen.
 
 ## Build Configuration
 
-- [ ] Expo app config created.
+- [x] Expo app config created.
 - [ ] EAS project configured.
-- [ ] EAS development, preview/TestFlight, and production profiles defined.
-- [ ] iOS bundle identifier set.
+- [x] EAS development, preview/TestFlight, and production profiles defined.
+- [x] iOS bundle identifier set.
 - [ ] App icon complete.
 - [ ] Splash screen complete.
 - [x] Version and build number process defined.
@@ -49,6 +49,12 @@ provisioning if a stronger brand or company identifier is chosen.
 - [ ] TestFlight build uploaded.
 - [ ] TestFlight install verified on real iPhone.
 
+June 2, 2026 status: `mobile/eas.json` now defines development, preview, and
+production profiles. `mobile/app.json` sets `com.roots.crm`, `roots://`,
+version `1.0.0`, and build number `2026060201`. EAS project linking, Apple
+Developer enrollment, provisioning, upload, and TestFlight install remain
+manual external blockers.
+
 ## URLs
 
 - [x] Privacy policy URL.
@@ -56,7 +62,7 @@ provisioning if a stronger brand or company identifier is chosen.
 - [ ] Marketing URL, if used.
 - [ ] User privacy choices or account deletion URL, if used.
 - [ ] Supabase auth redirect URLs configured.
-- [ ] Deep link scheme configured.
+- [x] Deep link scheme configured.
 
 Proposed deep link scheme:
 
@@ -103,7 +109,7 @@ Required decisions:
 
 ## Privacy Manifest And SDK Review
 
-- [ ] `PrivacyInfo.xcprivacy` exists if required by app behavior or selected
+- [x] `PrivacyInfo.xcprivacy` exists if required by app behavior or selected
       native dependencies.
 - [ ] Collected data declarations match App Store privacy answers.
 - [ ] Required-reason API usage is declared where applicable.
@@ -116,24 +122,37 @@ Required decisions:
 
 Contacts:
 
-- [ ] Purpose string written.
-- [ ] Permission pre-prompt screen implemented.
-- [ ] Denied-permission fallback implemented.
-- [ ] Limited/partial access behavior implemented if applicable.
-- [ ] Import review-before-save implemented.
-- [ ] Unselected contacts are not uploaded or persisted.
+- [x] Purpose string written.
+- [x] Permission pre-prompt screen implemented.
+- [x] Denied-permission fallback implemented.
+- [x] Limited/partial access behavior implemented if applicable.
+- [x] Import review-before-save implemented.
+- [x] Unselected contacts are not uploaded or persisted.
 
 Decision: support selected-contact import and an import-all option. Import all
 must still pass through review before save.
 
+June 2, 2026 status: native Contacts import is implemented as a review screen
+that maps only name, first email, and first phone. It flags likely duplicates
+and uploads only selected contacts through the trusted contacts import API.
+Update-existing behavior and real-device permission QA remain open.
+
 Push Notifications:
 
 - [ ] Purpose shown before system prompt.
-- [ ] Permission request implemented.
-- [ ] User can disable reminder notifications.
-- [ ] Notification payloads avoid private notes/details.
-- [ ] Notification preferences, token cleanup, and delivery logging match the
+- [x] Permission request implemented.
+  - Implemented from mobile Settings before token registration. Real iPhone QA
+    still required.
+- [x] User can disable reminder notifications.
+  - Mobile Settings exposes follow-up and birthday push preference toggles.
+- [x] Notification payloads avoid private notes/details.
+  - No sender is active yet. Token registration and delivery logging store only
+    privacy-safe metadata.
+- [x] Notification preferences, token cleanup, and delivery logging match the
       privacy policy.
+  - Settings preferences, trusted token registration, logout cleanup, and
+    server-side account deletion cleanup are implemented. Delivery sending and
+    physical-device validation remain open.
 
 ## Accessibility And Device QA
 
@@ -142,6 +161,8 @@ Push Notifications:
 - [ ] Color contrast checked for text, controls, tags, and status indicators.
 - [ ] Reduced Motion behavior checked if animations are used.
 - [ ] Keyboard avoidance checked for auth, person forms, and interaction forms.
+  - Implemented centrally in the mobile `Screen` component; still needs real
+    iPhone QA.
 - [ ] Safe areas checked on small and large iPhone sizes.
 - [ ] Empty, loading, error, and offline states checked on device.
 
@@ -151,7 +172,9 @@ Push Notifications:
 - [ ] Demo account credentials stored securely for submission.
 - [ ] Review notes explain Contacts permission.
 - [ ] Review notes explain Notifications permission.
-- [ ] Review notes explain account deletion path.
+- [x] Review notes explain account deletion path.
+  - Account deletion is available from mobile Settings and uses a trusted
+    server route with explicit confirmation.
 - [ ] Review notes mention no payment/subscription in mobile v1.
 - [ ] Review notes mention offline cache behavior if relevant to testing.
 
@@ -196,11 +219,18 @@ Screenshot rules:
 - [ ] Import/update.
 - [ ] Restore/replace.
 - [ ] Account deletion.
-- [ ] Local cache clearing after logout.
-- [ ] Local cache clearing after account deletion.
-- [ ] Push token cleanup after logout/account deletion where practical.
+  - Implemented in mobile Settings; still needs real-device/TestFlight QA.
+- [x] Local cache clearing after logout.
+- [x] Local cache clearing after account deletion.
+- [x] Push token cleanup after logout/account deletion where practical.
 - [ ] Restore/replace atomicity verified.
-- [ ] Mobile trusted API auth rejects missing/invalid bearer tokens.
+- [x] Mobile trusted API auth rejects missing/invalid bearer tokens.
+  - Implemented shared JSON auth errors and bearer/cookie trusted auth for
+    export, contacts import, account deletion, and restore/import. Locally
+    verified unauthenticated API smoke expectations for export, contacts
+    import, and push-token registration plus Supabase RPC unauthenticated
+    rejection; real mobile bearer-token QA still needs a device/simulator
+    session.
 
 ## Submission Gate
 

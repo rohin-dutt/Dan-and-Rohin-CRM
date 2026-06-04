@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -8,7 +8,6 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
 import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 import { INTERACTION_TYPES } from "@roots/shared"
-import { colors } from "@/constants/theme"
 
 function todayString() {
   return new Date().toISOString().split("T")[0]

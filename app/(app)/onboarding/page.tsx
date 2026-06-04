@@ -6,7 +6,7 @@ import type { User } from '@supabase/supabase-js'
 
 import { todayInputValue } from '@/lib/date-utils'
 import { INTERACTION_TYPES } from '@/lib/form-utils'
-import { updateStreakAfterAction } from '@/lib/crm-rules'
+import { updateStreakAfterAction } from '@roots/shared'
 import { supabase } from '@/lib/supabase'
 
 const ONBOARDING_CATEGORY_PILLS = [

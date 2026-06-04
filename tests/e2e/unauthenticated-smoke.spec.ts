@@ -54,7 +54,10 @@ test.describe("unauthenticated smoke coverage", () => {
     expect(exportBody).toEqual(
       expect.objectContaining({
         ok: false,
-        error: expect.any(String),
+        error: expect.objectContaining({
+          code: "unauthorized",
+          message: expect.any(String),
+        }),
       })
     );
 
@@ -66,7 +69,27 @@ test.describe("unauthenticated smoke coverage", () => {
     const importBody = await importResponse.json();
     expect(importBody).toEqual(
       expect.objectContaining({
-        error: expect.any(String),
+        ok: false,
+        error: expect.objectContaining({
+          code: "unauthorized",
+          message: expect.any(String),
+        }),
+      })
+    );
+
+    const pushTokenResponse = await request.post("/api/mobile/push-token", {
+      data: { token: "ExponentPushToken[test]" },
+    });
+    expect(pushTokenResponse.status()).toBe(401);
+    expect(pushTokenResponse.headers()["content-type"]).toContain("application/json");
+    const pushTokenBody = await pushTokenResponse.json();
+    expect(pushTokenBody).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: expect.objectContaining({
+          code: "unauthorized",
+          message: expect.any(String),
+        }),
       })
     );
   });

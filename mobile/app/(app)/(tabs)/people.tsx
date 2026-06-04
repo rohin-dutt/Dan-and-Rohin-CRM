@@ -97,12 +97,20 @@ export default function PeopleScreen() {
           <Text className="text-2xl font-bold text-warm-black">
             Your people{people.length > 0 ? ` (${people.length})` : ""}
           </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/people/new")}
-            className="bg-sage rounded-xl px-4 py-2"
-          >
-            <Text className="text-white text-sm font-semibold">+ Add</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              onPress={() => router.push("/people/import-contacts")}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-2"
+            >
+              <Text className="text-sage text-sm font-semibold">Import</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/people/new")}
+              className="bg-sage rounded-xl px-4 py-2"
+            >
+              <Text className="text-white text-sm font-semibold">+ Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {error && <ErrorBanner message={error} />}

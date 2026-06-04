@@ -1,4 +1,4 @@
-import type { Person, Interaction } from "./types";
+import type { Person, Interaction } from "./types.ts";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -42,6 +42,17 @@ export function getNextDueDays(
   const today = toDay(todayValue);
   if (!nextDue || !today) return null;
   return Math.ceil((nextDue.getTime() - today.getTime()) / MS_PER_DAY);
+}
+
+export function shouldTouchLastContacted(
+  currentValue: string | Date | null | undefined,
+  interactionDateValue: string | Date | null | undefined
+): boolean {
+  const current = toDay(currentValue);
+  const interactionDate = toDay(interactionDateValue);
+  if (!interactionDate) return false;
+  if (!current) return true;
+  return interactionDate >= current;
 }
 
 export function pluralize(count: number, word: string): string {
@@ -277,9 +288,60 @@ export function getTotalInteractions(interactions: Interaction[]): number {
   return interactions.length;
 }
 
+export function normalizeContactText(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9@.]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export type DuplicateContactCandidate = {
+  id: string;
+  name: string;
+  email?: string | null;
+};
+
+export function findDuplicateContacts(
+  people: DuplicateContactCandidate[]
+): Map<string, string> {
+  const warnings = new Map<string, string>();
+  const byEmail = new Map<string, DuplicateContactCandidate>();
+  const byName = new Map<string, DuplicateContactCandidate>();
+
+  for (const person of people) {
+    const email = normalizeContactText(person.email);
+    const name = normalizeContactText(person.name);
+
+    if (email) {
+      const existing = byEmail.get(email);
+      if (existing) {
+        warnings.set(person.id, `Possible duplicate of ${existing.name} by email`);
+        warnings.set(existing.id, `Possible duplicate of ${person.name} by email`);
+      } else {
+        byEmail.set(email, person);
+      }
+    }
+
+    if (name) {
+      const existing = byName.get(name);
+      if (existing) {
+        warnings.set(person.id, `Possible duplicate of ${existing.name} by name`);
+        warnings.set(existing.id, `Possible duplicate of ${person.name} by name`);
+      } else {
+        byName.set(name, person);
+      }
+    }
+  }
+
+  return warnings;
+}
+
 export async function updateStreakAfterAction(supabaseClient: {
   auth: { getUser: () => Promise<{ data: { user: { id: string } | null } }> };
-  rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown>;
+  rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<unknown>;
 }): Promise<void> {
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();

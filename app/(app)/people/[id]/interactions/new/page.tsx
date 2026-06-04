@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import AppLayout from "@/components/AppLayout";
 import { formatDate, todayInputValue } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
-import { updateStreakAfterAction } from "@/lib/crm-rules";
+import { updateStreakAfterAction } from "@roots/shared";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import type { Person } from "@/types/index";

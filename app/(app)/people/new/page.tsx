@@ -12,7 +12,7 @@ import {
   getOptionalFormValue,
   getTrimmedFormValue,
 } from "@/lib/form-utils";
-import { updateStreakAfterAction } from "@/lib/crm-rules";
+import { updateStreakAfterAction } from "@roots/shared";
 import { todayInputValue } from "@/lib/date-utils";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";

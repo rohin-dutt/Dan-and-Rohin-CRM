@@ -1,39 +1,13 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-
 import { apiError } from "@/lib/api-errors";
+import { authenticateTrustedRequest } from "@/lib/trusted-api-auth";
 
-export async function GET() {
-  const cookieStore = await cookies();
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll() {
-          // no-op: cannot set cookies in a GET route handler
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError) {
-    return apiError(userError.message, 401);
+export async function GET(request: Request) {
+  const auth = await authenticateTrustedRequest(request);
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  if (!user) {
-    return apiError("Unauthorized", 401);
-  }
-
+  const { supabase, user } = auth;
   const [peopleRes, tagsRes] = await Promise.all([
     supabase.from("people").select("*").eq("user_id", user.id),
     supabase.from("tags").select("*").eq("user_id", user.id),

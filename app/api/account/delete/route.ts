@@ -10,6 +10,19 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
+  const body = await request.json().catch(() => null);
+  if (body?.confirm !== "DELETE") {
+    return apiError("Account deletion requires explicit confirmation.", 400);
+  }
+
+  await auth.supabase
+    .from("push_tokens")
+    .update({
+      status: "revoked",
+      revoked_at: new Date().toISOString(),
+    })
+    .eq("user_id", auth.user.id);
+
   const adminClient = createServiceRoleClient();
   const { error: deleteError } = await adminClient.auth.admin.deleteUser(
     auth.user.id

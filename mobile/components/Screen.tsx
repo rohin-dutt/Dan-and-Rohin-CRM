@@ -1,4 +1,4 @@
-import { ScrollView, View } from "react-native"
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 type ScreenProps = {
@@ -16,13 +16,18 @@ export function Screen({ children, scrollable = true }: ScreenProps) {
   }
   return (
     <SafeAreaView className="flex-1 bg-cream">
-      <ScrollView
+      <KeyboardAvoidingView
         className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {children}
-      </ScrollView>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }

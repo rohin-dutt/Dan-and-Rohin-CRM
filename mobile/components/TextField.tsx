@@ -11,6 +11,7 @@ export function TextField({ label, error, ...props }: TextFieldProps) {
       <Text className="text-sm font-medium text-warm-black mb-1">{label}</Text>
       <TextInput
         {...props}
+        accessibilityLabel={props.accessibilityLabel ?? label}
         className={`border rounded-xl px-3 py-3 text-sm bg-white text-warm-black ${
           error ? "border-red-400" : "border-gray-200"
         }`}

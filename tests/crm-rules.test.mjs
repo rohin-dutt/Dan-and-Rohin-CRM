@@ -6,7 +6,7 @@ import {
   getFollowUpState,
   getFollowUpQueue,
   shouldTouchLastContacted,
-} from "../lib/crm-rules.js";
+} from "../packages/shared/index.ts";
 
 function test(name, fn) {
   try {

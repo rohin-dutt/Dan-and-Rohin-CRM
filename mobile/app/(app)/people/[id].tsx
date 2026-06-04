@@ -10,6 +10,15 @@ import { supabase } from "@/lib/supabase"
 import type { Person, Interaction, Tag } from "@/types"
 import { formatDate, formatShortDate, getNextDueDays, getFollowUpState } from "@roots/shared"
 
+type PersonTagRow = {
+  tags: Tag | Tag[] | null
+}
+
+function getTagFromJoin(row: PersonTagRow): Tag | null {
+  if (Array.isArray(row.tags)) return row.tags[0] ?? null
+  return row.tags
+}
+
 export default function PersonDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -35,8 +44,11 @@ export default function PersonDetailScreen() {
       if (personRes.error) throw personRes.error
       setPerson(personRes.data)
       setInteractions(interactionsRes.data ?? [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setTags((tagsRes.data ?? []).map((pt: any) => pt.tags).filter(Boolean))
+      setTags(
+        ((tagsRes.data ?? []) as PersonTagRow[])
+          .map(getTagFromJoin)
+          .filter((tag): tag is Tag => tag != null),
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load person")
     } finally {
@@ -121,10 +133,10 @@ export default function PersonDetailScreen() {
       {/* Header row */}
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">← Back</Text>
+          <Text className="text-sage text-sm font-semibold">Back</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={showMenu} className="py-1 pl-3">
-          <Text className="text-2xl text-warm-black leading-none">⋯</Text>
+          <Text className="text-2xl text-warm-black leading-none">...</Text>
         </TouchableOpacity>
       </View>
 
@@ -135,7 +147,7 @@ export default function PersonDetailScreen() {
         <Text className="text-2xl font-bold text-warm-black mb-1">{person.name}</Text>
         {(person.role != null || person.company != null) && (
           <Text className="text-sm text-gray-500 mb-3">
-            {[person.role, person.company].filter(Boolean).join(" · ")}
+            {[person.role, person.company].filter(Boolean).join(" - ")}
           </Text>
         )}
 
@@ -158,7 +170,7 @@ export default function PersonDetailScreen() {
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
             <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
               {nextDueDays === null
-                ? "—"
+                ? "-"
                 : nextDueDays < 0
                   ? `${Math.abs(nextDueDays)}d ago`
                   : `In ${nextDueDays}d`}
@@ -192,7 +204,7 @@ export default function PersonDetailScreen() {
               className="mt-5 mb-2 flex-row items-center justify-between"
             >
               <Text className="text-sm font-semibold text-warm-black">Details</Text>
-              <Text className="text-xs text-gray-500">{detailsExpanded ? "Hide ▲" : "Show ▼"}</Text>
+              <Text className="text-xs text-gray-500">{detailsExpanded ? "Hide" : "Show"}</Text>
             </TouchableOpacity>
             {detailsExpanded && (
               <Card className="mb-2">

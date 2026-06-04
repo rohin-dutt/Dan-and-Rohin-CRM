@@ -345,10 +345,14 @@ export function AccountTab({ onLogout }: { onLogout: () => void }) {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch("/api/account/delete", { method: "POST" });
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: "DELETE" }),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data?.error ?? "Failed to delete account.");
+        throw new Error(data?.error?.message ?? "Failed to delete account.");
       }
       router.push("/auth/login");
     } catch (err) {

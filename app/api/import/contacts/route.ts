@@ -1,65 +1,50 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextResponse, type NextRequest } from 'next/server'
+import { apiError } from "@/lib/api-errors";
+import { authenticateTrustedRequest } from "@/lib/trusted-api-auth";
 
 interface IncomingContact {
-  name?: string
-  email?: string | string[]
-  tel?: string | string[]
+  name?: string;
+  email?: string | string[];
+  tel?: string | string[];
 }
 
-export async function POST(request: NextRequest) {
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function POST(request: Request) {
+  const auth = await authenticateTrustedRequest(request);
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const body = await request.json()
-  const contacts: IncomingContact[] = body.contacts ?? []
+  let body: { contacts?: IncomingContact[] };
+  try {
+    body = await request.json();
+  } catch {
+    return apiError("Invalid JSON body.", 400, "invalid_json");
+  }
 
-  let imported = 0
-  const errors: string[] = []
+  const contacts = Array.isArray(body.contacts) ? body.contacts : [];
+
+  let imported = 0;
+  const errors: string[] = [];
 
   for (const contact of contacts) {
-    if (!contact.name) continue
+    if (!contact.name?.trim()) continue;
 
-    const email = Array.isArray(contact.email) ? contact.email[0] : contact.email
-    const phone = Array.isArray(contact.tel) ? contact.tel[0] : contact.tel
+    const email = Array.isArray(contact.email) ? contact.email[0] : contact.email;
+    const phone = Array.isArray(contact.tel) ? contact.tel[0] : contact.tel;
 
-    const { error } = await supabase.from('people').insert({
-      name: contact.name,
+    const { error } = await auth.supabase.from("people").insert({
+      name: contact.name.trim(),
       email: email ?? null,
       phone: phone ?? null,
-      user_id: user.id,
+      user_id: auth.user.id,
       contact_frequency_days: 30,
-    })
+    });
 
     if (error) {
-      errors.push(`Failed to import "${contact.name}": ${error.message}`)
+      errors.push(`Failed to import "${contact.name}": ${error.message}`);
     } else {
-      imported++
+      imported++;
     }
   }
 
-  return NextResponse.json({ imported, errors })
+  return Response.json({ ok: true, imported, errors });
 }

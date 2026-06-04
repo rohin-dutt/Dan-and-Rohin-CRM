@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { updateStreakAfterAction } from "@/lib/crm-rules";
+import { updateStreakAfterAction } from "@roots/shared";
 import { todayInputValue } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
 

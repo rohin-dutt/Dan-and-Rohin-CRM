@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ScrollView, Text, TouchableOpacity, View } from "react-native"
+import { Text, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
