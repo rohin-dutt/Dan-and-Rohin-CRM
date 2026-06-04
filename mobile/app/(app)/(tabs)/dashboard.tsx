@@ -143,18 +143,18 @@ export default function DashboardScreen() {
           </View>
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
             <Text className="text-2xl font-bold text-sage">{dueThisWeek.length}</Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Due this week</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Due This Week</Text>
           </View>
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
             <Text className="text-2xl font-bold text-warm-black">{comingUp.length}</Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Coming up</Text>
+            <Text className="text-xs text-gray-500 mt-0.5">Coming Up</Text>
           </View>
         </View>
 
         {/* Reach out */}
         {reachOut.length > 0 && (
           <View className="mb-6">
-            <Text className="text-base font-semibold text-warm-black mb-3">Reach out</Text>
+            <Text className="text-base font-semibold text-warm-black mb-3">Reach out ({reachOut.length})</Text>
             {reachOut.map((person) => {
               const days = getNextDueDays(person)
               const isOverdue = days !== null && days < 0
@@ -199,7 +199,7 @@ export default function DashboardScreen() {
         {birthdays.length > 0 && (
           <View className="mb-6">
             <Text className="text-base font-semibold text-warm-black mb-3">
-              Upcoming birthdays
+              Birthdays ({birthdays.length})
             </Text>
             {birthdays.map(({ person, daysUntil }) => (
               <TouchableOpacity

@@ -6,12 +6,9 @@ import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
+import { DatePicker } from "@/components/DatePicker"
 import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import { INTERACTION_TYPES } from "@roots/shared"
-
-function todayString() {
-  return new Date().toISOString().split("T")[0]
-}
+import { INTERACTION_TYPES, updateStreakAfterAction } from "@roots/shared"
 
 export default function OnboardingScreen() {
   const router = useRouter()
@@ -38,7 +35,13 @@ export default function OnboardingScreen() {
 
   // Step 3 form
   const [interactionType, setInteractionType] = useState("Call")
-  const [interactionDate, setInteractionDate] = useState(todayString())
+  const [interactionDate, setInteractionDate] = useState(() => {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = String(today.getMonth() + 1).padStart(2, "0")
+    const d = String(today.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  })
   const [interactionNotes, setInteractionNotes] = useState("")
   const [step3Saving, setStep3Saving] = useState(false)
   const [step3Error, setStep3Error] = useState<string | null>(null)
@@ -156,6 +159,7 @@ export default function OnboardingScreen() {
       return
     }
 
+    await updateStreakAfterAction(supabase)
     router.replace("/(app)/(tabs)/dashboard")
   }
 
@@ -175,7 +179,7 @@ export default function OnboardingScreen() {
             important slips away.
           </Text>
           <Text className="text-xs text-gray-400 text-center mb-8">
-            We'll send you reminders about who to reach out to. You can turn this off anytime
+            We'll send you a weekly email with who to reach out to. You can turn this off anytime
             in Settings.
           </Text>
           <Button title="Let's get started →" onPress={() => setStep(2)} />
@@ -262,15 +266,7 @@ export default function OnboardingScreen() {
           )}
 
           {showBirthday && (
-            <View className="mb-4">
-              <Text className="text-sm font-medium text-warm-black mb-1">Birthday</Text>
-              <TextInput
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-              />
-            </View>
+            <DatePicker label="Birthday" value={birthday} onChange={setBirthday} />
           )}
 
           {showFamily && (
@@ -340,15 +336,7 @@ export default function OnboardingScreen() {
           ))}
         </View>
 
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-1">When?</Text>
-          <TextInput
-            value={interactionDate}
-            onChangeText={setInteractionDate}
-            placeholder="YYYY-MM-DD"
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-          />
-        </View>
+        <DatePicker label="When?" value={interactionDate} onChange={setInteractionDate} />
 
         <View className="mb-6">
           <Text className="text-sm font-medium text-warm-black mb-1">Notes (optional)</Text>

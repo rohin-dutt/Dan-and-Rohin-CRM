@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { Alert, Text, TouchableOpacity, View } from "react-native"
+import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Card } from "@/components/Card"
@@ -28,6 +28,10 @@ export default function PersonDetailScreen() {
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [detailsExpanded, setDetailsExpanded] = useState(false)
+
+  // Quick note
+  const [note, setNote] = useState("")
+  const [addingNote, setAddingNote] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -70,10 +74,10 @@ export default function PersonDetailScreen() {
         text: "Delete",
         style: "destructive",
         onPress: () =>
-          Alert.alert("Delete person", `Delete ${person?.name}? This cannot be undone.`, [
+          Alert.alert("Delete person", `Delete ${person?.name} and all related interactions?`, [
             { text: "Cancel", style: "cancel" },
             {
-              text: "Delete",
+              text: "Delete person",
               style: "destructive",
               onPress: async () => {
                 await supabase.from("people").delete().eq("id", id)
@@ -105,6 +109,35 @@ export default function PersonDetailScreen() {
     load()
   }
 
+  async function handleAddNote() {
+    if (!note.trim() || addingNote || !person) return
+    setAddingNote(true)
+
+    const today = new Date()
+    const dateStr = today.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+
+    const noteWithDate = `[${dateStr}] ${note.trim()}`
+    const updatedNotes = person.notes
+      ? `${person.notes}\n\n---\n\n${noteWithDate}`
+      : noteWithDate
+
+    const { error: updateError } = await supabase
+      .from("people")
+      .update({ notes: updatedNotes })
+      .eq("id", id)
+
+    if (!updateError) {
+      setPerson((prev) => (prev ? { ...prev, notes: updatedNotes } : prev))
+      setNote("")
+    }
+
+    setAddingNote(false)
+  }
+
   if (loading) return <LoadingState />
 
   if (!person) {
@@ -124,8 +157,14 @@ export default function PersonDetailScreen() {
     person.email != null && { label: "Email", value: person.email },
     person.phone != null && { label: "Phone", value: person.phone },
     person.birthday != null && { label: "Birthday", value: formatDate(person.birthday) },
-    person.how_met != null && { label: "How met", value: person.how_met },
+    person.how_met != null && { label: "How you met", value: person.how_met },
     person.location != null && { label: "Location", value: person.location },
+    person.relationship_strength != null && { label: "Relationship Strength", value: person.relationship_strength },
+    person.preferred_contact_method != null && { label: "Preferred Contact", value: person.preferred_contact_method },
+    person.contact_frequency_days != null && {
+      label: "How often you connect",
+      value: `Every ${person.contact_frequency_days} days`,
+    },
   ].filter((f): f is { label: string; value: string } => Boolean(f))
 
   return (
@@ -133,10 +172,10 @@ export default function PersonDetailScreen() {
       {/* Header row */}
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">Back</Text>
+          <Text className="text-sage text-sm font-semibold">Back to people</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={showMenu} className="py-1 pl-3">
-          <Text className="text-2xl text-warm-black leading-none">...</Text>
+          <Text className="text-2xl text-warm-black leading-none">⋯</Text>
         </TouchableOpacity>
       </View>
 
@@ -144,10 +183,15 @@ export default function PersonDetailScreen() {
         {error != null && <ErrorBanner message={error} />}
 
         {/* Name + role/company */}
+        {person.relationship_type != null && (
+          <Text className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+            {person.relationship_type}
+          </Text>
+        )}
         <Text className="text-2xl font-bold text-warm-black mb-1">{person.name}</Text>
         {(person.role != null || person.company != null) && (
           <Text className="text-sm text-gray-500 mb-3">
-            {[person.role, person.company].filter(Boolean).join(" - ")}
+            {[person.role, person.company].filter(Boolean).join(" at ")}
           </Text>
         )}
 
@@ -157,9 +201,10 @@ export default function PersonDetailScreen() {
             {tags.map((tag) => (
               <View
                 key={tag.id}
-                className="rounded-full bg-green-50 border border-green-200 px-3 py-1"
+                className="rounded-full px-3 py-1"
+                style={{ backgroundColor: tag.color }}
               >
-                <Text className="text-xs font-medium text-green-700">{tag.name}</Text>
+                <Text className="text-xs font-medium text-white">{tag.name}</Text>
               </View>
             ))}
           </View>
@@ -168,24 +213,34 @@ export default function PersonDetailScreen() {
         {/* Stat cards */}
         <View className="flex-row gap-3 mb-5">
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
-            <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
-              {nextDueDays === null
-                ? "-"
-                : nextDueDays < 0
-                  ? `${Math.abs(nextDueDays)}d ago`
-                  : `In ${nextDueDays}d`}
+            <Text className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+              Next step
             </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Next step</Text>
+            <Text className="text-sm font-bold text-warm-black text-center" numberOfLines={2}>
+              {nextDueDays === null
+                ? "Log the first interaction"
+                : nextDueDays < 0
+                  ? `Reach out now, overdue by ${Math.abs(nextDueDays)}d`
+                  : nextDueDays === 0
+                    ? "Reach out today"
+                    : `Reach out in ${nextDueDays}d`}
+            </Text>
           </View>
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
+            <Text className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+              Last chat
+            </Text>
             <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
               {formatShortDate(person.last_contacted_at)}
             </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Last chat</Text>
           </View>
           <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
-            <Text className="text-sm font-bold text-warm-black">{openFollowUps.length}</Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Follow-ups</Text>
+            <Text className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+              Follow-ups
+            </Text>
+            <Text className="text-sm font-bold text-warm-black">
+              {openFollowUps.length === 0 ? "None active" : `${openFollowUps.length} active`}
+            </Text>
           </View>
         </View>
 
@@ -203,14 +258,17 @@ export default function PersonDetailScreen() {
               onPress={() => setDetailsExpanded((v) => !v)}
               className="mt-5 mb-2 flex-row items-center justify-between"
             >
-              <Text className="text-sm font-semibold text-warm-black">Details</Text>
-              <Text className="text-xs text-gray-500">{detailsExpanded ? "Hide" : "Show"}</Text>
+              <Text className="text-xs font-medium text-gray-500">
+                {detailsExpanded
+                  ? "Hide details ▴"
+                  : `View details (${detailFields.length}) ▾`}
+              </Text>
             </TouchableOpacity>
             {detailsExpanded && (
               <Card className="mb-2">
                 {detailFields.map((field, i) => (
                   <View key={field.label} className={i > 0 ? "mt-3 pt-3 border-t border-gray-100" : ""}>
-                    <Text className="text-xs text-gray-400">{field.label}</Text>
+                    <Text className="text-xs text-gray-400 uppercase tracking-wide">{field.label}</Text>
                     <Text className="text-sm text-warm-black mt-0.5">{field.value}</Text>
                   </View>
                 ))}
@@ -220,14 +278,34 @@ export default function PersonDetailScreen() {
         )}
 
         {/* Notes */}
-        {person.notes != null && (
-          <View className="mt-4">
-            <Text className="text-sm font-semibold text-warm-black mb-2">Notes</Text>
-            <Card>
-              <Text className="text-sm text-warm-black">{person.notes}</Text>
-            </Card>
+        <View className="mt-6">
+          <Text className="text-lg font-semibold text-warm-black mb-2">Notes</Text>
+          <Text className="text-sm text-warm-black leading-6 mb-4">
+            {person.notes ||
+              "Add context, conversation threads, or anything useful for the next reach-out."}
+          </Text>
+          {/* Quick note form */}
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="e.g. mentioned they're moving to Chicago..."
+            multiline
+            numberOfLines={2}
+            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-warm-black mb-2"
+            placeholderTextColor="#9CA3AF"
+          />
+          <View className="flex-row items-center justify-end">
+            <TouchableOpacity
+              onPress={handleAddNote}
+              disabled={!note.trim() || addingNote}
+              className={`bg-sage rounded-xl px-4 py-2 ${(!note.trim() || addingNote) ? "opacity-50" : ""}`}
+            >
+              <Text className="text-xs font-medium text-white">
+                {addingNote ? "Saving..." : "Save note"}
+              </Text>
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
 
         {/* Open follow-ups */}
         {openFollowUps.length > 0 && (
@@ -249,13 +327,13 @@ export default function PersonDetailScreen() {
                       onPress={() => snoozeFollowUp(fu.id)}
                       className="bg-gray-100 rounded-lg px-2.5 py-1.5"
                     >
-                      <Text className="text-xs text-gray-600">Snooze 7d</Text>
+                      <Text className="text-xs text-gray-600">Snooze 7 days</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => markFollowUpDone(fu.id)}
                       className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5"
                     >
-                      <Text className="text-xs font-semibold text-green-700">Done</Text>
+                      <Text className="text-xs font-semibold text-green-700">Mark done</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -265,13 +343,28 @@ export default function PersonDetailScreen() {
         )}
 
         {/* Interaction history */}
-        {interactions.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-sm font-semibold text-warm-black mb-2">Your history</Text>
-            {interactions.map((interaction) => (
+        <View className="mt-5">
+          <Text className="text-lg font-semibold text-warm-black mb-2">Your history</Text>
+          {interactions.length === 0 ? (
+            <Card>
+              <Text className="text-sm font-semibold text-warm-black mb-1">No history yet.</Text>
+              <Text className="text-xs text-gray-500">
+                Log your first conversation so Roots can track your cadence.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/people/${id}/log`)}
+                className="mt-3 bg-sage rounded-xl px-4 py-2 self-start"
+              >
+                <Text className="text-xs font-medium text-white">Add your first conversation</Text>
+              </TouchableOpacity>
+            </Card>
+          ) : (
+            interactions.map((interaction) => (
               <Card key={interaction.id} className="mb-2">
                 <View className="flex-row items-center gap-2 mb-1">
-                  <Text className="text-xs font-semibold text-sage">{interaction.type}</Text>
+                  <View className="rounded-full bg-gray-100 px-3 py-1">
+                    <Text className="text-xs font-medium text-warm-black">{interaction.type}</Text>
+                  </View>
                   <Text className="text-xs text-gray-400">{formatDate(interaction.date)}</Text>
                   {interaction.follow_up_needed && interaction.follow_up_status !== "done" && (
                     <View className="rounded-full bg-amber-50 px-2 py-0.5">
@@ -280,12 +373,12 @@ export default function PersonDetailScreen() {
                   )}
                 </View>
                 {interaction.notes != null && (
-                  <Text className="text-sm text-warm-black">{interaction.notes}</Text>
+                  <Text className="text-sm text-warm-black leading-6">{interaction.notes}</Text>
                 )}
               </Card>
-            ))}
-          </View>
-        )}
+            ))
+          )}
+        </View>
       </View>
     </Screen>
   )

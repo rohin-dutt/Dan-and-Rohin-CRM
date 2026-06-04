@@ -9,59 +9,93 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 
 export default function SignupScreen() {
   const router = useRouter()
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
+  const [confirmEmail, setConfirmEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [confirmationSent, setConfirmationSent] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   async function handleSignUp() {
     setError(null)
-    if (!firstName.trim()) {
-      setError("First name is required")
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.")
       return
     }
-    setLoading(true)
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { first_name: firstName, last_name: lastName },
-      },
-    })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else if (!data.session) {
-      setConfirmationSent(true)
-    } else {
-      router.replace("/(app)/onboarding")
+
+    if (email !== confirmEmail) {
+      setError("Email addresses do not match.")
+      return
     }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.")
+      return
+    }
+
+    if (!agreed) {
+      setError("Please agree to the Terms of Service and Privacy Policy.")
+      return
+    }
+
+    setLoading(true)
+    const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+    setLoading(false)
+
+    if (signUpError) {
+      setError(signUpError.message)
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      setError("An account with this email already exists. Please sign in instead.")
+    } else if (data.session) {
+      router.replace("/(app)/onboarding")
+    } else {
+      setSuccess(true)
+    }
+  }
+
+  if (success) {
+    return (
+      <Screen scrollable={false}>
+        <View className="flex-1 justify-center px-6 py-12">
+          <View className="bg-white border border-gray-200 rounded-2xl p-8 items-center shadow-sm">
+            <Text className="text-2xl font-semibold text-warm-black mb-4">Check your email</Text>
+            <Text className="text-sm text-gray-500 text-center mb-6">
+              We sent a confirmation link to <Text className="font-semibold">{email}</Text>. Click it to activate your account.
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+              <Text className="text-sm font-medium text-sage underline">Back to sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Screen>
+    )
   }
 
   return (
     <Screen>
-      <View className="flex-1 justify-center px-6 py-12">
-        <Text className="text-3xl font-bold text-warm-black mb-2">Create account</Text>
-        <Text className="text-base text-gray-500 mb-8">Join Roots</Text>
+      <View className="px-6 py-12">
+        <Text className="text-xs font-semibold text-sage uppercase tracking-wide mb-1">Roots</Text>
+        <Text className="text-2xl font-semibold text-warm-black mb-6">Create an account</Text>
 
         {error && <ErrorBanner message={error} />}
-        {confirmationSent && (
-          <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-            <Text className="text-green-700 text-sm font-medium">
-              Check your email to confirm your account before signing in.
-            </Text>
-          </View>
-        )}
 
-        <TextField label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" />
-        <TextField label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" />
         <TextField
           label="Email"
           value={email}
           onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+        <TextField
+          label="Confirm email"
+          value={confirmEmail}
+          onChangeText={setConfirmEmail}
+          placeholder="Confirm your email"
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
@@ -73,8 +107,34 @@ export default function SignupScreen() {
           secureTextEntry
           autoComplete="new-password"
         />
+        <TextField
+          label="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          placeholder="Confirm your password"
+          secureTextEntry
+          autoComplete="new-password"
+        />
 
-        <Button title="Create Account" onPress={handleSignUp} loading={loading} />
+        <TouchableOpacity
+          onPress={() => setAgreed((v) => !v)}
+          className="flex-row items-start gap-3 mb-6"
+          activeOpacity={0.7}
+        >
+          <View
+            className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${agreed ? "bg-sage border-sage" : "border-gray-300 bg-white"}`}
+          >
+            {agreed && <Text className="text-white text-xs font-bold">✓</Text>}
+          </View>
+          <Text className="text-sm text-gray-500 flex-1">
+            I agree to the{" "}
+            <Text className="text-sage underline">Terms of Service</Text>
+            {" "}and{" "}
+            <Text className="text-sage underline">Privacy Policy</Text>
+          </Text>
+        </TouchableOpacity>
+
+        <Button title={loading ? "Creating account…" : "Sign up"} onPress={handleSignUp} loading={loading} />
 
         <TouchableOpacity
           onPress={() => router.push("/(auth)/login")}

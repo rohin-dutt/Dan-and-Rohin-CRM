@@ -17,27 +17,27 @@ export default function ForgotPasswordScreen() {
   async function handleReset() {
     setError(null)
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: "roots://update-password",
     })
     setLoading(false)
-    if (error) {
-      setError(error.message)
+    if (resetError) {
+      setError(resetError.message)
     } else {
       setSent(true)
     }
   }
 
   return (
-    <Screen>
+    <Screen scrollable={false}>
       <View className="flex-1 justify-center px-6 py-12">
         <TouchableOpacity onPress={() => router.back()} className="mb-6">
-          <Text className="text-sage text-sm">← Back</Text>
+          <Text className="text-sm text-gray-500">← Back to sign in</Text>
         </TouchableOpacity>
 
-        <Text className="text-3xl font-bold text-warm-black mb-2">Reset password</Text>
-        <Text className="text-base text-gray-500 mb-8">
-          We'll send a reset link to your email.
+        <Text className="text-2xl font-semibold text-warm-black mb-2">Reset your password</Text>
+        <Text className="text-sm text-gray-500 mb-8">
+          Enter your email and we'll send you a reset link.
         </Text>
 
         {error && <ErrorBanner message={error} />}
@@ -45,7 +45,7 @@ export default function ForgotPasswordScreen() {
         {sent ? (
           <View className="bg-green-50 border border-green-200 rounded-xl p-4">
             <Text className="text-green-700 text-sm font-medium">
-              Check your email for a reset link.
+              Check your email for a reset link. It may take a minute to arrive.
             </Text>
           </View>
         ) : (
@@ -58,7 +58,11 @@ export default function ForgotPasswordScreen() {
               autoCapitalize="none"
               autoComplete="email"
             />
-            <Button title="Send Reset Link" onPress={handleReset} loading={loading} />
+            <Button
+              title={loading ? "Sending…" : "Send reset link"}
+              onPress={handleReset}
+              loading={loading}
+            />
           </>
         )}
       </View>

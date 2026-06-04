@@ -186,9 +186,9 @@ export default function SettingsScreen() {
         <Card className="mb-6">
           <View className="flex-row items-center justify-between">
             <View className="flex-1 mr-4">
-              <Text className="text-sm font-medium text-warm-black">Weekly email digest</Text>
+              <Text className="text-sm font-medium text-warm-black">Send me a weekly email digest</Text>
               <Text className="text-xs text-gray-500 mt-0.5">
-                Get a weekly summary of who to reach out to
+                Every Sunday evening — who to reach out to this week and upcoming birthdays.
               </Text>
             </View>
             <Switch
