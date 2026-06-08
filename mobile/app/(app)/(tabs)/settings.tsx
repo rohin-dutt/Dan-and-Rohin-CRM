@@ -1,26 +1,29 @@
 import { useEffect, useState } from "react"
-import { Alert, Linking, Share, Switch, Text, TouchableOpacity, View } from "react-native"
+import { Alert, Linking, Share, Text, TouchableOpacity, View } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import * as DocumentPicker from "expo-document-picker"
 import * as FileSystem from "expo-file-system/legacy"
 import { Screen } from "@/components/Screen"
-import { Card } from "@/components/Card"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
+import { BrandHeader, Divider, IconTile, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { clearLocalPrivateData } from "@/lib/private-data"
 import { registerPushToken, revokePushToken } from "@/lib/push-notifications"
 import { callTrustedApi } from "@/lib/trusted-api"
-import { colors } from "@/constants/theme"
+import { colors, fonts } from "@/constants/theme"
 import type { Settings } from "@/types"
 
 type Status = { ok: boolean; message: string } | null
+type ExpandedPanel = "profile" | "email" | "password" | null
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>(null)
+  const [expanded, setExpanded] = useState<ExpandedPanel>(null)
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [newEmail, setNewEmail] = useState("")
@@ -28,12 +31,11 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
   const [toggling, setToggling] = useState(false)
-  const [pushWorking, setPushWorking] = useState(false)
+  const [dataWorking, setDataWorking] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
-  const [dataWorking, setDataWorking] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -60,7 +62,7 @@ export default function SettingsScreen() {
           .single()
         setSettings(data ?? null)
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load settings")
+        setError(e instanceof Error ? e.message : "Failed to load settings.")
       } finally {
         setLoading(false)
       }
@@ -78,10 +80,10 @@ export default function SettingsScreen() {
   }
 
   async function handleSignOut() {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+    Alert.alert("Log out", "Sign out of your Roots account?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Sign out",
+        text: "Log out",
         style: "destructive",
         onPress: async () => {
           await revokePushToken().catch(() => null)
@@ -100,9 +102,10 @@ export default function SettingsScreen() {
         data: { full_name: displayName.trim() || null },
       })
       if (updateError) throw updateError
-      setOk("Display name updated.")
+      setExpanded(null)
+      setOk("Profile updated.")
     } catch (e) {
-      setFailure(e instanceof Error ? e.message : "Failed to update display name.")
+      setFailure(e instanceof Error ? e.message : "Failed to update profile.")
     } finally {
       setSavingProfile(false)
     }
@@ -119,6 +122,7 @@ export default function SettingsScreen() {
       const { error: updateError } = await supabase.auth.updateUser({ email: newEmail.trim() })
       if (updateError) throw updateError
       setNewEmail("")
+      setExpanded(null)
       setOk("Confirmation sent. Check your inbox.")
     } catch (e) {
       setFailure(e instanceof Error ? e.message : "Failed to update email.")
@@ -143,33 +147,12 @@ export default function SettingsScreen() {
       if (updateError) throw updateError
       setNewPassword("")
       setConfirmPassword("")
+      setExpanded(null)
       setOk("Password updated.")
     } catch (e) {
       setFailure(e instanceof Error ? e.message : "Failed to update password.")
     } finally {
       setSavingPassword(false)
-    }
-  }
-
-  async function toggleEmailReminders(value: boolean) {
-    if (!settings) return
-    setToggling(true)
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) return
-      const { error: err } = await supabase
-        .from("settings")
-        .update({ email_reminders_enabled: value })
-        .eq("user_id", session.user.id)
-      if (err) throw err
-      setSettings({ ...settings, email_reminders_enabled: value })
-      setOk("Reminder settings updated.")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update settings")
-    } finally {
-      setToggling(false)
     }
   }
 
@@ -189,25 +172,38 @@ export default function SettingsScreen() {
     setError(null)
   }
 
-  async function togglePushPreference(
-    field: "push_followups_enabled" | "push_birthdays_enabled",
-    value: boolean,
-  ) {
+  async function toggleEmailDigest() {
     if (!settings) return
-    setPushWorking(true)
+    setToggling(true)
     try {
-      if (value) {
-        await registerPushToken()
-      } else if (!settings[field === "push_followups_enabled" ? "push_birthdays_enabled" : "push_followups_enabled"]) {
-        await revokePushToken()
-      }
-
-      await updateSettingsPatch({ [field]: value } as Partial<Settings>)
-      setOk("Notification settings updated.")
+      await updateSettingsPatch({ email_reminders_enabled: !settings.email_reminders_enabled })
+      setOk("Email digest settings updated.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update notification settings")
+      setError(e instanceof Error ? e.message : "Failed to update email digest.")
     } finally {
-      setPushWorking(false)
+      setToggling(false)
+    }
+  }
+
+  async function togglePushNotifications() {
+    if (!settings) return
+    setToggling(true)
+    try {
+      const currentlyOn = settings.push_followups_enabled || settings.push_birthdays_enabled
+      if (currentlyOn) {
+        await revokePushToken()
+      } else {
+        await registerPushToken()
+      }
+      await updateSettingsPatch({
+        push_followups_enabled: !currentlyOn,
+        push_birthdays_enabled: !currentlyOn,
+      })
+      setOk("Push notification settings updated.")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update push notifications.")
+    } finally {
+      setToggling(false)
     }
   }
 
@@ -216,10 +212,9 @@ export default function SettingsScreen() {
     setStatus(null)
     try {
       const payload = await callTrustedApi("/api/export", { method: "GET" })
-      const text = JSON.stringify(payload, null, 2)
       await Share.share({
         title: "Roots export",
-        message: text,
+        message: JSON.stringify(payload, null, 2),
       })
       setOk("Export generated.")
     } catch (e) {
@@ -308,7 +303,7 @@ export default function SettingsScreen() {
               await clearLocalPrivateData()
               await supabase.auth.signOut()
             } catch (e) {
-              setError(e instanceof Error ? e.message : "Failed to delete account")
+              setError(e instanceof Error ? e.message : "Failed to delete account.")
             } finally {
               setDeletingAccount(false)
             }
@@ -320,207 +315,273 @@ export default function SettingsScreen() {
 
   if (loading) return <LoadingState />
 
+  const pushOn = Boolean(settings?.push_followups_enabled || settings?.push_birthdays_enabled)
+  const emailDigestOn = Boolean(settings?.email_reminders_enabled)
+
   return (
     <Screen>
-      <View className="px-5 pt-6 pb-8">
-        <Text className="text-2xl font-bold text-warm-black mb-6">Settings</Text>
+      <BrandHeader
+        title="Settings"
+        subtitle="Manage your account and preferences."
+        actionIcon="person-outline"
+        actionLabel="Profile settings"
+        onAction={() => setExpanded((current) => current === "profile" ? null : "profile")}
+      />
 
-        {error && <ErrorBanner message={error} />}
-        {status && (
-          <Text className={`mb-4 rounded-xl px-3 py-2 text-sm ${status.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+      <View className="px-5 pb-8">
+        {error ? <ErrorBanner message={error} /> : null}
+        {status ? (
+          <Text
+            style={{ fontFamily: fonts.medium }}
+            className={`mb-4 rounded-xl px-3 py-2 text-sm ${
+              status.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+            }`}
+          >
             {status.message}
           </Text>
-        )}
+        ) : null}
 
-        <SectionTitle title="Account" />
-        <Card className="mb-6">
-          <Text className="text-xs text-gray-500">Signed in as</Text>
-          <Text className="mt-1 text-sm font-semibold text-warm-black">{email}</Text>
-          <View className="mt-4">
-            <TextField
-              label="Display name"
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Your name"
-              autoCapitalize="words"
-            />
-            <Button title="Save display name" onPress={saveDisplayName} loading={savingProfile} />
-          </View>
-          <TouchableOpacity onPress={handleSignOut} className="mt-4 min-h-11 justify-center">
-            <Text className="text-sm font-semibold text-red-500">Sign out</Text>
-          </TouchableOpacity>
-        </Card>
-
-        <SectionTitle title="Email and Password" />
-        <Card className="mb-6">
-          <TextField
-            label="New email"
-            value={newEmail}
-            onChangeText={setNewEmail}
-            placeholder="new@example.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
+        <SettingsSection title="Account" subtitle="Manage your profile and security.">
+          <SettingsRow
+            icon="person-outline"
+            title="Profile"
+            description="View and edit your profile information"
+            onPress={() => setExpanded((current) => current === "profile" ? null : "profile")}
           />
-          <Button title="Update email" onPress={saveEmail} loading={savingEmail} />
-
-          <View className="my-5 border-t border-gray-100" />
-
-          <TextField
-            label="New password"
-            value={newPassword}
-            onChangeText={setNewPassword}
-            placeholder="At least 8 characters"
-            secureTextEntry
+          {expanded === "profile" ? (
+            <InlineForm>
+              <TextField
+                label="Display name"
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Your name"
+                autoCapitalize="words"
+              />
+              <Button title="Save profile" onPress={saveDisplayName} loading={savingProfile} />
+            </InlineForm>
+          ) : null}
+          <Divider />
+          <SettingsRow
+            icon="mail-outline"
+            title="Email"
+            description={email || "Update your email address"}
+            onPress={() => setExpanded((current) => current === "email" ? null : "email")}
           />
-          <TextField
-            label="Confirm password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirm new password"
-            secureTextEntry
+          {expanded === "email" ? (
+            <InlineForm>
+              <TextField
+                label="New email"
+                value={newEmail}
+                onChangeText={setNewEmail}
+                placeholder="new@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <Button title="Update email" onPress={saveEmail} loading={savingEmail} />
+            </InlineForm>
+          ) : null}
+          <Divider />
+          <SettingsRow
+            icon="lock-closed-outline"
+            title="Password"
+            description="Change your password"
+            onPress={() => setExpanded((current) => current === "password" ? null : "password")}
           />
-          <Button title="Update password" onPress={savePassword} loading={savingPassword} />
-        </Card>
+          {expanded === "password" ? (
+            <InlineForm>
+              <TextField
+                label="New password"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="At least 8 characters"
+                secureTextEntry
+              />
+              <TextField
+                label="Confirm password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm new password"
+                secureTextEntry
+              />
+              <Button title="Update password" onPress={savePassword} loading={savingPassword} />
+            </InlineForm>
+          ) : null}
+          <Divider />
+          <SettingsRow
+            icon="log-out-outline"
+            title="Log out"
+            description="Sign out of your account"
+            onPress={handleSignOut}
+          />
+        </SettingsSection>
 
-        <SectionTitle title="Notifications" />
-        <Card className="mb-6">
-          <SettingSwitch
-            title="Weekly email digest"
-            description="A weekly summary of people to reach out to and upcoming birthdays."
-            value={settings?.email_reminders_enabled ?? false}
-            onValueChange={toggleEmailReminders}
+        <SettingsSection title="Notifications" subtitle="Choose how you stay up to date.">
+          <SettingsRow
+            icon="notifications-outline"
+            title="Push notifications"
+            description="Follow-ups and birthdays"
+            value={pushOn ? "On" : "Off"}
             disabled={toggling || !settings}
+            onPress={togglePushNotifications}
           />
-
           <Divider />
-
-          <SettingSwitch
-            title="Follow-up reminders"
-            description="Privacy-safe push reminders when someone needs attention."
-            value={settings?.push_followups_enabled ?? false}
-            onValueChange={(value) => togglePushPreference("push_followups_enabled", value)}
-            disabled={pushWorking || !settings}
+          <SettingsRow
+            icon="mail-outline"
+            title="Email digest"
+            description="Weekly relationship summary"
+            value={emailDigestOn ? "On" : "Off"}
+            disabled={toggling || !settings}
+            onPress={toggleEmailDigest}
           />
+        </SettingsSection>
 
-          <Divider />
-
-          <SettingSwitch
-            title="Birthday reminders"
-            description="Minimal notification text; private details load only after opening Roots."
-            value={settings?.push_birthdays_enabled ?? false}
-            onValueChange={(value) => togglePushPreference("push_birthdays_enabled", value)}
-            disabled={pushWorking || !settings}
-          />
-        </Card>
-
-        <SectionTitle title="Data" />
-        <Card className="mb-6">
-          <Text className="text-sm text-gray-600 mb-4">
-            Export your Roots data, import an export file, or restore from a saved backup.
-          </Text>
-          <Button title="Export data" onPress={exportData} loading={dataWorking} variant="secondary" />
-          <View className="h-3" />
-          <Button title="Import / update from file" onPress={importData} loading={dataWorking} variant="secondary" />
-          <View className="h-3" />
-          <TouchableOpacity
-            onPress={restoreData}
+        <SettingsSection title="Data" subtitle="Import, export, and manage your data.">
+          <SettingsRow
+            icon="cloud-download-outline"
+            title="Export data"
+            description="Download a copy of your data"
             disabled={dataWorking}
-            className={`min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-3 ${dataWorking ? "opacity-50" : ""}`}
-            accessibilityRole="button"
-            accessibilityLabel="Restore and replace from file"
-          >
-            <Text className="text-sm font-semibold text-red-700">Restore and replace</Text>
-          </TouchableOpacity>
-        </Card>
-
-        <SectionTitle title="Billing" />
-        <Card className="mb-6">
-          <Text className="text-sm font-semibold text-warm-black">Roots beta</Text>
-          <Text className="mt-1 text-sm text-gray-500">
-            Billing is not active in mobile v1. Roots is free during beta, and no credit card is required.
-          </Text>
-        </Card>
-
-        <SectionTitle title="Legal and Support" />
-        <Card className="mb-6">
-          <LinkRow label="Privacy Policy" url="https://useroots.app/privacy" />
+            onPress={exportData}
+          />
           <Divider />
-          <LinkRow label="Terms of Service" url="https://useroots.app/terms" />
+          <SettingsRow
+            icon="cloud-upload-outline"
+            title="Import data"
+            description="Import or update from a file"
+            disabled={dataWorking}
+            onPress={importData}
+          />
           <Divider />
-          <LinkRow label="Support" url="https://useroots.app/contact" />
-          <Divider />
-          <Text className="text-xs text-gray-400">Version 1.0.0</Text>
-        </Card>
+          <SettingsRow
+            icon="refresh-outline"
+            title="Restore / Replace"
+            description="Replace all your data with a backup"
+            disabled={dataWorking}
+            onPress={restoreData}
+          />
+        </SettingsSection>
 
-        <SectionTitle title="Delete Account" />
-        <Card>
-          <Text className="text-sm text-gray-600">
-            Permanently delete your account and private CRM data.
-          </Text>
-          <TouchableOpacity
-            onPress={handleDeleteAccount}
-            disabled={deletingAccount}
-            className="mt-4 min-h-11 justify-center rounded-xl border border-red-200 bg-red-50 px-4"
-            accessibilityRole="button"
-            accessibilityLabel="Delete account"
-            accessibilityHint="Permanently deletes your Roots account and private CRM data"
-          >
-            <Text className="text-sm font-semibold text-red-700">
-              {deletingAccount ? "Deleting account..." : "Delete account"}
-            </Text>
-          </TouchableOpacity>
-        </Card>
+        <SettingsSection title="Tags" subtitle="Organize your people with tags.">
+          <SettingsRow
+            icon="pricetag-outline"
+            title="Manage tags"
+            description="Create, edit, and organize your tags"
+            onPress={() => Alert.alert("Manage tags", "Tag management is available from people profile flows today.")}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Legal & Support" subtitle="Resources and important information.">
+          <SettingsRow
+            icon="help-circle-outline"
+            title="Help & Support"
+            description="Get help or contact us"
+            onPress={() => Linking.openURL("https://useroots.app/contact")}
+          />
+          <Divider />
+          <SettingsRow
+            icon="document-text-outline"
+            title="Privacy Policy"
+            onPress={() => Linking.openURL("https://useroots.app/privacy")}
+          />
+          <Divider />
+          <SettingsRow
+            icon="document-text-outline"
+            title="Terms of Service"
+            onPress={() => Linking.openURL("https://useroots.app/terms")}
+          />
+          <View className="mt-3 rounded-xl bg-red-50">
+            <SettingsRow
+              icon="trash-outline"
+              title={deletingAccount ? "Deleting account..." : "Delete account"}
+              description="Permanently delete your account and all data"
+              danger
+              disabled={deletingAccount}
+              onPress={handleDeleteAccount}
+            />
+          </View>
+        </SettingsSection>
       </View>
     </Screen>
   )
 }
 
-function SectionTitle({ title }: { title: string }) {
+function SettingsSection({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle: string
+  children: React.ReactNode
+}) {
   return (
-    <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-      {title}
-    </Text>
+    <SoftCard className="mb-4 p-4">
+      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-lg">
+        {title}
+      </Text>
+      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-sm">
+        {subtitle}
+      </Text>
+      <View className="mt-3">{children}</View>
+    </SoftCard>
   )
 }
 
-function Divider() {
-  return <View className="border-t border-gray-100 my-4" />
-}
-
-function SettingSwitch({
+function SettingsRow({
+  icon,
   title,
   description,
   value,
-  onValueChange,
+  danger,
   disabled,
+  onPress,
 }: {
+  icon: keyof typeof Ionicons.glyphMap
   title: string
-  description: string
-  value: boolean
-  onValueChange: (value: boolean) => void
+  description?: string
+  value?: string
+  danger?: boolean
   disabled?: boolean
+  onPress: () => void
 }) {
   return (
-    <View className="flex-row items-center justify-between">
-      <View className="flex-1 mr-4">
-        <Text className="text-sm font-medium text-warm-black">{title}</Text>
-        <Text className="text-xs text-gray-500 mt-0.5">{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled}
-        trackColor={{ false: colors.border, true: colors.sage }}
-        thumbColor="#FFFFFF"
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      disabled={disabled}
+      onPress={onPress}
+      activeOpacity={0.74}
+      className={`min-h-16 flex-row items-center py-2 ${disabled ? "opacity-50" : ""}`}
+    >
+      <IconTile
+        icon={icon}
+        size={44}
+        color={danger ? colors.danger : colors.forest}
+        background={danger ? "#FDECE8" : colors.mint}
       />
-    </View>
+      <View className="ml-4 flex-1">
+        <Text
+          style={{ fontFamily: fonts.bold, color: danger ? colors.danger : colors.ink }}
+          className="text-base"
+        >
+          {title}
+        </Text>
+        {description ? (
+          <Text style={{ fontFamily: fonts.body, color: danger ? "#7A271A" : colors.muted }} className="mt-1 text-sm">
+            {description}
+          </Text>
+        ) : null}
+      </View>
+      {value ? (
+        <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="mr-2 text-base">
+          {value}
+        </Text>
+      ) : null}
+      <Ionicons name="chevron-forward" size={22} color={colors.muted} />
+    </TouchableOpacity>
   )
 }
 
-function LinkRow({ label, url }: { label: string; url: string }) {
-  return (
-    <TouchableOpacity onPress={() => Linking.openURL(url)} className="py-1">
-      <Text className="text-sm font-medium text-warm-black">{label}</Text>
-    </TouchableOpacity>
-  )
+function InlineForm({ children }: { children: React.ReactNode }) {
+  return <View className="mb-3 rounded-2xl bg-stone-50 p-3">{children}</View>
 }

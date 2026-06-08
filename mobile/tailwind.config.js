@@ -8,8 +8,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        cream: "#F0EBE1",
-        sage: "#7C9A7E",
+        cream: "#F7F5EF",
+        ivory: "#FCFBF7",
+        sage: "#6F8E70",
+        forest: "#0F4A24",
+        mint: "#EEF4EA",
         terracotta: "#C17A5A",
         "warm-black": "#1C1917",
       },

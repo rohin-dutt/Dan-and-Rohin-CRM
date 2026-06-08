@@ -4,7 +4,8 @@ import { useRouter } from "expo-router"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
-import { colors } from "@/constants/theme"
+import { colors, fonts } from "@/constants/theme"
+import { Divider, IconTile } from "@/components/RootsUI"
 
 type QuickAddMode = "note" | "chat"
 
@@ -14,17 +15,16 @@ type PersonOption = {
   company: string | null
 }
 
-export function QuickAddMenu() {
+export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [pickerMode, setPickerMode] = useState<QuickAddMode | null>(null)
   const [people, setPeople] = useState<PersonOption[]>([])
   const [loadingPeople, setLoadingPeople] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function openPersonPicker(mode: QuickAddMode) {
-    setMenuOpen(false)
+    onClose()
     setPickerMode(mode)
     setLoadingPeople(true)
     setError(null)
@@ -58,55 +58,65 @@ export function QuickAddMenu() {
   }
 
   return (
-    <View pointerEvents="box-none" className="absolute inset-0">
-      {menuOpen && (
+    <>
+      <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
         <Pressable
+          className="flex-1 justify-end bg-black/45"
+          onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Dismiss quick add menu"
-          onPress={() => setMenuOpen(false)}
-          className="absolute inset-0"
-        />
-      )}
-
-      <View
-        className="absolute right-4 items-end"
-        style={{ top: Math.max(insets.top + 8, 18) }}
-        pointerEvents="box-none"
-      >
-        {menuOpen && (
-          <View className="mb-2 w-44 rounded-2xl border border-gray-100 bg-white p-2 shadow-lg">
+        >
+          <Pressable
+            className="rounded-t-[30px] bg-white px-6 pt-6"
+            style={{ paddingBottom: Math.max(insets.bottom + 20, 36) }}
+          >
+            <View className="mb-8 items-center">
+              <View className="h-1.5 w-24 rounded-full bg-stone-200" />
+            </View>
             <QuickAddAction
-              icon="person-add-outline"
+              icon="person-outline"
               label="Add person"
+              description="Add a new person to your network"
+              color={colors.forest}
+              background={colors.mint}
               onPress={() => {
-                setMenuOpen(false)
+                onClose()
                 router.push("/people/new")
               }}
             />
+            <Divider />
             <QuickAddAction
-              icon="document-text-outline"
-              label="Add note"
-              onPress={() => void openPersonPicker("note")}
-            />
-            <QuickAddAction
-              icon="chatbubble-ellipses-outline"
-              label="Log chat"
+              icon="chatbubble-outline"
+              label="Log interaction"
+              description="Log a chat, call, or meeting"
+              color="#98520B"
+              background="#FBF1E9"
               onPress={() => void openPersonPicker("chat")}
             />
-          </View>
-        )}
+            <Divider />
+            <QuickAddAction
+              icon="calendar-outline"
+              label="Add note"
+              description="Save a note about someone"
+              color={colors.purple}
+              background="#F2EEFA"
+              onPress={() => void openPersonPicker("note")}
+            />
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={menuOpen ? "Close quick add menu" : "Open quick add menu"}
-          accessibilityHint="Add a person, note, or chat"
-          activeOpacity={0.82}
-          onPress={() => setMenuOpen((value) => !value)}
-          className="h-12 w-12 items-center justify-center rounded-full bg-sage shadow-lg"
-        >
-          <Ionicons name={menuOpen ? "close" : "add"} size={26} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Cancel quick add"
+              onPress={onClose}
+              activeOpacity={0.8}
+              className="mt-8 min-h-16 items-center justify-center rounded-2xl bg-stone-100"
+            >
+              <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl">
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         animationType="fade"
@@ -114,25 +124,28 @@ export function QuickAddMenu() {
         visible={pickerMode != null}
         onRequestClose={() => setPickerMode(null)}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/25"
-          onPress={() => setPickerMode(null)}
-        >
-          <Pressable className="rounded-t-3xl bg-cream px-5 pb-8 pt-5">
+        <Pressable className="flex-1 justify-end bg-black/30" onPress={() => setPickerMode(null)}>
+          <Pressable
+            className="rounded-t-[30px] bg-white px-6 pt-6"
+            style={{ paddingBottom: Math.max(insets.bottom + 20, 34) }}
+          >
+            <View className="mb-5 items-center">
+              <View className="h-1.5 w-24 rounded-full bg-stone-200" />
+            </View>
             <View className="mb-4 flex-row items-center justify-between">
               <View>
-                <Text className="text-base font-semibold text-warm-black">
+                <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-xl">
                   Choose a person
                 </Text>
-                <Text className="mt-0.5 text-xs text-gray-500">
-                  {pickerMode === "note" ? "Add a note to an existing person." : "Log a chat with someone."}
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                  {pickerMode === "note" ? "Add a note to someone." : "Log a chat, call, or meeting."}
                 </Text>
               </View>
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Close person picker"
                 onPress={() => setPickerMode(null)}
-                className="h-9 w-9 items-center justify-center rounded-full bg-white"
+                className="h-10 w-10 items-center justify-center rounded-full bg-stone-100"
               >
                 <Ionicons name="close" size={18} color={colors.warmBlack} />
               </TouchableOpacity>
@@ -140,16 +153,18 @@ export function QuickAddMenu() {
 
             {loadingPeople ? (
               <View className="py-8">
-                <ActivityIndicator color={colors.sage} />
+                <ActivityIndicator color={colors.forest} />
               </View>
             ) : error ? (
               <Text className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-700">
                 {error}
               </Text>
             ) : people.length === 0 ? (
-              <View className="rounded-2xl border border-gray-100 bg-white p-4">
-                <Text className="text-sm font-semibold text-warm-black">No people yet</Text>
-                <Text className="mt-1 text-xs text-gray-500">
+              <View className="rounded-2xl border border-stone-100 bg-white p-4">
+                <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                  No people yet
+                </Text>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                   Add someone first, then you can log notes and chats.
                 </Text>
                 <TouchableOpacity
@@ -157,9 +172,11 @@ export function QuickAddMenu() {
                     setPickerMode(null)
                     router.push("/people/new")
                   }}
-                  className="mt-4 min-h-11 items-center justify-center rounded-xl bg-sage"
+                  className="mt-4 min-h-12 items-center justify-center rounded-xl bg-forest"
                 >
-                  <Text className="text-sm font-semibold text-white">Add person</Text>
+                  <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
+                    Add person
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -170,16 +187,20 @@ export function QuickAddMenu() {
                     accessibilityRole="button"
                     accessibilityLabel={`Choose ${person.name}`}
                     onPress={() => routeToPersonLog(person.id)}
-                    className="mb-2 rounded-2xl border border-gray-100 bg-white px-4 py-3"
+                    className="mb-2 rounded-2xl border border-stone-100 bg-white px-4 py-3"
                   >
-                    <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
+                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                      {person.name}
+                    </Text>
                     {person.company && (
-                      <Text className="mt-0.5 text-xs text-gray-500">{person.company}</Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                        {person.company}
+                      </Text>
                     )}
                   </TouchableOpacity>
                 ))}
                 {people.length > 8 && (
-                  <Text className="pt-1 text-center text-xs text-gray-500">
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="pt-1 text-center text-xs">
                     Showing first 8. Use People search for the full list.
                   </Text>
                 )}
@@ -188,17 +209,23 @@ export function QuickAddMenu() {
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </>
   )
 }
 
 function QuickAddAction({
   icon,
   label,
+  description,
+  color,
+  background,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   label: string
+  description: string
+  color: string
+  background: string
   onPress: () => void
 }) {
   return (
@@ -206,10 +233,18 @@ function QuickAddAction({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      className="min-h-11 flex-row items-center rounded-xl px-3 py-2"
+      activeOpacity={0.76}
+      className="min-h-28 flex-row items-center py-5"
     >
-      <Ionicons name={icon} size={18} color={colors.sage} />
-      <Text className="ml-3 text-sm font-semibold text-warm-black">{label}</Text>
+      <IconTile icon={icon} color={color} background={background} size={70} />
+      <View className="ml-5 flex-1">
+        <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-xl">
+          {label}
+        </Text>
+        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-lg">
+          {description}
+        </Text>
+      </View>
     </TouchableOpacity>
   )
 }

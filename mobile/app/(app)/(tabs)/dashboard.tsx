@@ -1,23 +1,22 @@
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Text, TouchableOpacity, View } from "react-native"
-import { useRouter, useFocusEffect } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
+import { useFocusEffect, useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
-import { Card } from "@/components/Card"
-import { EmptyState } from "@/components/EmptyState"
+import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard, StatusDot } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import type { Person, Interaction, Settings } from "@/types"
+import type { Interaction, Person, Settings } from "@/types"
+import { colors, fonts } from "@/constants/theme"
 import {
   categorizePeople,
   getBirthdayReminders,
   getMostContacted,
-  getNeedsAttention,
   getNextDueDays,
   getOnTimeRate,
   getTotalContacts,
   getTotalInteractions,
-  pluralize,
 } from "@roots/shared"
 
 function getGreeting(firstName: string): string {
@@ -33,6 +32,41 @@ function getFirstNameFromMetadata(metadata: Record<string, unknown> | null | und
         : typeof metadata?.display_name === "string" ? metadata.display_name
           : ""
   return fullName.trim().split(/\s+/)[0] || "there"
+}
+
+function daysSince(value: string | null) {
+  if (!value) return null
+  const then = new Date(value)
+  if (Number.isNaN(then.getTime())) return null
+  const now = new Date()
+  return Math.max(0, Math.floor((now.getTime() - then.getTime()) / 86_400_000))
+}
+
+function formatLastTalked(value: string | null) {
+  const days = daysSince(value)
+  if (days == null) return "No interaction yet"
+  if (days === 0) return "Last talked today"
+  return `Last talked ${days} ${days === 1 ? "day" : "days"} ago`
+}
+
+function formatBirthdayDate(value: string | null) {
+  if (!value) return ""
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
+}
+
+function statusDotForPerson(person: Person): "red" | "amber" | "green" | "gray" {
+  const days = getNextDueDays(person)
+  if (days == null) return "gray"
+  if (days <= 0) return "red"
+  if (days <= 7) return "amber"
+  return "green"
+}
+
+function personImageUrl(person: Person) {
+  const maybePerson = person as Person & { photo_url?: string | null; avatar_url?: string | null; image_url?: string | null }
+  return maybePerson.photo_url ?? maybePerson.avatar_url ?? maybePerson.image_url ?? null
 }
 
 export default function DashboardScreen() {
@@ -61,24 +95,26 @@ export default function DashboardScreen() {
       ])
 
       if (peopleRes.error) throw peopleRes.error
-      const loaded = peopleRes.data ?? []
-      setPeople(loaded)
+      const loadedPeople = peopleRes.data ?? []
+      setPeople(loadedPeople)
       setSettings(settingsRes.data ?? null)
 
-      if (loaded.length > 0) {
-        const { data: ints } = await supabase
+      if (loadedPeople.length > 0) {
+        const { data: loadedInteractions, error: interactionsError } = await supabase
           .from("interactions")
           .select("*")
           .in(
             "person_id",
-            loaded.map((p) => p.id),
+            loadedPeople.map((person) => person.id),
           )
-        setInteractions(ints ?? [])
+          .order("date", { ascending: false })
+        if (interactionsError) throw interactionsError
+        setInteractions(loadedInteractions ?? [])
       } else {
         setInteractions([])
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard")
+      setError(e instanceof Error ? e.message : "Failed to load dashboard.")
     } finally {
       setLoading(false)
     }
@@ -91,200 +127,284 @@ export default function DashboardScreen() {
     }, [load]),
   )
 
+  const dashboard = useMemo(() => {
+    const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), interactions)
+    const dueToday = people.filter((person) => {
+      const days = getNextDueDays(person)
+      return days != null && days <= 0
+    })
+    const followUps = [...dueToday, ...overdue, ...dueThisWeek]
+      .filter((person, index, list) => list.findIndex((candidate) => candidate.id === person.id) === index)
+      .slice(0, 3)
+    const recentNotes = interactions
+      .filter((interaction) => interaction.notes?.trim())
+      .slice(0, 2)
+      .map((interaction) => ({
+        interaction,
+        person: people.find((person) => person.id === interaction.person_id) ?? null,
+      }))
+
+    return {
+      dueToday,
+      dueThisWeek,
+      comingUp,
+      followUps,
+      birthdays: getBirthdayReminders(people, new Date(), 30).slice(0, 3),
+      recentNotes,
+      onTimeRate: getOnTimeRate(people),
+      mostContacted: getMostContacted(people, interactions),
+    }
+  }, [interactions, people])
+
   if (loading) return <LoadingState />
-
-  if (people.length === 0) {
-    return (
-      <Screen>
-        <View className="px-5 pt-6 pb-2">
-          <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
-          <Text className="mt-2 text-sm text-gray-500">
-            Keep close to the people who matter most.
-          </Text>
-        </View>
-        {error && (
-          <View className="px-5">
-            <ErrorBanner message={error} />
-          </View>
-        )}
-        <EmptyState
-          title="No people yet"
-          description="Add someone you want to stay in touch with to get started."
-          actionLabel="Add someone"
-          onAction={() => router.push("/people/new")}
-        />
-      </Screen>
-    )
-  }
-
-  const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), interactions)
-  const birthdays = getBirthdayReminders(people, new Date(), 7)
-  const reachOut = [...overdue, ...dueThisWeek].slice(0, 5)
-  const streak = settings?.current_streak ?? 0
-  const onTimeRate = getOnTimeRate(people)
-  const mostContacted = getMostContacted(people, interactions)
-  const needsAttention = getNeedsAttention(people)
 
   return (
     <Screen>
-      <View className="px-5 pt-6 pb-2">
-        <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
-        <Text className="mt-2 text-sm text-gray-500">
-          Keep close to the people who matter most.
-        </Text>
-        {streak > 0 && (
-          <View className="mt-3 self-start bg-orange-50 border border-orange-200 rounded-full px-3 py-1">
-            <Text className="text-xs font-semibold text-terracotta">Streak: {streak} days</Text>
+      <View className="px-5 pt-5 pb-2">
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text
+                style={{ fontFamily: fonts.heading, color: colors.forest }}
+                className="text-[46px] leading-[52px]"
+              >
+                Roots
+              </Text>
+              <View className="ml-2 mt-2">
+                <Ionicons name="leaf-outline" size={35} color={colors.sage} />
+              </View>
+            </View>
+            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[17px]">
+              {getGreeting(firstName)}
+            </Text>
           </View>
-        )}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open Roots overview"
+            onPress={() => router.push("/roots-map")}
+            className="mt-2 h-14 w-14 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
+          >
+            <Ionicons name="leaf" size={25} color={colors.forest} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View className="px-5 mt-4">
-        {error && <ErrorBanner message={error} />}
-
-        <View className="flex-row gap-3 mb-6">
-          <DashboardStatButton
-            label="Overdue"
-            count={overdue.length}
-            countClassName="text-terracotta"
-            accessibilityLabel="Show overdue people"
-            onPress={() => router.push("/people?status=overdue")}
-          />
-          <DashboardStatButton
-            label="Due this week"
-            count={dueThisWeek.length}
-            countClassName="text-sage"
-            accessibilityLabel="Show people due this week"
-            onPress={() => router.push("/people?status=due_this_week")}
-          />
-          <DashboardStatButton
-            label="Coming up"
-            count={comingUp.length}
-            countClassName="text-warm-black"
-            accessibilityLabel="Show people coming up"
-            onPress={() => router.push("/people?status=coming_up")}
-          />
+      {error ? (
+        <View className="px-5">
+          <ErrorBanner message={error} />
         </View>
+      ) : null}
 
-        {reachOut.length > 0 && (
-          <View className="mb-6">
-            <Text className="text-base font-semibold text-warm-black mb-3">Reach out</Text>
-            {reachOut.map((person) => {
-              const days = getNextDueDays(person)
-              const isOverdue = days !== null && days < 0
-              return (
-                <TouchableOpacity
-                  key={person.id}
-                  onPress={() => router.push(`/people/${person.id}`)}
-                  activeOpacity={0.7}
-                >
-                  <Card className="mb-2">
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-1 mr-3">
-                        <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
-                        {person.company != null && (
-                          <Text className="text-xs text-gray-500 mt-0.5">{person.company}</Text>
-                        )}
-                      </View>
-                      <View
-                        className={`rounded-full px-2.5 py-1 ${
-                          isOverdue ? "bg-red-50" : "bg-amber-50"
-                        }`}
-                      >
-                        <Text
-                          className={`text-xs font-medium ${
-                            isOverdue ? "text-red-600" : "text-amber-700"
-                          }`}
-                        >
-                          {isOverdue
-                            ? `${pluralize(Math.abs(days!), "day")} overdue`
-                            : `Due in ${pluralize(days!, "day")}`}
+      {people.length === 0 ? (
+        <EmptyPanel
+          title="No people yet"
+          body="Add someone you want to stay in touch with to start building your relationship dashboard."
+        />
+      ) : (
+        <>
+          <View className="mt-5 flex-row gap-3 px-5">
+            <MetricCard icon="checkmark-circle" value={dashboard.dueToday.length} label="due today" />
+            <MetricCard icon="time" value={dashboard.dueThisWeek.length} label="due this week" tone="amber" />
+            <MetricCard icon="calendar-outline" value={dashboard.comingUp.length} label="coming up" tone="blue" />
+          </View>
+
+          <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle
+              title="People to follow up with"
+              actionLabel="View all"
+              onAction={() => router.push("/people")}
+            />
+            {dashboard.followUps.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                No follow-ups need attention right now.
+              </Text>
+            ) : (
+              dashboard.followUps.map((person, index) => (
+                <View key={person.id}>
+                  {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${person.name}`}
+                    onPress={() => router.push(`/people/${person.id}`)}
+                    activeOpacity={0.76}
+                    className="flex-row items-center"
+                  >
+                    <View className="mr-3 items-center">
+                      <StatusDot status={statusDotForPerson(person)} />
+                    </View>
+                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={62} />
+                    <View className="ml-4 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-lg">
+                        {person.name}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
+                        {person.relationship_type ?? person.company ?? "Relationship"}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                        {formatLastTalked(person.last_contacted_at)}
+                      </Text>
+                    </View>
+                    <View className="mr-3 max-w-[34%] rounded-xl bg-mint px-4 py-3">
+                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-sm leading-5">
+                        {person.notes?.trim() || "Check in and see how things are going."}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </SoftCard>
+
+          <View className="mt-5 flex-row gap-4 px-5">
+            <SoftCard className="flex-1 p-4">
+              <SectionTitle title="Upcoming birthdays" actionLabel="View all" onAction={() => router.push("/people")} />
+              {dashboard.birthdays.length === 0 ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                  No birthdays in the next month.
+                </Text>
+              ) : (
+                dashboard.birthdays.map(({ person, daysUntil }, index) => (
+                  <TouchableOpacity
+                    key={person.id}
+                    onPress={() => router.push(`/people/${person.id}`)}
+                    className={`flex-row items-center ${index > 0 ? "mt-5" : ""}`}
+                  >
+                    <IconTile
+                      icon="calendar-outline"
+                      color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
+                      background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
+                      size={52}
+                    />
+                    <View className="ml-3 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
+                        {person.name}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                        {daysUntil === 0 ? "Today" : `In ${daysUntil} days`} · {formatBirthdayDate(person.birthday)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </SoftCard>
+
+            <SoftCard className="flex-1 p-4">
+              <SectionTitle title="Recent notes" actionLabel="View all" onAction={() => router.push("/people")} />
+              {dashboard.recentNotes.length === 0 ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                  Notes you log will appear here.
+                </Text>
+              ) : (
+                dashboard.recentNotes.map(({ interaction, person }, index) => (
+                  <View key={interaction.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
+                    <TouchableOpacity
+                      onPress={() => person && router.push(`/people/${person.id}`)}
+                      activeOpacity={0.76}
+                      className="flex-row"
+                    >
+                      <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={52} />
+                      <View className="ml-3 flex-1">
+                        <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
+                          {person ? `Note with ${person.name}` : "Recent note"}
+                        </Text>
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
+                          {interaction.notes}
+                        </Text>
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                          {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${interaction.date}T12:00:00`))}
                         </Text>
                       </View>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-        )}
-
-        <View className="mb-6">
-          <Text className="text-base font-semibold text-warm-black mb-3">
-            Upcoming birthdays
-          </Text>
-          {birthdays.length === 0 ? (
-            <Card>
-              <Text className="text-sm text-gray-500">No upcoming birthdays this week.</Text>
-            </Card>
-          ) : (
-            birthdays.map(({ person, daysUntil }) => (
-              <TouchableOpacity
-                key={person.id}
-                onPress={() => router.push(`/people/${person.id}`)}
-                activeOpacity={0.7}
-              >
-                <Card className="mb-2">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
-                    <Text className="text-xs text-gray-500">
-                      {daysUntil === 0 ? "Today" : `In ${pluralize(daysUntil, "day")}`}
-                    </Text>
+                    </TouchableOpacity>
                   </View>
-                </Card>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-
-        <View className="mb-8">
-          <Text className="text-base font-semibold text-warm-black mb-3">Your Roots</Text>
-          <View className="flex-row flex-wrap gap-3">
-            <RootStat label="Total contacts" value={String(getTotalContacts(people))} />
-            <RootStat label="Interactions logged" value={String(getTotalInteractions(interactions))} />
-            <RootStat label="On-time rate" value={onTimeRate === null ? "-" : `${onTimeRate}%`} />
-            <RootStat label="Most contacted" value={mostContacted?.name ?? "-"} />
-            <RootStat label="Needs attention" value={needsAttention?.name ?? "-"} />
+                ))
+              )}
+            </SoftCard>
           </View>
-        </View>
-      </View>
+
+          <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle title="Your summary" />
+            <View className="flex-row items-start">
+              <SummaryStat icon="people" value={String(getTotalContacts(people))} label="Total contacts" />
+              <SummaryDivider />
+              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions))} label="Interactions logged" />
+              <SummaryDivider />
+              <SummaryStat icon="golf" value={dashboard.onTimeRate == null ? "-" : `${dashboard.onTimeRate}%`} label="On-time outreach" />
+              <SummaryDivider />
+              <SummaryStat
+                icon="star"
+                value={dashboard.mostContacted?.name.split(/\s+/).slice(0, 2).join(" ") ?? "-"}
+                label="Most contacted"
+              />
+            </View>
+            {settings?.current_streak ? (
+              <Text style={{ fontFamily: fonts.medium, color: colors.amber }} className="mt-5 text-sm">
+                {settings.current_streak} day streak
+              </Text>
+            ) : null}
+          </SoftCard>
+        </>
+      )}
     </Screen>
   )
 }
 
-function DashboardStatButton({
+function MetricCard({
+  icon,
+  value,
   label,
-  count,
-  countClassName,
-  accessibilityLabel,
-  onPress,
+  tone = "green",
 }: {
+  icon: keyof typeof Ionicons.glyphMap
+  value: number
   label: string
-  count: number
-  countClassName: string
-  accessibilityLabel: string
-  onPress: () => void
+  tone?: "green" | "amber" | "blue"
 }) {
+  const toneColors = {
+    green: { bg: colors.mint, icon: colors.forest },
+    amber: { bg: "#FFF3DE", icon: colors.amber },
+    blue: { bg: "#EAF1FC", icon: colors.blue },
+  }[tone]
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center"
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Text className={`text-2xl font-bold ${countClassName}`}>{count}</Text>
-      <Text className="text-xs text-gray-500 mt-0.5 text-center">{label}</Text>
-    </TouchableOpacity>
+    <SoftCard className="min-h-24 flex-1 flex-row items-center justify-center px-3">
+      <View className="mr-3 h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
+        <Ionicons name={icon} size={28} color={toneColors.icon} />
+      </View>
+      <View>
+        <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-3xl leading-8">
+          {value}
+        </Text>
+        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-sm">
+          {label}
+        </Text>
+      </View>
+    </SoftCard>
   )
 }
 
-function RootStat({ label, value }: { label: string; value: string }) {
+function SummaryStat({
+  icon,
+  value,
+  label,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  value: string
+  label: string
+}) {
   return (
-    <View className="min-w-[30%] flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm">
-      <Text className="text-xs text-gray-500">{label}</Text>
-      <Text className="mt-1 text-base font-semibold text-warm-black" numberOfLines={1}>
+    <View className="flex-1 items-center px-2">
+      <Ionicons name={icon} size={27} color={colors.forest} />
+      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} adjustsFontSizeToFit className="mt-3 text-2xl">
         {value}
+      </Text>
+      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-center text-xs leading-4">
+        {label}
       </Text>
     </View>
   )
+}
+
+function SummaryDivider() {
+  return <View className="h-16 w-px bg-stone-200" />
 }

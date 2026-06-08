@@ -1,6 +1,16 @@
 import { Slot, useRouter, useSegments } from "expo-router"
+import { useFonts } from "expo-font"
 import { useEffect, useState } from "react"
 import { Linking } from "react-native"
+import {
+  CormorantGaramond_700Bold,
+} from "@expo-google-fonts/cormorant-garamond"
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter"
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import { handlePasswordRecoveryUrl } from "@/lib/auth-links"
@@ -9,6 +19,13 @@ import "../global.css"
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fontsLoaded, fontError] = useFonts({
+    CormorantGaramond_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  })
   const router = useRouter()
   const segments = useSegments()
 
@@ -53,6 +70,6 @@ export default function RootLayout() {
     }
   }, [session, loading, segments])
 
-  if (loading) return null
+  if (loading || (!fontsLoaded && !fontError)) return null
   return <Slot />
 }
