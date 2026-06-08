@@ -12,7 +12,7 @@ import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 const CATEGORIES = [
   { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
   { label: "Family", tagName: "Family", tagColor: "#2563EB" },
-  { label: "Professional", tagName: "Colleague", tagColor: "#D97706" },
+  { label: "Professional", tagName: "Professional", tagColor: "#D97706" },
 ] as const
 
 type CategoryLabel = (typeof CATEGORIES)[number]["label"]
@@ -44,6 +44,7 @@ export default function NewPersonScreen() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [categoryError, setCategoryError] = useState<string | null>(null)
 
   const [name, setName] = useState("")
   const [category, setCategory] = useState<CategoryLabel | null>(null)
@@ -65,9 +66,14 @@ export default function NewPersonScreen() {
       setError("Name is required")
       return
     }
+    if (!category) {
+      setCategoryError("Choose Friend, Family, or Professional.")
+      return
+    }
 
     setSaving(true)
     setError(null)
+    setCategoryError(null)
 
     try {
       const {
@@ -143,17 +149,21 @@ export default function NewPersonScreen() {
 
         {/* Category */}
         <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Category</Text>
+          <Text className="text-sm font-medium text-warm-black mb-2">Relationship type *</Text>
           <View className="flex-row gap-2">
             {CATEGORIES.map((cat) => (
               <PillButton
                 key={cat.label}
                 label={cat.label}
                 selected={category === cat.label}
-                onPress={() => setCategory(category === cat.label ? null : cat.label)}
+                onPress={() => {
+                  setCategory(cat.label)
+                  setCategoryError(null)
+                }}
               />
             ))}
           </View>
+          {categoryError && <Text className="text-xs text-red-500 mt-2">{categoryError}</Text>}
         </View>
 
         {/* Conditional: Professional fields */}

@@ -1,7 +1,7 @@
 export const ONBOARDING_CATEGORY_PILLS = [
   { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
   { label: "Family", tagName: "Family", tagColor: "#2563EB" },
-  { label: "Professional", tagName: "Colleague", tagColor: "#D97706" },
+  { label: "Professional", tagName: "Professional", tagColor: "#D97706" },
 ] as const
 
 export const ONBOARDING_FREQ_OPTIONS = [

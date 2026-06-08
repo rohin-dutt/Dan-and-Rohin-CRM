@@ -208,34 +208,31 @@ States:
 - error
 - offline cached
 
-### Follow Ups
+### Your Roots
 
-Purpose: dedicated queue for relationship follow-up actions.
+Purpose: show where saved relationships live without geocoding private contact data.
 
 Data:
 
-- interactions requiring follow-up
-- related person names
+- people with saved latitude/longitude
+- people with saved location text
 
 Sections:
 
-- overdue
-- due today/soon
-- snoozed
-- completed/recently done
+- native map pins grouped by nearby saved coordinates
+- selected location group
+- location-based list fallback
 
 Actions:
 
-- mark done
-- reopen
-- snooze
 - open person
-- log interaction
+- review people without saved coordinates
 
 States:
 
 - loading
 - empty
+- map unavailable/no coordinates
 - error
 - offline cached
 

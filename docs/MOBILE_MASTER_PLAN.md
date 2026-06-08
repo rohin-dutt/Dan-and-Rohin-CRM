@@ -88,7 +88,7 @@ Mobile v1 includes:
 - Tags and tag assignment.
 - Interaction create, edit, and delete.
 - Follow-up status controls, including done, reopen, and snooze.
-- Dedicated Follow Ups tab.
+- Your Roots tab with a native, token-free map/list view.
 - iOS Contacts import with review before save.
 - Push notifications for follow-ups and birthdays.
 - Offline read cache for recently synced private CRM data.
@@ -110,7 +110,7 @@ The primary navigation should use a floating iOS-style tab bar:
 
 - Dashboard
 - People
-- Follow Ups
+- Your Roots
 - Settings
 
 Secondary screens should be stack-based:

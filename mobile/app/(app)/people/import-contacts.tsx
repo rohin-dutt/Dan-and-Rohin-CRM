@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
-import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native"
+import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import * as Contacts from "expo-contacts"
 import { useRouter } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
 import { EmptyState } from "@/components/EmptyState"
@@ -12,6 +13,7 @@ import { callTrustedApi } from "@/lib/trusted-api"
 import { supabase } from "@/lib/supabase"
 import { mapDeviceContact, toContactImportPayload, type ImportCandidate } from "@/lib/contact-import"
 import type { Person } from "@/types"
+import { colors } from "@/constants/theme"
 
 type PermissionState = "unknown" | "denied" | "limited" | "granted"
 
@@ -19,6 +21,16 @@ type ImportResponse = {
   ok: boolean
   imported: number
   errors: string[]
+}
+
+function matchesCandidate(candidate: ImportCandidate, rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase()
+  if (!query) return true
+  return (
+    candidate.name.toLowerCase().startsWith(query) ||
+    (candidate.email ?? "").toLowerCase().startsWith(query) ||
+    (candidate.phone ?? "").toLowerCase().startsWith(query)
+  )
 }
 
 export default function ImportContactsScreen() {
@@ -29,13 +41,28 @@ export default function ImportContactsScreen() {
   const [error, setError] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<ImportCandidate[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [hiddenDuplicateIds, setHiddenDuplicateIds] = useState<Set<string>>(new Set())
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [search, setSearch] = useState("")
   const [result, setResult] = useState<string | null>(null)
+
+  const visibleCandidates = useMemo(
+    () =>
+      candidates.filter((candidate) => {
+        if (!matchesCandidate(candidate, search)) return false
+        if (candidate.duplicateReason && !showDuplicates) return false
+        if (hiddenDuplicateIds.has(candidate.id)) return false
+        return true
+      }),
+    [candidates, hiddenDuplicateIds, search, showDuplicates],
+  )
 
   const selectedCandidates = useMemo(
     () => candidates.filter((candidate) => selectedIds.has(candidate.id)),
     [candidates, selectedIds],
   )
   const duplicateCount = candidates.filter((candidate) => candidate.duplicateReason != null).length
+  const visibleDuplicateCount = visibleCandidates.filter((candidate) => candidate.duplicateReason != null).length
 
   async function loadExistingPeople() {
     const {
@@ -56,6 +83,7 @@ export default function ImportContactsScreen() {
     setLoading(true)
     setError(null)
     setResult(null)
+    setSearch("")
 
     try {
       const permission = await Contacts.requestPermissionsAsync()
@@ -82,9 +110,11 @@ export default function ImportContactsScreen() {
       const mapped = contacts.data
         .map((contact) => mapDeviceContact(contact, people as Person[]))
         .filter((contact): contact is ImportCandidate => contact != null)
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
 
       setCandidates(mapped)
+      setHiddenDuplicateIds(new Set())
+      setShowDuplicates(false)
       setSelectedIds(new Set(mapped.filter((candidate) => candidate.duplicateReason == null).map((candidate) => candidate.id)))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load contacts.")
@@ -102,8 +132,16 @@ export default function ImportContactsScreen() {
     })
   }
 
-  function selectAllNonDuplicates() {
-    setSelectedIds(new Set(candidates.filter((candidate) => candidate.duplicateReason == null).map((candidate) => candidate.id)))
+  function removeDuplicates() {
+    const duplicateIds = candidates
+      .filter((candidate) => candidate.duplicateReason != null)
+      .map((candidate) => candidate.id)
+    setHiddenDuplicateIds(new Set(duplicateIds))
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      duplicateIds.forEach((id) => next.delete(id))
+      return next
+    })
   }
 
   function clearSelection() {
@@ -150,6 +188,11 @@ export default function ImportContactsScreen() {
       if (failures === 0) {
         setCandidates((current) => current.filter((candidate) => !submittedIds.has(candidate.id)))
         setSelectedIds(new Set())
+        setHiddenDuplicateIds((current) => {
+          const next = new Set(current)
+          submittedIds.forEach((id) => next.delete(id))
+          return next
+        })
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to import contacts.")
@@ -184,7 +227,7 @@ export default function ImportContactsScreen() {
               Choose contacts to add to Roots
             </Text>
             <Text className="text-sm text-gray-600 mb-4">
-              Roots only imports contacts you select on the review screen. Names, first email addresses, and first phone numbers are mapped; notes, addresses, images, and unselected contacts stay on your device.
+              Roots imports only the selected names and contact details you approve.
             </Text>
             {permissionState === "denied" && (
               <Text className="text-sm text-red-600 mb-4">
@@ -195,10 +238,19 @@ export default function ImportContactsScreen() {
           </Card>
         ) : (
           <>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search contacts..."
+              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white mb-3 text-warm-black"
+              placeholderTextColor="#9CA3AF"
+              accessibilityLabel="Search import contacts"
+            />
+
             <View className="flex-row items-center justify-between mb-3">
-              <View>
+              <View className="flex-1 pr-3">
                 <Text className="text-sm font-semibold text-warm-black">
-                  {selectedCandidates.length} selected of {candidates.length}
+                  {selectedCandidates.length} selected of {visibleCandidates.length} shown
                 </Text>
                 <Text className="text-xs text-gray-500">
                   {permissionState === "limited" ? "Limited Contacts access. " : ""}
@@ -206,14 +258,39 @@ export default function ImportContactsScreen() {
                 </Text>
               </View>
               <View className="flex-row gap-3">
-                <TouchableOpacity onPress={selectAllNonDuplicates} className="py-2">
-                  <Text className="text-xs font-semibold text-sage">Select safe</Text>
+                <TouchableOpacity onPress={removeDuplicates} className="py-2">
+                  <Text className="text-xs font-semibold text-sage">Remove duplicates</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={clearSelection} className="py-2">
                   <Text className="text-xs font-semibold text-gray-500">Clear</Text>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {duplicateCount > 0 && (
+              <TouchableOpacity
+                onPress={() => setShowDuplicates((value) => !value)}
+                className="mb-3 flex-row items-center rounded-xl bg-white px-3 py-2"
+                accessibilityRole="switch"
+                accessibilityState={{ checked: showDuplicates }}
+              >
+                <Ionicons
+                  name={showDuplicates ? "checkbox-outline" : "square-outline"}
+                  size={18}
+                  color={colors.sage}
+                />
+                <Text className="ml-2 text-xs font-semibold text-warm-black">
+                  Show and allow possible duplicates
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {visibleDuplicateCount > 0 && (
+              <Text className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Possible duplicates are visible. Review warnings before selecting them.
+              </Text>
+            )}
+
             <Button
               title={`Import ${selectedCandidates.length} selected`}
               onPress={importSelectedContacts}
@@ -226,7 +303,7 @@ export default function ImportContactsScreen() {
 
       {candidates.length > 0 ? (
         <FlatList
-          data={candidates}
+          data={visibleCandidates}
           keyExtractor={(item) => item.id}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 32 }}
@@ -239,13 +316,13 @@ export default function ImportContactsScreen() {
                     <View className="flex-1">
                       <Text className="text-sm font-semibold text-warm-black">{item.name}</Text>
                       {item.email && <Text className="text-xs text-gray-500 mt-1">{item.email}</Text>}
-                      {item.phone && <Text className="text-xs text-gray-500 mt-1">{item.phone}</Text>}
+                      {item.displayPhone && <Text className="text-xs text-gray-500 mt-1">{item.displayPhone}</Text>}
                       {item.duplicateReason && (
                         <Text className="text-xs text-amber-700 mt-2">{item.duplicateReason}</Text>
                       )}
                     </View>
                     <View className={`h-6 w-6 rounded-full border items-center justify-center ${selected ? "bg-sage border-sage" : "bg-white border-gray-300"}`}>
-                      {selected && <Text className="text-white text-xs font-bold">X</Text>}
+                      {selected && <Ionicons name="checkmark" size={15} color="#FFFFFF" />}
                     </View>
                   </View>
                 </Card>
@@ -254,8 +331,8 @@ export default function ImportContactsScreen() {
           }}
           ListEmptyComponent={
             <EmptyState
-              title="No importable contacts"
-              description="No contacts with a name were available from your device."
+              title="No contacts shown"
+              description="Try a different search or show possible duplicates."
             />
           }
         />

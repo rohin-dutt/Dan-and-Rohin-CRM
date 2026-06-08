@@ -293,7 +293,7 @@ Primary tabs:
 
 - Dashboard
 - People
-- Follow Ups
+- Your Roots
 - Settings
 
 Secondary stack screens:
@@ -397,7 +397,7 @@ Push notifications should support:
 - due follow-up reminders
 - overdue follow-up reminders
 - birthday reminders
-- deep links into person detail or Follow Ups
+- deep links into person detail and relevant People filters
 
 Push token storage should be per user/device. Tokens should be cleaned up when
 practical on logout and account deletion.

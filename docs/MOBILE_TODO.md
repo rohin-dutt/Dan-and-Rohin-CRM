@@ -219,8 +219,10 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Build Person detail.
 - [ ] Build Add person.
 - [ ] Build Log interaction.
-- [ ] Build Follow Ups basic tab.
-- [ ] Verify a created person and interaction update Dashboard and Follow Ups.
+- [x] Replace the Follow Ups tab with a Your Roots tab.
+  - Your Roots uses stored latitude/longitude when available and falls back to a
+    saved-location list without geocoding private contact data.
+- [ ] Verify a created person and interaction update Dashboard and person detail follow-ups.
 - [ ] Verify data matches Supabase and web behavior.
 - [ ] Verify RLS still prevents cross-user access for mobile reads and writes.
 
@@ -363,6 +365,17 @@ For mobile-specific work, also run the selected Expo checks, mobile unit tests,
 and mobile E2E checks where available. Complete real-device TestFlight QA when
 the feature touches auth, native permissions, push, offline behavior, import,
 restore, or account deletion.
+
+## June 8, 2026 Mobile Review Fix Pass Notes
+
+- Automated verification passed for the Expo Go review fix pass:
+  `npm.cmd test`, `npm.cmd run lint`, `npm.cmd run build`,
+  `npm.cmd run typecheck` in `mobile/`, `npm.cmd run lint` in `mobile/`, and
+  `npx.cmd expo-doctor`.
+- Expo Go manual QA remains open in this Windows environment because no
+  physical iPhone/Expo Go session is available here. Required follow-up:
+  Home, People filters/search, quick-add, Add person validation, Contacts
+  import, Your Roots, and Settings data/account flows on a real device.
 
 ## June 2, 2026 Readiness Pass Notes
 

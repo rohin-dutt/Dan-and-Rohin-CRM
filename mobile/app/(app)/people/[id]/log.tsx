@@ -12,12 +12,13 @@ import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@ro
 
 export default function LogInteractionScreen() {
   const router = useRouter()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, action } = useLocalSearchParams<{ id: string; action?: string }>()
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [interactionType, setInteractionType] = useState(INTERACTION_TYPES[0])
+  const isNoteMode = action === "note"
+  const [interactionType, setInteractionType] = useState(isNoteMode ? "Other" : INTERACTION_TYPES[0])
   const [date, setDate] = useState(todayInputValue())
   const [notes, setNotes] = useState("")
   const [followUpEnabled, setFollowUpEnabled] = useState(false)
@@ -66,7 +67,9 @@ export default function LogInteractionScreen() {
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
           <Text className="text-sage text-sm font-semibold">Cancel</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-warm-black">Log a chat</Text>
+        <Text className="text-base font-semibold text-warm-black">
+          {isNoteMode ? "Add note" : "Log a chat"}
+        </Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -101,7 +104,7 @@ export default function LogInteractionScreen() {
           label="Notes"
           value={notes}
           onChangeText={setNotes}
-          placeholder="What did you talk about?"
+          placeholder={isNoteMode ? "What do you want to remember?" : "What did you talk about?"}
           multiline
           numberOfLines={4}
           returnKeyType="default"
@@ -136,7 +139,7 @@ export default function LogInteractionScreen() {
           )}
         </View>
 
-        <Button title="Save" onPress={handleSave} loading={saving} />
+        <Button title={isNoteMode ? "Save note" : "Save"} onPress={handleSave} loading={saving} />
       </View>
     </Screen>
   )

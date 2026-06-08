@@ -185,7 +185,7 @@ Required iPhone screenshots:
 - [ ] Dashboard.
 - [ ] People list.
 - [ ] Person detail.
-- [ ] Follow Ups.
+- [ ] Your Roots.
 - [ ] Contacts import or onboarding.
 - [ ] Settings if useful.
 
