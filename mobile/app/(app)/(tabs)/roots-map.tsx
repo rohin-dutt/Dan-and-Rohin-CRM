@@ -173,13 +173,13 @@ export default function RootsMapScreen() {
         />
         <View className="px-5">
           {error ? <ErrorBanner message={error} /> : null}
-          <SearchBox className="h-16">
+          <SearchBox className="h-11">
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder="Search locations"
               placeholderTextColor="#777A83"
-              className="ml-3 flex-1 text-[17px] text-warm-black"
+              className="ml-3 flex-1 text-sm text-warm-black"
               style={{ fontFamily: fonts.body }}
               accessibilityLabel="Search locations"
             />
@@ -204,8 +204,8 @@ export default function RootsMapScreen() {
                 description={`${group.people.length} ${group.people.length === 1 ? "person" : "people"}`}
                 onPress={() => setSelectedGroupKey(group.key)}
               >
-                <View className="h-14 w-14 items-center justify-center rounded-full border-[5px] border-white bg-forest shadow-lg">
-                  <Text style={{ fontFamily: fonts.bold }} className="text-lg text-white">
+                <View className="h-10 w-10 items-center justify-center rounded-full border-[3px] border-white bg-forest shadow-lg">
+                  <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
                     {group.people.length}
                   </Text>
                 </View>
@@ -314,7 +314,7 @@ function LocationRow({
       activeOpacity={0.76}
     >
       <View className={`flex-row items-center py-3 ${showDivider ? "border-b border-stone-200" : ""}`}>
-        <IconTile icon={isSelected ? "navigate-circle-outline" : "location-outline"} size={64} />
+        <IconTile icon={isSelected ? "navigate-circle-outline" : "location-outline"} size={40} />
         <View className="ml-4 flex-1">
           <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-lg">
             {group.location}

@@ -35,26 +35,26 @@ export function BrandHeader({
   onAction?: () => void
 }) {
   return (
-    <View className="px-5 pt-5 pb-4">
+    <View className="px-5 pt-4 pb-3">
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-4">
           <View className="flex-row items-center">
             <Text
               style={{ fontFamily: fonts.heading, color: colors.forest }}
-              className="text-[46px] leading-[52px]"
+              className="text-[32px] leading-[38px]"
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
               {title}
             </Text>
-            <View className="ml-2 mt-2">
-              <LogoMark size={34} muted />
+            <View className="ml-2 mt-1">
+              <LogoMark size={24} muted />
             </View>
           </View>
           {subtitle ? (
             <Text
               style={{ fontFamily: fonts.body, color: colors.ink }}
-              className="mt-1 text-[17px] leading-6"
+              className="mt-1 text-[15px] leading-5"
             >
               {subtitle}
             </Text>
@@ -66,9 +66,9 @@ export function BrandHeader({
             accessibilityLabel={actionLabel ?? "Screen action"}
             onPress={onAction}
             activeOpacity={0.78}
-            className="mt-2 h-14 w-14 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
+            className="mt-1 h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
           >
-            <Ionicons name={actionIcon} size={27} color={colors.forest} />
+            <Ionicons name={actionIcon} size={20} color={colors.forest} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -100,10 +100,10 @@ export function SectionTitle({
   onAction?: () => void
 }) {
   return (
-    <View className="mb-4 flex-row items-center justify-between">
+    <View className="mb-3 flex-row items-center justify-between">
       <Text
         style={{ fontFamily: fonts.heading, color: colors.forest }}
-        className="text-[29px] leading-8"
+        className="text-[20px] leading-6"
       >
         {title}
       </Text>
@@ -125,7 +125,7 @@ export function SectionTitle({
 
 export function PersonAvatar({
   name,
-  size = 58,
+  size = 44,
   imageUrl,
 }: {
   name: string
@@ -155,7 +155,7 @@ export function PersonAvatar({
       style={{ width: size, height: size, borderRadius: size / 2 }}
       accessibilityLabel={`${name} initials`}
     >
-      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-lg">
+      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-sm">
         {initials}
       </Text>
     </View>
@@ -166,7 +166,7 @@ export function IconTile({
   icon,
   color = colors.forest,
   background = colors.mint,
-  size = 54,
+  size = 40,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   color?: string
@@ -178,7 +178,7 @@ export function IconTile({
       className="items-center justify-center rounded-xl"
       style={{ width: size, height: size, backgroundColor: background }}
     >
-      <Ionicons name={icon} size={26} color={color} />
+      <Ionicons name={icon} size={20} color={color} />
     </View>
   )
 }
@@ -192,7 +192,7 @@ export function SearchBox({
 }) {
   return (
     <View className={`flex-row items-center rounded-2xl border border-stone-200 bg-white px-4 shadow-sm ${className}`}>
-      <Ionicons name="search-outline" size={24} color="#60646D" />
+      <Ionicons name="search-outline" size={18} color="#60646D" />
       {children}
     </View>
   )

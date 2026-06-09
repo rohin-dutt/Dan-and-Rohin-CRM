@@ -160,21 +160,21 @@ export default function DashboardScreen() {
 
   return (
     <Screen>
-      <View className="px-5 pt-5 pb-2">
+      <View className="px-5 pt-4 pb-2">
         <View className="flex-row items-start justify-between">
           <View className="flex-1">
             <View className="flex-row items-center">
               <Text
                 style={{ fontFamily: fonts.heading, color: colors.forest }}
-                className="text-[46px] leading-[52px]"
+                className="text-[32px] leading-[38px]"
               >
                 Roots
               </Text>
-              <View className="ml-2 mt-2">
-                <Ionicons name="leaf-outline" size={35} color={colors.sage} />
+              <View className="ml-2 mt-1">
+                <Ionicons name="leaf-outline" size={24} color={colors.sage} />
               </View>
             </View>
-            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[17px]">
+            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[15px]">
               {getGreeting(firstName)}
             </Text>
           </View>
@@ -182,9 +182,9 @@ export default function DashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel="Open Roots overview"
             onPress={() => router.push("/roots-map")}
-            className="mt-2 h-14 w-14 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
+            className="mt-1 h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
           >
-            <Ionicons name="leaf" size={25} color={colors.forest} />
+            <Ionicons name="leaf" size={20} color={colors.forest} />
           </TouchableOpacity>
         </View>
       </View>
@@ -232,14 +232,16 @@ export default function DashboardScreen() {
                     <View className="mr-3 items-center">
                       <StatusDot status={statusDotForPerson(person)} />
                     </View>
-                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={62} />
+                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
                     <View className="ml-4 flex-1">
-                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-lg">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
                         {person.name}
                       </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
-                        {person.relationship_type ?? person.company ?? "Relationship"}
-                      </Text>
+                      {(person.relationship_type ?? person.company) ? (
+                        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
+                          {person.relationship_type ?? person.company}
+                        </Text>
+                      ) : null}
                       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                         {formatLastTalked(person.last_contacted_at)}
                       </Text>
@@ -274,7 +276,7 @@ export default function DashboardScreen() {
                       icon="calendar-outline"
                       color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
                       background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
-                      size={52}
+                      size={38}
                     />
                     <View className="ml-3 flex-1">
                       <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
@@ -303,7 +305,7 @@ export default function DashboardScreen() {
                       activeOpacity={0.76}
                       className="flex-row"
                     >
-                      <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={52} />
+                      <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
                       <View className="ml-3 flex-1">
                         <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
                           {person ? `Note with ${person.name}` : "Recent note"}
@@ -367,15 +369,15 @@ function MetricCard({
   }[tone]
 
   return (
-    <SoftCard className="min-h-24 flex-1 flex-row items-center justify-center px-3">
-      <View className="mr-3 h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
-        <Ionicons name={icon} size={28} color={toneColors.icon} />
+    <SoftCard className="min-h-16 flex-1 flex-row items-center justify-center px-3 py-3">
+      <View className="mr-2 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
+        <Ionicons name={icon} size={20} color={toneColors.icon} />
       </View>
       <View>
-        <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-3xl leading-8">
+        <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl leading-6">
           {value}
         </Text>
-        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-sm">
+        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-xs">
           {label}
         </Text>
       </View>
@@ -394,8 +396,8 @@ function SummaryStat({
 }) {
   return (
     <View className="flex-1 items-center px-2">
-      <Ionicons name={icon} size={27} color={colors.forest} />
-      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} adjustsFontSizeToFit className="mt-3 text-2xl">
+      <Ionicons name={icon} size={20} color={colors.forest} />
+      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} adjustsFontSizeToFit className="mt-2 text-lg">
         {value}
       </Text>
       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-center text-xs leading-4">
