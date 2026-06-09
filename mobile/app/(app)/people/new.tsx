@@ -1,21 +1,19 @@
 import { useRef, useState } from "react"
-import { Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Alert, Text, TextInput, TouchableOpacity, View, type AlertButton } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
-import { Button } from "@/components/Button"
-import { TextField } from "@/components/TextField"
-import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { IconTile, SoftCard } from "@/components/RootsUI"
 import { supabase } from "@/lib/supabase"
 import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 import { colors, fonts } from "@/constants/theme"
 import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 
 const CATEGORIES = [
-  { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
-  { label: "Family", tagName: "Family", tagColor: "#2563EB" },
-  { label: "Professional", tagName: "Professional", tagColor: "#D97706" },
+  { label: "Friend", tagName: "Friend", tagColor: "#16A34A", icon: "people-outline" },
+  { label: "Family", tagName: "Family", tagColor: "#2563EB", icon: "people-circle-outline" },
+  { label: "Professional", tagName: "Professional", tagColor: "#D97706", icon: "briefcase-outline" },
 ] as const
 
 type CategoryLabel = (typeof CATEGORIES)[number]["label"]
@@ -43,22 +41,86 @@ async function getOrCreateTag(
   return created?.id ?? null
 }
 
+function freqLabel(days: number) {
+  return ONBOARDING_FREQ_OPTIONS.find((option) => option.value === days)?.label ?? `Every ${days} days`
+}
+
+function AddTextField({
+  label,
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+  keyboardType,
+  autoCapitalize,
+  maxLength,
+}: {
+  label: string
+  icon: keyof typeof Ionicons.glyphMap
+  value: string
+  onChangeText: (text: string) => void
+  placeholder: string
+  multiline?: boolean
+  keyboardType?: "default" | "email-address" | "phone-pad" | "numbers-and-punctuation"
+  autoCapitalize?: "none" | "sentences" | "words" | "characters"
+  maxLength?: number
+}) {
+  return (
+    <View className="mb-5">
+      <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-2 text-[15px]">
+        {label}
+      </Text>
+      <View
+        className={`flex-row rounded-xl border border-stone-200 bg-white ${multiline ? "items-start" : "items-center"}`}
+      >
+        <View
+          className={`items-center justify-center border-r border-stone-200 ${multiline ? "mt-2" : ""}`}
+          style={{ width: 52, height: multiline ? 44 : 50 }}
+        >
+          <Ionicons name={icon} size={22} color={colors.forest} />
+        </View>
+        <TextInput
+          accessibilityLabel={label}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#8F96A3"
+          multiline={multiline}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          maxLength={maxLength}
+          className="flex-1 px-4 text-base"
+          style={{
+            minHeight: multiline ? 88 : 50,
+            paddingVertical: multiline ? 14 : 0,
+            fontFamily: fonts.body,
+            color: colors.ink,
+            textAlignVertical: multiline ? "top" : "center",
+          }}
+          returnKeyType={multiline ? "default" : "next"}
+        />
+      </View>
+    </View>
+  )
+}
+
 export default function NewPersonScreen() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
 
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [category, setCategory] = useState<CategoryLabel | null>(null)
+  const [fullName, setFullName] = useState("")
+  const [category, setCategory] = useState<CategoryLabel>("Friend")
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
   const [birthday, setBirthday] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [howMet, setHowMet] = useState("")
-  const [frequencyDays, setFrequencyDays] = useState(30)
+  const [frequencyDays, setFrequencyDays] = useState(90)
   const [location, setLocation] = useState("")
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
@@ -66,9 +128,6 @@ export default function NewPersonScreen() {
   const [notes, setNotes] = useState("")
 
   const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const isProfessional = category === "Professional"
-  const isFriendOrFamily = category === "Friend" || category === "Family"
 
   function handleLocationChange(text: string) {
     setLocation(text)
@@ -93,9 +152,24 @@ export default function NewPersonScreen() {
     setLocationSuggestions([])
   }
 
+  function showFrequencyPicker() {
+    const buttons: AlertButton[] = ONBOARDING_FREQ_OPTIONS.map((option) => ({
+      text: option.label,
+      onPress: () => setFrequencyDays(option.value),
+    }))
+    buttons.push({ text: "Cancel", style: "cancel" })
+
+    Alert.alert(
+      "Keep in touch",
+      "Choose a contact cadence.",
+      buttons,
+    )
+  }
+
   async function handleSave() {
-    if (!firstName.trim()) {
-      setError("First name is required")
+    const cleanName = fullName.trim().replace(/\s+/g, " ")
+    if (!cleanName) {
+      setError("Full name is required")
       return
     }
     if (!category) {
@@ -106,8 +180,6 @@ export default function NewPersonScreen() {
     setSaving(true)
     setError(null)
     setCategoryError(null)
-
-    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ")
 
     try {
       const {
@@ -121,7 +193,7 @@ export default function NewPersonScreen() {
         .from("people")
         .insert({
           user_id: userId,
-          name: fullName,
+          name: cleanName,
           email: email.trim() || null,
           phone: phone.trim() || null,
           company: company.trim() || null,
@@ -162,180 +234,266 @@ export default function NewPersonScreen() {
 
   return (
     <Screen>
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
-        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.sage, fontSize: 14 }}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 16 }}>Add person</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <View className="px-5 pt-4 pb-8">
+        <View className="flex-row items-center justify-between">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Cancel adding person"
+            onPress={() => router.back()}
+            className="min-h-11 justify-center pr-4"
+          >
+            <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-lg">
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-xl">
+            Add Person
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Save person"
+            onPress={handleSave}
+            disabled={saving}
+            className="min-h-11 justify-center pl-4"
+          >
+            <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-lg">
+              {saving ? "Saving" : "Save"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      <View className="px-5 pb-8">
         {error != null && <ErrorBanner message={error} />}
 
-        <TextField
-          label="First name *"
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="First name"
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-        <TextField
-          label="Last name"
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Last name (optional)"
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Import from Contacts"
+          onPress={() => router.push("/people/import-contacts")}
+          activeOpacity={0.78}
+          className="mt-6"
+        >
+          <SoftCard className="flex-row items-center p-4">
+            <IconTile icon="id-card-outline" size={52} />
+            <View className="ml-4 flex-1">
+              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-lg">
+                Import from Contacts
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm leading-5">
+                Pull in name, phone, and email from your contacts.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+          </SoftCard>
+        </TouchableOpacity>
 
-        {/* Category */}
-        <View className="mb-4">
-          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 8 }}>Relationship type *</Text>
-          <View className="flex-row gap-2">
-            {CATEGORIES.map((cat) => (
-              <PillButton
-                key={cat.label}
-                label={cat.label}
-                selected={category === cat.label}
-                onPress={() => {
-                  setCategory(cat.label)
-                  setCategoryError(null)
-                }}
-              />
-            ))}
-          </View>
-          {categoryError && <Text className="text-xs text-red-500 mt-2">{categoryError}</Text>}
-        </View>
-
-        {/* Conditional: Professional fields */}
-        {isProfessional && (
-          <>
-            <TextField
-              label="Company"
-              value={company}
-              onChangeText={setCompany}
-              placeholder="Company name"
-              returnKeyType="next"
-            />
-            <TextField
-              label="Role"
-              value={role}
-              onChangeText={setRole}
-              placeholder="Job title"
-              returnKeyType="next"
-            />
-          </>
-        )}
-
-        {/* Conditional: Friend/Family birthday */}
-        {isFriendOrFamily && (
-          <TextField
-            label="Birthday"
-            value={birthday}
-            onChangeText={setBirthday}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
+        <SoftCard className="mt-6 p-4">
+          <AddTextField
+            label="Full name"
+            icon="person-outline"
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Alex Taylor"
+            autoCapitalize="words"
           />
-        )}
 
-        <TextField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="email@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-        />
-
-        <TextField
-          label="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="+1 (555) 000-0000"
-          keyboardType="phone-pad"
-          returnKeyType="next"
-        />
-
-        <TextField
-          label="How did you meet?"
-          value={howMet}
-          onChangeText={setHowMet}
-          placeholder="At a conference, through a friend…"
-          returnKeyType="next"
-        />
-
-        {/* Frequency */}
-        <View className="mb-4">
-          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 8 }}>
-            How often should you stay in touch?
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {ONBOARDING_FREQ_OPTIONS.map((opt) => (
-              <PillButton
-                key={opt.value}
-                label={opt.label}
-                selected={frequencyDays === opt.value}
-                onPress={() => setFrequencyDays(opt.value)}
-              />
-            ))}
+          <View className="mb-5">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-2 text-[15px]">
+              Relationship type
+            </Text>
+            <View className="flex-row overflow-hidden rounded-xl border border-stone-200">
+              {CATEGORIES.map((cat, index) => {
+                const selected = category === cat.label
+                return (
+                  <TouchableOpacity
+                    key={cat.label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Relationship type ${cat.label}`}
+                    onPress={() => {
+                      setCategory(cat.label)
+                      setCategoryError(null)
+                    }}
+                    className={`min-h-[56px] flex-1 flex-row items-center justify-center px-1 ${index > 0 ? "border-l border-stone-200" : ""}`}
+                    style={{ backgroundColor: selected ? colors.forest : "white" }}
+                  >
+                    <Ionicons name={cat.icon} size={20} color={selected ? "white" : colors.muted} />
+                    <Text
+                      style={{ fontFamily: fonts.medium, color: selected ? "white" : colors.ink }}
+                      className="ml-2 text-sm"
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.78}
+                    >
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+            {categoryError ? <Text className="mt-2 text-xs text-red-500">{categoryError}</Text> : null}
           </View>
-        </View>
 
-        {/* Location with Mapbox autocomplete */}
-        <View className="mb-4">
-          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 4 }}>Location</Text>
-          <View
-            className="flex-row items-center rounded-xl border bg-white px-3"
-            style={{ borderColor: "#E5E7EB", minHeight: 44 }}
-          >
-            <TextInput
-              value={location}
-              onChangeText={handleLocationChange}
-              placeholder="City, country"
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 text-sm"
-              style={{ fontFamily: fonts.body, color: colors.ink, paddingVertical: 10 }}
-              returnKeyType="next"
-            />
-            {latitude !== null ? (
-              <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
-            ) : null}
+          <View className="mb-5">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-2 text-[15px]">
+              Keep in touch
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Choose keep in touch cadence"
+              onPress={showFrequencyPicker}
+              activeOpacity={0.78}
+              className="flex-row items-center rounded-xl border border-stone-200 bg-white"
+            >
+              <View className="items-center justify-center border-r border-stone-200" style={{ width: 52, height: 50 }}>
+                <Ionicons name="calendar-outline" size={22} color={colors.forest} />
+              </View>
+              <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="flex-1 px-4 text-base">
+                {freqLabel(frequencyDays)}
+              </Text>
+              <Ionicons name="chevron-down" size={22} color={colors.muted} />
+              <View className="w-4" />
+            </TouchableOpacity>
           </View>
-          {locationSuggestions.length > 0 ? (
-            <View className="mt-1 rounded-xl border border-stone-200 bg-white shadow-lg" style={{ zIndex: 20 }}>
-              {locationSuggestions.map((suggestion, index) => (
-                <TouchableOpacity
-                  key={index}
-                  accessibilityRole="button"
-                  accessibilityLabel={suggestion.place_name}
-                  onPress={() => handleLocationSuggestionSelect(suggestion)}
-                  className={`px-4 py-3 ${index < locationSuggestions.length - 1 ? "border-b border-stone-100" : ""}`}
-                >
-                  <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="text-sm">
-                    {suggestion.place_name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+
+          <AddTextField
+            label="Phone"
+            icon="call-outline"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="(415) 555-2671"
+            keyboardType="phone-pad"
+          />
+          <AddTextField
+            label="Email"
+            icon="mail-outline"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="alex@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          {email.trim() ? (
+            <View className="-mt-2 mb-5 flex-row items-center">
+              <Ionicons name="checkmark-circle-outline" size={18} color={colors.forest} />
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="ml-2 text-sm">
+                Looks good
+              </Text>
             </View>
           ) : null}
-        </View>
+          <AddTextField
+            label="Quick note (optional)"
+            icon="chatbubble-outline"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="We met at the product launch."
+            multiline
+            maxLength={200}
+          />
+          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="-mt-4 text-right text-xs">
+            {notes.length}/200
+          </Text>
+        </SoftCard>
 
-        <TextField
-          label="Notes"
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Anything else to remember…"
-          multiline
-          numberOfLines={3}
-          returnKeyType="default"
-        />
+        <SoftCard className="mt-6">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ expanded: detailsExpanded }}
+            accessibilityLabel={detailsExpanded ? "Hide more details" : "Show more details"}
+            onPress={() => setDetailsExpanded((value) => !value)}
+            activeOpacity={0.78}
+            className="flex-row items-center p-4"
+          >
+            <View className="flex-1">
+              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-lg">
+                {detailsExpanded ? "Hide more details" : "Show more details"}
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm leading-5">
+                Birthday, location, company, how you met, tags, and more
+              </Text>
+            </View>
+            <Ionicons name={detailsExpanded ? "chevron-up" : "chevron-down"} size={24} color={colors.muted} />
+          </TouchableOpacity>
 
-        <Button title="Add person" onPress={handleSave} loading={saving} />
+          {detailsExpanded ? (
+            <View className="border-t border-stone-100 p-4">
+              <AddTextField
+                label="Birthday"
+                icon="calendar-outline"
+                value={birthday}
+                onChangeText={setBirthday}
+                placeholder="YYYY-MM-DD"
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <View className="mb-5">
+                <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-2 text-[15px]">
+                  Location
+                </Text>
+                <View className="flex-row items-center rounded-xl border border-stone-200 bg-white">
+                  <View className="items-center justify-center border-r border-stone-200" style={{ width: 52, height: 50 }}>
+                    <Ionicons name="location-outline" size={22} color={colors.forest} />
+                  </View>
+                  <TextInput
+                    accessibilityLabel="Location"
+                    value={location}
+                    onChangeText={handleLocationChange}
+                    placeholder="City, country"
+                    placeholderTextColor="#8F96A3"
+                    className="flex-1 px-4 text-base"
+                    style={{ fontFamily: fonts.body, color: colors.ink }}
+                    returnKeyType="next"
+                  />
+                  {latitude !== null ? (
+                    <View className="pr-4">
+                      <Ionicons name="checkmark-circle" size={20} color={colors.forest} />
+                    </View>
+                  ) : null}
+                </View>
+                {locationSuggestions.length > 0 ? (
+                  <View className="mt-2 rounded-xl border border-stone-200 bg-white shadow-lg" style={{ zIndex: 20 }}>
+                    {locationSuggestions.map((suggestion, index) => (
+                      <TouchableOpacity
+                        key={`${suggestion.place_name}-${index}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={suggestion.place_name}
+                        onPress={() => handleLocationSuggestionSelect(suggestion)}
+                        className={`px-4 py-3 ${index < locationSuggestions.length - 1 ? "border-b border-stone-100" : ""}`}
+                      >
+                        <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="text-sm">
+                          {suggestion.place_name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+
+              <AddTextField
+                label="Company"
+                icon="business-outline"
+                value={company}
+                onChangeText={setCompany}
+                placeholder="Company"
+              />
+              <AddTextField
+                label="Role"
+                icon="briefcase-outline"
+                value={role}
+                onChangeText={setRole}
+                placeholder="Job title"
+              />
+              <AddTextField
+                label="How we met"
+                icon="people-outline"
+                value={howMet}
+                onChangeText={setHowMet}
+                placeholder="At a conference, through a friend..."
+              />
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm leading-5">
+                Tags are created from the selected relationship type when this person is saved.
+              </Text>
+            </View>
+          ) : null}
+        </SoftCard>
       </View>
     </Screen>
   )

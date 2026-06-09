@@ -1,22 +1,291 @@
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { Alert, Text, TouchableOpacity, View } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Screen } from "@/components/Screen"
-import { Card } from "@/components/Card"
 import { Button } from "@/components/Button"
+import { Divider, IconTile, PersonAvatar, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import type { Person, Interaction, Tag } from "@/types"
-import { formatDate, formatShortDate, getNextDueDays, getFollowUpState } from "@roots/shared"
+import { colors, fonts } from "@/constants/theme"
+import { formatDate, getNextDueDays, getFollowUpState } from "@roots/shared"
+
+type ProfileTab = "Timeline" | "About" | "Notes" | "Follow-ups"
 
 type PersonTagRow = {
   tags: Tag | Tag[] | null
 }
 
+type DetailPerson = Person & {
+  photo_url?: string | null
+  avatar_url?: string | null
+  image_url?: string | null
+}
+
+type InfoRow = {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  value: string
+  actionIcon?: keyof typeof Ionicons.glyphMap
+  tone?: "green" | "purple" | "amber" | "red"
+}
+
+const PROFILE_TABS: ProfileTab[] = ["Timeline", "About", "Notes", "Follow-ups"]
+
+const toneColors = {
+  green: { color: colors.forest, background: colors.mint },
+  purple: { color: colors.purple, background: "#F0EAFB" },
+  amber: { color: colors.amber, background: "#FFF3DE" },
+  red: { color: "#CF2D2D", background: "#FEECEC" },
+}
+
 function getTagFromJoin(row: PersonTagRow): Tag | null {
   if (Array.isArray(row.tags)) return row.tags[0] ?? null
   return row.tags
+}
+
+function personImageUrl(person: Person) {
+  const maybePerson = person as DetailPerson
+  return maybePerson.photo_url ?? maybePerson.avatar_url ?? maybePerson.image_url ?? null
+}
+
+function compactDate(value: string | null | undefined) {
+  if (!value) return "Not set"
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date)
+}
+
+function displayDate(value: string | null | undefined) {
+  if (!value) return "No date"
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date)
+}
+
+function daysSince(value: string | null) {
+  if (!value) return null
+  const then = new Date(value)
+  if (Number.isNaN(then.getTime())) return null
+  return Math.max(0, Math.floor((Date.now() - then.getTime()) / 86_400_000))
+}
+
+function formatLastTalked(value: string | null) {
+  const days = daysSince(value)
+  if (days == null) return "Not yet"
+  if (days === 0) return "Today"
+  if (days === 1) return "1 day ago"
+  return `${days} days ago`
+}
+
+function formatNextAction(days: number | null) {
+  if (days == null) return "No cadence"
+  if (days < 0) return `${Math.abs(days)}d overdue`
+  if (days === 0) return "Due today"
+  if (days === 1) return "Due tomorrow"
+  return `Due in ${days}d`
+}
+
+function formatFrequency(days: number | null | undefined) {
+  if (!days) return "Not set"
+  if (days === 7) return "Every week"
+  if (days === 14) return "Every 2 weeks"
+  if (days === 30) return "Every month"
+  if (days === 90) return "Every 3 months"
+  if (days === 180) return "Every 6 months"
+  if (days === 365) return "Once a year"
+  return `Every ${days} days`
+}
+
+function interactionIcon(type: string): keyof typeof Ionicons.glyphMap {
+  const normalized = type.trim().toLowerCase()
+  if (normalized.includes("call") || normalized.includes("phone")) return "call-outline"
+  if (normalized.includes("text") || normalized.includes("message")) return "chatbubble-outline"
+  if (normalized.includes("coffee")) return "cafe-outline"
+  if (normalized.includes("meeting") || normalized.includes("meet")) return "people-outline"
+  if (normalized.includes("email")) return "mail-outline"
+  if (normalized.includes("note")) return "document-text-outline"
+  return "chatbubbles-outline"
+}
+
+function TabBar({
+  activeTab,
+  onChange,
+}: {
+  activeTab: ProfileTab
+  onChange: (tab: ProfileTab) => void
+}) {
+  return (
+    <View className="mt-5 border-b border-stone-200">
+      <View className="flex-row">
+        {PROFILE_TABS.map((tab) => {
+          const isActive = activeTab === tab
+          return (
+            <TouchableOpacity
+              key={tab}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${tab} tab`}
+              onPress={() => onChange(tab)}
+              activeOpacity={0.78}
+              className="flex-1 items-center px-1 pb-3"
+            >
+              <Text
+                style={{ fontFamily: isActive ? fonts.semibold : fonts.medium, color: isActive ? colors.forest : colors.muted }}
+                className="text-[15px]"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
+                {tab}
+              </Text>
+              <View
+                className="absolute bottom-[-1px] h-0.5 rounded-full"
+                style={{ width: 78, backgroundColor: isActive ? colors.forest : "transparent" }}
+              />
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
+function TagPill({ tag, highlighted = false }: { tag: Pick<Tag, "id" | "name">; highlighted?: boolean }) {
+  return (
+    <View
+      className="rounded-lg px-3 py-1.5"
+      style={{ backgroundColor: highlighted ? "#E9F1FF" : colors.mint }}
+    >
+      <Text
+        style={{ fontFamily: fonts.semibold, color: highlighted ? colors.blue : colors.forest }}
+        className="text-xs"
+      >
+        {tag.name}
+      </Text>
+    </View>
+  )
+}
+
+function StatStrip({
+  lastTalked,
+  nextAction,
+  interactionsCount,
+  openFollowUpsCount,
+}: {
+  lastTalked: string
+  nextAction: string
+  interactionsCount: number
+  openFollowUpsCount: number
+}) {
+  const stats = [
+    ["Last talked", lastTalked],
+    ["Next action", nextAction],
+    ["Interactions", String(interactionsCount)],
+    ["Open follow-ups", String(openFollowUpsCount)],
+  ]
+
+  return (
+    <SoftCard className="mt-5 flex-row px-2 py-4">
+      {stats.map(([label, value], index) => (
+        <View
+          key={label}
+          className={`flex-1 items-center px-1 ${index > 0 ? "border-l border-stone-200" : ""}`}
+        >
+          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-[11px]" numberOfLines={1}>
+            {label}
+          </Text>
+          <Text
+            style={{ fontFamily: fonts.semibold, color: colors.ink }}
+            className="mt-2 text-[13px]"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {value}
+          </Text>
+        </View>
+      ))}
+    </SoftCard>
+  )
+}
+
+function SectionCard({
+  icon,
+  title,
+  children,
+  onEdit,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  title: string
+  children: React.ReactNode
+  onEdit?: () => void
+}) {
+  return (
+    <SoftCard className="mb-4 p-4">
+      <View className="mb-3 flex-row items-center justify-between">
+        <View className="flex-1 flex-row items-center">
+          <IconTile icon={icon} size={36} />
+          <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="ml-3 text-lg">
+            {title}
+          </Text>
+        </View>
+        {onEdit ? (
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit ${title}`} onPress={onEdit} className="px-2 py-1">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+              Edit
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {children}
+    </SoftCard>
+  )
+}
+
+function InfoList({ rows }: { rows: InfoRow[] }) {
+  if (rows.length === 0) {
+    return <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">Nothing added yet.</Text>
+  }
+
+  return (
+    <View>
+      {rows.map((row, index) => {
+        const tone = toneColors[row.tone ?? "green"]
+        return (
+          <View key={`${row.label}-${row.value}`} className={index > 0 ? "border-t border-stone-100 pt-3 mt-3" : ""}>
+            <View className="flex-row items-center">
+              <IconTile icon={row.icon} color={tone.color} background={tone.background} size={38} />
+              <View className="ml-3 flex-1">
+                <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
+                  {row.label}
+                </Text>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                  {row.value}
+                </Text>
+              </View>
+              {row.actionIcon ? <Ionicons name={row.actionIcon} size={22} color={colors.forest} /> : null}
+            </View>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <SoftCard className="p-5">
+      <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} className="text-base">
+        {title}
+      </Text>
+      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
+        {body}
+      </Text>
+    </SoftCard>
+  )
 }
 
 export default function PersonDetailScreen() {
@@ -27,7 +296,7 @@ export default function PersonDetailScreen() {
   const [person, setPerson] = useState<Person | null>(null)
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<ProfileTab>("Timeline")
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +374,34 @@ export default function PersonDetailScreen() {
     load()
   }
 
+  const openFollowUps = useMemo(
+    () => interactions.filter((i) => i.follow_up_needed && getFollowUpState(i) !== "done"),
+    [interactions],
+  )
+
+  const noteItems = useMemo(() => {
+    const interactionNotes = interactions
+      .filter((interaction) => interaction.notes?.trim())
+      .map((interaction) => ({
+        id: interaction.id,
+        date: interaction.date,
+        notes: interaction.notes?.trim() ?? "",
+      }))
+
+    if (person?.notes?.trim()) {
+      return [
+        {
+          id: "person-notes",
+          date: person.created_at,
+          notes: person.notes.trim(),
+        },
+        ...interactionNotes,
+      ]
+    }
+
+    return interactionNotes
+  }, [interactions, person])
+
   if (loading) return <LoadingState />
 
   if (!person) {
@@ -116,176 +413,274 @@ export default function PersonDetailScreen() {
   }
 
   const nextDueDays = getNextDueDays(person)
-  const openFollowUps = interactions.filter(
-    (i) => i.follow_up_needed && getFollowUpState(i) !== "done",
-  )
+  const subtitle = [person.role, person.company].filter(Boolean).join(" at ")
+  const topTags = tags.slice(0, 3)
+  const contactRows: InfoRow[] = []
+  if (person.email) contactRows.push({ icon: "mail-outline", label: "Email", value: person.email, actionIcon: "mail-outline" })
+  if (person.phone) contactRows.push({ icon: "call-outline", label: "Phone", value: person.phone, actionIcon: "chatbubble-outline" })
+  if (person.location) contactRows.push({ icon: "location-outline", label: "Location", value: person.location, actionIcon: "map-outline" })
 
-  const detailFields = [
-    person.email != null && { label: "Email", value: person.email },
-    person.phone != null && { label: "Phone", value: person.phone },
-    person.birthday != null && { label: "Birthday", value: formatDate(person.birthday) },
-    person.how_met != null && { label: "How met", value: person.how_met },
-    person.location != null && { label: "Location", value: person.location },
-  ].filter((f): f is { label: string; value: string } => Boolean(f))
+  const personalRows: InfoRow[] = []
+  if (person.birthday) personalRows.push({ icon: "calendar-outline", label: "Birthday", value: compactDate(person.birthday), actionIcon: "chevron-forward", tone: "purple" })
+  if (person.how_met) personalRows.push({ icon: "people-outline", label: "How we met", value: person.how_met, actionIcon: "chevron-forward", tone: "amber" })
+  if (person.relationship_type) personalRows.push({ icon: "heart-outline", label: "Relationship type", value: person.relationship_type, actionIcon: "chevron-forward", tone: "red" })
+  personalRows.push({ icon: "time-outline", label: "Contact frequency", value: formatFrequency(person.contact_frequency_days), actionIcon: "chevron-forward", tone: "amber" })
 
   return (
     <Screen>
-      {/* Header row */}
-      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
-        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={showMenu} className="py-1 pl-3">
-          <Text className="text-2xl text-warm-black leading-none">...</Text>
-        </TouchableOpacity>
-      </View>
+      <View className="px-5 pt-4 pb-8">
+        <View className="flex-row items-center justify-between">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+            className="h-10 w-10 items-start justify-center"
+          >
+            <Ionicons name="arrow-back" size={26} color={colors.warmBlack} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open contact actions"
+            onPress={showMenu}
+            className="h-10 w-10 items-end justify-center"
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color={colors.warmBlack} />
+          </TouchableOpacity>
+        </View>
 
-      <View className="px-5 pb-8">
         {error != null && <ErrorBanner message={error} />}
 
-        {/* Name + role/company */}
-        <Text className="text-2xl font-bold text-warm-black mb-1">{person.name}</Text>
-        {(person.role != null || person.company != null) && (
-          <Text className="text-sm text-gray-500 mb-3">
-            {[person.role, person.company].filter(Boolean).join(" - ")}
-          </Text>
-        )}
-
-        {/* Tags */}
-        {tags.length > 0 && (
-          <View className="flex-row flex-wrap gap-2 mb-4">
-            {tags.map((tag) => (
-              <View
-                key={tag.id}
-                className="rounded-full bg-green-50 border border-green-200 px-3 py-1"
-              >
-                <Text className="text-xs font-medium text-green-700">{tag.name}</Text>
+        <View className="mt-5 flex-row items-center">
+          <PersonAvatar name={person.name} size={92} imageUrl={personImageUrl(person)} />
+          <View className="ml-4 flex-1">
+            <Text
+              style={{ fontFamily: fonts.heading, color: colors.forest }}
+              className="text-[34px] leading-[38px]"
+              adjustsFontSizeToFit
+              minimumFontScale={0.72}
+              numberOfLines={2}
+            >
+              {person.name}
+            </Text>
+            {subtitle ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-base leading-5">
+                {subtitle}
+              </Text>
+            ) : null}
+            {topTags.length > 0 ? (
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {topTags.map((tag, index) => (
+                  <TagPill key={tag.id} tag={tag} highlighted={index === 0} />
+                ))}
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* Stat cards */}
-        <View className="flex-row gap-3 mb-5">
-          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
-            <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
-              {nextDueDays === null
-                ? "-"
-                : nextDueDays < 0
-                  ? `${Math.abs(nextDueDays)}d ago`
-                  : `In ${nextDueDays}d`}
-            </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Next step</Text>
-          </View>
-          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
-            <Text className="text-sm font-bold text-warm-black" numberOfLines={1}>
-              {formatShortDate(person.last_contacted_at)}
-            </Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Last chat</Text>
-          </View>
-          <View className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center">
-            <Text className="text-sm font-bold text-warm-black">{openFollowUps.length}</Text>
-            <Text className="text-xs text-gray-500 mt-0.5">Follow-ups</Text>
+            ) : null}
           </View>
         </View>
 
-        {/* Log a chat */}
-        <Button
-          title="Log a chat"
-          onPress={() => router.push(`/people/${id}/log`)}
-          variant="primary"
+        <StatStrip
+          lastTalked={formatLastTalked(person.last_contacted_at)}
+          nextAction={formatNextAction(nextDueDays)}
+          interactionsCount={interactions.length}
+          openFollowUpsCount={openFollowUps.length}
         />
 
-        {/* Collapsible details */}
-        {detailFields.length > 0 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setDetailsExpanded((v) => !v)}
-              className="mt-5 mb-2 flex-row items-center justify-between"
-            >
-              <Text className="text-sm font-semibold text-warm-black">Details</Text>
-              <Text className="text-xs text-gray-500">{detailsExpanded ? "Hide" : "Show"}</Text>
-            </TouchableOpacity>
-            {detailsExpanded && (
-              <Card className="mb-2">
-                {detailFields.map((field, i) => (
-                  <View key={field.label} className={i > 0 ? "mt-3 pt-3 border-t border-gray-100" : ""}>
-                    <Text className="text-xs text-gray-400">{field.label}</Text>
-                    <Text className="text-sm text-warm-black mt-0.5">{field.value}</Text>
+        <TabBar activeTab={activeTab} onChange={setActiveTab} />
+
+        {activeTab === "Timeline" ? (
+          <View className="mt-6">
+            {interactions.length > 0 ? (
+              <View>
+                {interactions.slice(0, 6).map((interaction, index) => (
+                  <View key={interaction.id} className="flex-row">
+                    <View className="items-center">
+                      <IconTile icon={interactionIcon(interaction.type)} size={44} />
+                      {index < Math.min(interactions.length, 6) - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
+                    </View>
+                    <View className="ml-4 flex-1 pb-6">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+                        {displayDate(interaction.date)}  ·  {interaction.type}
+                      </Text>
+                      {interaction.notes ? (
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
+                          {interaction.notes}
+                        </Text>
+                      ) : (
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                          No notes for this interaction.
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 ))}
-              </Card>
+                <Divider />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="View all interactions"
+                  onPress={() => router.push(`/people/${id}/log`)}
+                  className="py-4"
+                >
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-base">
+                    View all interactions
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <EmptyState title="No interactions yet" body="Log a call, text, meeting, or note to start this contact's timeline." />
             )}
-          </>
-        )}
 
-        {/* Notes */}
-        {person.notes != null && (
-          <View className="mt-4">
-            <Text className="text-sm font-semibold text-warm-black mb-2">Notes</Text>
-            <Card>
-              <Text className="text-sm text-warm-black">{person.notes}</Text>
-            </Card>
+            <View className="mt-5 flex-row gap-3">
+              <View className="flex-1">
+                <Button title="Log Interaction" onPress={() => router.push(`/people/${id}/log`)} />
+              </View>
+              <View className="flex-1">
+                <Button title="Add Note" onPress={() => router.push(`/people/${id}/log`)} variant="secondary" />
+              </View>
+            </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Open follow-ups */}
-        {openFollowUps.length > 0 && (
+        {activeTab === "About" ? (
           <View className="mt-5">
-            <Text className="text-sm font-semibold text-warm-black mb-2">Follow-ups</Text>
-            {openFollowUps.map((fu) => (
-              <Card key={fu.id} className="mb-2">
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 mr-3">
-                    <Text className="text-sm font-medium text-warm-black">{fu.type}</Text>
-                    {fu.follow_up_date != null && (
-                      <Text className="text-xs text-gray-500 mt-0.5">
-                        {formatDate(fu.follow_up_date)}
+            <SectionCard icon="person-outline" title="Overview" onEdit={() => router.push(`/people/${id}/edit`)}>
+              <Text style={{ fontFamily: fonts.body, color: colors.warmBlack }} className="text-base leading-6">
+                {person.notes?.trim() || "No overview notes added yet."}
+              </Text>
+            </SectionCard>
+
+            <SectionCard icon="call-outline" title="Contact information" onEdit={() => router.push(`/people/${id}/edit`)}>
+              <InfoList rows={contactRows} />
+            </SectionCard>
+
+            <SectionCard icon="calendar-outline" title="Personal details" onEdit={() => router.push(`/people/${id}/edit`)}>
+              <InfoList rows={personalRows} />
+            </SectionCard>
+
+            <SectionCard icon="pricetag-outline" title="Additional info" onEdit={() => router.push(`/people/${id}/edit`)}>
+              {person.company || person.role ? (
+                <View className="mb-3">
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
+                    Work
+                  </Text>
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                    {[person.role, person.company].filter(Boolean).join(" at ")}
+                  </Text>
+                </View>
+              ) : null}
+              {tags.length > 0 ? (
+                <View>
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
+                    Tags
+                  </Text>
+                  <View className="mt-2 flex-row flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <TagPill key={tag.id} tag={tag} />
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                  No tags or extra work details added yet.
+                </Text>
+              )}
+            </SectionCard>
+          </View>
+        ) : null}
+
+        {activeTab === "Notes" ? (
+          <View className="mt-6">
+            <Text style={{ fontFamily: fonts.heading, color: colors.forest }} className="mb-4 text-[24px] leading-7">
+              Notes ({noteItems.length})
+            </Text>
+            {noteItems.length > 0 ? (
+              <View className="gap-4">
+                {noteItems.map((note) => (
+                  <SoftCard key={note.id} className="flex-row items-center p-4">
+                    <IconTile icon="document-text-outline" size={58} />
+                    <View className="ml-4 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+                        {displayDate(note.date)}
                       </Text>
-                    )}
-                  </View>
-                  <View className="flex-row gap-2">
-                    <TouchableOpacity
-                      onPress={() => snoozeFollowUp(fu.id)}
-                      className="bg-gray-100 rounded-lg px-2.5 py-1.5"
-                    >
-                      <Text className="text-xs text-gray-600">Snooze 7d</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => markFollowUpDone(fu.id)}
-                      className="bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5"
-                    >
-                      <Text className="text-xs font-semibold text-green-700">Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Card>
-            ))}
-          </View>
-        )}
-
-        {/* Interaction history */}
-        {interactions.length > 0 && (
-          <View className="mt-5">
-            <Text className="text-sm font-semibold text-warm-black mb-2">Your history</Text>
-            {interactions.map((interaction) => (
-              <Card key={interaction.id} className="mb-2">
-                <View className="flex-row items-center gap-2 mb-1">
-                  <Text className="text-xs font-semibold text-sage">{interaction.type}</Text>
-                  <Text className="text-xs text-gray-400">{formatDate(interaction.date)}</Text>
-                  {interaction.follow_up_needed && interaction.follow_up_status !== "done" && (
-                    <View className="rounded-full bg-amber-50 px-2 py-0.5">
-                      <Text className="text-xs text-amber-700">Follow-up</Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6" numberOfLines={3}>
+                        {note.notes}
+                      </Text>
                     </View>
-                  )}
-                </View>
-                {interaction.notes != null && (
-                  <Text className="text-sm text-warm-black">{interaction.notes}</Text>
-                )}
-              </Card>
-            ))}
+                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+                  </SoftCard>
+                ))}
+              </View>
+            ) : (
+              <EmptyState title="No notes yet" body="Notes from this contact's profile and interactions will appear here." />
+            )}
+            <View className="mt-6">
+              <Button title="Add Note" onPress={() => router.push(`/people/${id}/log`)} />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="View all interactions"
+                onPress={() => router.push(`/people/${id}/log`)}
+                className="mt-4 flex-row items-center justify-center"
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-base">
+                  View all interactions
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.forest} />
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
+        ) : null}
+
+        {activeTab === "Follow-ups" ? (
+          <View className="mt-6">
+            {openFollowUps.length > 0 ? (
+              <View className="gap-3">
+                {openFollowUps.map((fu) => (
+                  <SoftCard key={fu.id} className="p-4">
+                    <View className="flex-row items-start">
+                      <IconTile icon="flag-outline" size={42} background="#FFF3DE" color={colors.amber} />
+                      <View className="ml-3 flex-1">
+                        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+                          {fu.type}
+                        </Text>
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                          {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"}
+                        </Text>
+                        {fu.notes ? (
+                          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
+                            {fu.notes}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <View className="mt-4 flex-row gap-2">
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`Snooze ${fu.type} follow-up for 7 days`}
+                        onPress={() => snoozeFollowUp(fu.id)}
+                        className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: colors.muted }} className="text-sm">
+                          Snooze 7d
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`Mark ${fu.type} follow-up done`}
+                        onPress={() => markFollowUpDone(fu.id)}
+                        className="flex-1 items-center rounded-xl py-3"
+                        style={{ backgroundColor: colors.forest }}
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: "white" }} className="text-sm">
+                          Done
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </SoftCard>
+                ))}
+              </View>
+            ) : (
+              <EmptyState title="No open follow-ups" body="Open follow-ups from logged interactions will appear here." />
+            )}
+          </View>
+        ) : null}
       </View>
     </Screen>
   )
