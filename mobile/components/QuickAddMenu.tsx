@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,7 +21,6 @@ import { PillButton } from "@/components/PillButton"
 import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
 
 type QuickAddMode = "note" | "chat"
-type PickerStep = "search" | "form"
 
 type PersonOption = {
   id: string
@@ -31,61 +31,64 @@ type PersonOption = {
 export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+
   const [pickerMode, setPickerMode] = useState<QuickAddMode | null>(null)
-  const [pickerStep, setPickerStep] = useState<PickerStep>("search")
   const [people, setPeople] = useState<PersonOption[]>([])
   const [loadingPeople, setLoadingPeople] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // Person typeahead
   const [personSearch, setPersonSearch] = useState("")
   const [selectedPerson, setSelectedPerson] = useState<PersonOption | null>(null)
+  const [personInputFocused, setPersonInputFocused] = useState(false)
 
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+  // Chat fields
   const [interactionType, setInteractionType] = useState(INTERACTION_TYPES[0])
   const [date, setDate] = useState(todayInputValue())
   const [interactionNotes, setInteractionNotes] = useState("")
+
+  // Note fields
   const [noteText, setNoteText] = useState("")
-  const [followUpEnabled, setFollowUpEnabled] = useState(false)
-  const [followUpDate, setFollowUpDate] = useState("")
+
+  // Common
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const filteredPeople = useMemo(() => {
     const normalized = personSearch.trim().toLowerCase()
-    if (!normalized) return people
-    return people.filter(
-      (p) =>
-        p.name.toLowerCase().includes(normalized) ||
-        (p.company?.toLowerCase().includes(normalized) ?? false),
-    )
+    if (!normalized) return people.slice(0, 5)
+    return people
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(normalized) ||
+          (p.company?.toLowerCase().includes(normalized) ?? false),
+      )
+      .slice(0, 5)
   }, [people, personSearch])
 
-  function resetPickerState() {
-    setPickerStep("search")
+  const showPersonResults = personInputFocused && !selectedPerson
+
+  const resetForm = useCallback(() => {
     setPersonSearch("")
     setSelectedPerson(null)
+    setPersonInputFocused(false)
     setFormError(null)
     setSaving(false)
     setInteractionType(INTERACTION_TYPES[0])
     setDate(todayInputValue())
     setInteractionNotes("")
     setNoteText("")
-    setFollowUpEnabled(false)
-    setFollowUpDate("")
-  }
+  }, [])
 
-  function closePickerModal() {
+  function closeForm() {
     setPickerMode(null)
-    resetPickerState()
+    resetForm()
   }
 
-  async function openPersonPicker(mode: QuickAddMode) {
+  async function openForm(mode: QuickAddMode) {
     onClose()
+    resetForm()
     setPickerMode(mode)
-    setPickerStep("search")
-    setPersonSearch("")
-    setSelectedPerson(null)
-    setFormError(null)
-    setInteractionType(INTERACTION_TYPES[0])
-    setDate(todayInputValue())
     setLoadingPeople(true)
     setFetchError(null)
 
@@ -111,14 +114,11 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
     }
   }
 
-  function handlePersonSelect(person: PersonOption) {
-    setSelectedPerson(person)
-    setPickerStep("form")
-    setFormError(null)
-  }
-
   async function handleSaveInteraction() {
-    if (!selectedPerson) return
+    if (!selectedPerson) {
+      setFormError("Please select a person first")
+      return
+    }
     if (!date.trim()) {
       setFormError("Date is required")
       return
@@ -135,12 +135,12 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         p_type: interactionType,
         p_date: date.trim(),
         p_notes: interactionNotes.trim() || null,
-        p_follow_up_needed: followUpEnabled,
-        p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
+        p_follow_up_needed: false,
+        p_follow_up_date: null,
       })
       if (rpcError) throw rpcError
       await updateStreakAfterAction(supabase)
-      closePickerModal()
+      closeForm()
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save")
     } finally {
@@ -149,7 +149,10 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
   }
 
   async function handleSaveNote() {
-    if (!selectedPerson) return
+    if (!selectedPerson) {
+      setFormError("Please select a person first")
+      return
+    }
     if (!noteText.trim()) {
       setFormError("Note text is required")
       return
@@ -171,7 +174,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
       })
       if (rpcError) throw rpcError
       await updateStreakAfterAction(supabase)
-      closePickerModal()
+      closeForm()
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save note")
     } finally {
@@ -181,6 +184,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
 
   return (
     <>
+      {/* ── Action sheet ──────────────────────────────────────────── */}
       <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
         <Pressable
           className="flex-1 justify-end bg-black/45"
@@ -213,7 +217,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
               description="Log a chat, call, or meeting"
               color="#98520B"
               background="#FBF1E9"
-              onPress={() => void openPersonPicker("chat")}
+              onPress={() => void openForm("chat")}
             />
             <Divider />
             <QuickAddAction
@@ -222,7 +226,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
               description="Save a note about someone"
               color={colors.purple}
               background="#F2EEFA"
-              onPress={() => void openPersonPicker("note")}
+              onPress={() => void openForm("note")}
             />
 
             <TouchableOpacity
@@ -240,148 +244,294 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         </Pressable>
       </Modal>
 
+      {/* ── Single-step form modal ─────────────────────────────────── */}
       <Modal
         animationType="slide"
         transparent
         visible={pickerMode != null}
-        onRequestClose={closePickerModal}
+        onRequestClose={closeForm}
       >
-        <Pressable className="flex-1 justify-end bg-black/30" onPress={closePickerModal}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
           <Pressable
-            className="rounded-t-[30px] bg-white px-6 pt-6"
-            style={{ paddingBottom: Math.max(insets.bottom + 16, 32), maxHeight: "85%" }}
-            onStartShouldSetResponder={() => true}
+            style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.3)" }}
+            onPress={closeForm}
           >
-            <View className="mb-5 items-center">
-              <View className="h-1.5 w-24 rounded-full bg-stone-200" />
-            </View>
+            <Pressable
+              onStartShouldSetResponder={() => true}
+              style={{
+                backgroundColor: "white",
+                borderTopLeftRadius: 30,
+                borderTopRightRadius: 30,
+                maxHeight: "90%",
+                paddingBottom: Math.max(insets.bottom + 16, 32),
+              }}
+            >
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 }}
+              >
+                {/* Handle */}
+                <View style={{ alignItems: "center", marginBottom: 20 }}>
+                  <View style={{ height: 6, width: 96, borderRadius: 3, backgroundColor: "#E7E5E4" }} />
+                </View>
 
-            {pickerStep === "search" ? (
-              <>
-                <View className="mb-4 flex-row items-center justify-between">
-                  <View>
-                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-xl">
-                      {pickerMode === "note" ? "Add a note" : "Log a chat"}
-                    </Text>
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                      {pickerMode === "note" ? "Who is it about?" : "Who did you connect with?"}
-                    </Text>
-                  </View>
+                {/* Header */}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+                  <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 20, flex: 1 }}>
+                    {pickerMode === "note" ? "Add a note" : "Log a chat"}
+                  </Text>
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel="Close"
-                    onPress={closePickerModal}
-                    className="h-10 w-10 items-center justify-center rounded-full bg-stone-100"
+                    onPress={closeForm}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: "#F5F5F4",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
                     <Ionicons name="close" size={18} color={colors.warmBlack} />
                   </TouchableOpacity>
                 </View>
 
-                <View className="mb-4 h-11 flex-row items-center rounded-2xl border border-stone-200 bg-stone-50 px-3">
-                  <Ionicons name="search-outline" size={16} color="#60646D" />
-                  <TextInput
-                    value={personSearch}
-                    onChangeText={setPersonSearch}
-                    placeholder="Search people"
-                    placeholderTextColor="#777A83"
-                    className="ml-2 flex-1 text-sm"
-                    style={{ fontFamily: fonts.body, color: colors.ink }}
-                    autoFocus
-                    accessibilityLabel="Search people"
-                  />
-                </View>
-
-                {loadingPeople ? (
-                  <View className="py-8">
-                    <ActivityIndicator color={colors.forest} />
-                  </View>
-                ) : fetchError ? (
-                  <Text className="rounded-xl bg-red-50 px-3 py-3 text-sm text-red-700">
-                    {fetchError}
-                  </Text>
-                ) : people.length === 0 ? (
-                  <View className="rounded-2xl border border-stone-100 bg-white p-4">
-                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
-                      No people yet
-                    </Text>
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                      Add someone first, then you can log notes and chats.
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        closePickerModal()
-                        router.push("/people/new")
-                      }}
-                      className="mt-4 min-h-12 items-center justify-center rounded-xl bg-forest"
-                    >
-                      <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
-                        Add person
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : filteredPeople.length === 0 ? (
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="py-4 text-center text-sm">
-                    No people match "{personSearch}"
-                  </Text>
-                ) : (
-                  <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 320 }}>
-                    {filteredPeople.map((person) => (
-                      <TouchableOpacity
-                        key={person.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Choose ${person.name}`}
-                        onPress={() => handlePersonSelect(person)}
-                        className="mb-2 rounded-2xl border border-stone-100 bg-white px-4 py-3"
-                      >
-                        <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
-                          {person.name}
-                        </Text>
-                        {person.company ? (
-                          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
-                            {person.company}
-                          </Text>
-                        ) : null}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </>
-            ) : (
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                <View className="mb-4 flex-row items-center">
-                  <TouchableOpacity
-                    onPress={() => {
-                      setPickerStep("search")
-                      setFormError(null)
-                    }}
-                    className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-stone-100"
-                    accessibilityRole="button"
-                    accessibilityLabel="Back to person search"
-                  >
-                    <Ionicons name="arrow-back" size={18} color={colors.ink} />
-                  </TouchableOpacity>
-                  <View className="flex-1">
-                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-lg">
-                      {pickerMode === "note" ? "Add note" : "Log chat"}
-                    </Text>
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                      with {selectedPerson?.name}
-                    </Text>
-                  </View>
-                </View>
-
                 {formError ? (
-                  <Text className="mb-3 rounded-xl bg-red-50 px-3 py-3 text-sm text-red-700">
+                  <Text
+                    style={{
+                      fontFamily: fonts.body,
+                      color: "#B91C1C",
+                      fontSize: 13,
+                      backgroundColor: "#FEF2F2",
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      marginBottom: 16,
+                    }}
+                  >
                     {formError}
                   </Text>
                 ) : null}
 
+                {/* Person search */}
+                <Text
+                  style={{
+                    fontFamily: fonts.medium,
+                    color: colors.ink,
+                    fontSize: 14,
+                    marginBottom: 8,
+                  }}
+                >
+                  {pickerMode === "note" ? "Who is this about?" : "Who did you talk to?"}
+                </Text>
+
+                {selectedPerson ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: colors.mint,
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 15 }}>
+                        {selectedPerson.name}
+                      </Text>
+                      {selectedPerson.company ? (
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 1 }}>
+                          {selectedPerson.company}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear person selection"
+                      onPress={() => {
+                        setSelectedPerson(null)
+                        setPersonSearch("")
+                        setFormError(null)
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.forest} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: 4 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        height: 44,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: "#E7E5E4",
+                        backgroundColor: "#FAFAF9",
+                        paddingHorizontal: 12,
+                        marginBottom: 0,
+                      }}
+                    >
+                      {loadingPeople ? (
+                        <ActivityIndicator size="small" color={colors.forest} style={{ marginRight: 8 }} />
+                      ) : (
+                        <Ionicons name="search-outline" size={16} color="#60646D" style={{ marginRight: 8 }} />
+                      )}
+                      <TextInput
+                        value={personSearch}
+                        onChangeText={setPersonSearch}
+                        placeholder="Search by name…"
+                        placeholderTextColor="#777A83"
+                        style={{ flex: 1, fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}
+                        onFocus={() => setPersonInputFocused(true)}
+                        onBlur={() => {
+                          setTimeout(() => setPersonInputFocused(false), 150)
+                        }}
+                        accessibilityLabel="Search people"
+                      />
+                    </View>
+
+                    {showPersonResults && filteredPeople.length > 0 ? (
+                      <View
+                        style={{
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: "#E7E5E4",
+                          backgroundColor: "white",
+                          marginTop: 4,
+                          overflow: "hidden",
+                          marginBottom: 12,
+                        }}
+                      >
+                        {filteredPeople.map((person, index) => (
+                          <TouchableOpacity
+                            key={person.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Select ${person.name}`}
+                            onPress={() => {
+                              setSelectedPerson(person)
+                              setPersonSearch("")
+                              setPersonInputFocused(false)
+                              setFormError(null)
+                            }}
+                            style={{
+                              paddingHorizontal: 16,
+                              paddingVertical: 11,
+                              borderBottomWidth: index < filteredPeople.length - 1 ? 1 : 0,
+                              borderBottomColor: "#F5F5F4",
+                            }}
+                          >
+                            <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 14 }}>
+                              {person.name}
+                            </Text>
+                            {person.company ? (
+                              <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 1 }}>
+                                {person.company}
+                              </Text>
+                            ) : null}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : showPersonResults && !loadingPeople && personSearch.trim() && filteredPeople.length === 0 ? (
+                      <Text
+                        style={{
+                          fontFamily: fonts.body,
+                          color: colors.muted,
+                          fontSize: 13,
+                          marginTop: 6,
+                          marginBottom: 12,
+                        }}
+                      >
+                        No people match "{personSearch}"
+                      </Text>
+                    ) : !loadingPeople && people.length === 0 && !fetchError ? (
+                      <View
+                        style={{
+                          borderRadius: 14,
+                          borderWidth: 1,
+                          borderColor: "#E7E5E4",
+                          backgroundColor: "white",
+                          padding: 16,
+                          marginTop: 4,
+                          marginBottom: 12,
+                        }}
+                      >
+                        <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 14 }}>
+                          No people yet
+                        </Text>
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 4 }}>
+                          Add someone first, then you can log notes and chats.
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            closeForm()
+                            router.push("/people/new")
+                          }}
+                          style={{
+                            marginTop: 12,
+                            minHeight: 40,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 10,
+                            backgroundColor: colors.forest,
+                          }}
+                        >
+                          <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 13 }}>
+                            Add person
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : fetchError ? (
+                      <Text
+                        style={{
+                          fontFamily: fonts.body,
+                          color: "#B91C1C",
+                          fontSize: 13,
+                          backgroundColor: "#FEF2F2",
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          marginTop: 4,
+                          marginBottom: 12,
+                        }}
+                      >
+                        {fetchError}
+                      </Text>
+                    ) : (
+                      <View style={{ height: 16 }} />
+                    )}
+                  </View>
+                )}
+
+                {/* ── Chat-specific fields ─────────────────────── */}
                 {pickerMode === "chat" ? (
                   <>
-                    <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 text-sm">
-                      Type
+                    <Text
+                      style={{
+                        fontFamily: fonts.medium,
+                        color: colors.ink,
+                        fontSize: 14,
+                        marginBottom: 10,
+                      }}
+                    >
+                      How did you connect?
                     </Text>
-                    <View className="mb-4 flex-row flex-wrap gap-2">
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginBottom: 20,
+                      }}
+                    >
                       {INTERACTION_TYPES.map((type) => (
                         <PillButton
                           key={type}
@@ -392,8 +542,15 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                       ))}
                     </View>
 
-                    <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-1 text-sm">
-                      Date
+                    <Text
+                      style={{
+                        fontFamily: fonts.medium,
+                        color: colors.ink,
+                        fontSize: 14,
+                        marginBottom: 8,
+                      }}
+                    >
+                      When?
                     </Text>
                     <TextInput
                       value={date}
@@ -401,81 +558,118 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                       placeholder="YYYY-MM-DD"
                       placeholderTextColor="#9CA3AF"
                       keyboardType="numbers-and-punctuation"
-                      className="mb-4 rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm"
-                      style={{ fontFamily: fonts.body, color: colors.ink }}
+                      style={{
+                        fontFamily: fonts.body,
+                        color: colors.ink,
+                        fontSize: 14,
+                        borderWidth: 1,
+                        borderColor: "#E7E5E4",
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        backgroundColor: "white",
+                        marginBottom: 20,
+                      }}
+                    />
+
+                    <Text
+                      style={{
+                        fontFamily: fonts.medium,
+                        color: colors.ink,
+                        fontSize: 14,
+                        marginBottom: 8,
+                      }}
+                    >
+                      What did you talk about? (optional)
+                    </Text>
+                    <TextInput
+                      value={interactionNotes}
+                      onChangeText={setInteractionNotes}
+                      placeholder="Topics, updates, anything worth noting…"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      numberOfLines={3}
+                      style={{
+                        fontFamily: fonts.body,
+                        color: colors.ink,
+                        fontSize: 14,
+                        borderWidth: 1,
+                        borderColor: "#E7E5E4",
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        backgroundColor: "white",
+                        minHeight: 84,
+                        textAlignVertical: "top",
+                        marginBottom: 24,
+                      }}
                     />
                   </>
-                ) : null}
+                ) : (
+                  // ── Note-specific fields ──────────────────────
+                  <>
+                    <Text
+                      style={{
+                        fontFamily: fonts.medium,
+                        color: colors.ink,
+                        fontSize: 14,
+                        marginBottom: 8,
+                      }}
+                    >
+                      What do you want to note?
+                    </Text>
+                    <TextInput
+                      value={noteText}
+                      onChangeText={setNoteText}
+                      placeholder="What do you want to remember?"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      numberOfLines={4}
+                      style={{
+                        fontFamily: fonts.body,
+                        color: colors.ink,
+                        fontSize: 14,
+                        borderWidth: 1,
+                        borderColor: "#E7E5E4",
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 11,
+                        backgroundColor: "white",
+                        minHeight: 100,
+                        textAlignVertical: "top",
+                        marginBottom: 24,
+                      }}
+                    />
+                  </>
+                )}
 
-                <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-1 text-sm">
-                  {pickerMode === "note" ? "Note" : "Notes"}
-                </Text>
-                <TextInput
-                  value={pickerMode === "note" ? noteText : interactionNotes}
-                  onChangeText={pickerMode === "note" ? setNoteText : setInteractionNotes}
-                  placeholder={pickerMode === "note" ? "What do you want to remember?" : "What did you talk about?"}
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  numberOfLines={4}
-                  className="mb-4 rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm"
-                  style={{ fontFamily: fonts.body, color: colors.ink, minHeight: 96, textAlignVertical: "top" }}
-                />
-
-                {pickerMode === "chat" ? (
-                  <View className="mb-4">
-                    <View className="flex-row items-center justify-between py-2">
-                      <View className="mr-4 flex-1">
-                        <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
-                          Set a follow-up
-                        </Text>
-                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-xs">
-                          Remind yourself to follow up
-                        </Text>
-                      </View>
-                      <Switch
-                        value={followUpEnabled}
-                        onValueChange={setFollowUpEnabled}
-                        trackColor={{ false: colors.border, true: colors.sage }}
-                        thumbColor="#FFFFFF"
-                      />
-                    </View>
-                    {followUpEnabled ? (
-                      <>
-                        <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-1 text-sm">
-                          Follow-up date
-                        </Text>
-                        <TextInput
-                          value={followUpDate}
-                          onChangeText={setFollowUpDate}
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor="#9CA3AF"
-                          keyboardType="numbers-and-punctuation"
-                          className="rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm"
-                          style={{ fontFamily: fonts.body, color: colors.ink }}
-                        />
-                      </>
-                    ) : null}
-                  </View>
-                ) : null}
-
+                {/* Save button */}
                 <TouchableOpacity
                   onPress={pickerMode === "note" ? handleSaveNote : handleSaveInteraction}
                   disabled={saving}
                   activeOpacity={0.8}
-                  className="mb-2 min-h-12 items-center justify-center rounded-2xl bg-forest"
+                  style={{
+                    minHeight: 48,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 16,
+                    backgroundColor: colors.forest,
+                    opacity: saving ? 0.7 : 1,
+                    marginBottom: 4,
+                  }}
                 >
                   {saving ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={{ fontFamily: fonts.bold }} className="text-base text-white">
+                    <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 16 }}>
                       {pickerMode === "note" ? "Save note" : "Save"}
                     </Text>
                   )}
                 </TouchableOpacity>
               </ScrollView>
-            )}
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   )

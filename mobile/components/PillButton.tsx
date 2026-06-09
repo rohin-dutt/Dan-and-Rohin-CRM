@@ -12,7 +12,7 @@ export function PillButton({ label, selected, onPress }: PillButtonProps) {
       onPress={onPress}
       className={`rounded-full border px-4 py-1.5 ${
         selected
-          ? "bg-sage border-sage"
+          ? "bg-forest border-forest"
           : "bg-white border-gray-200"
       }`}
     >

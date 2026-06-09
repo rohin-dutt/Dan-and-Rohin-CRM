@@ -49,7 +49,8 @@ export default function NewPersonScreen() {
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
 
-  const [name, setName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [category, setCategory] = useState<CategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
@@ -93,8 +94,8 @@ export default function NewPersonScreen() {
   }
 
   async function handleSave() {
-    if (!name.trim()) {
-      setError("Name is required")
+    if (!firstName.trim()) {
+      setError("First name is required")
       return
     }
     if (!category) {
@@ -105,6 +106,8 @@ export default function NewPersonScreen() {
     setSaving(true)
     setError(null)
     setCategoryError(null)
+
+    const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ")
 
     try {
       const {
@@ -118,7 +121,7 @@ export default function NewPersonScreen() {
         .from("people")
         .insert({
           user_id: userId,
-          name: name.trim(),
+          name: fullName,
           email: email.trim() || null,
           phone: phone.trim() || null,
           company: company.trim() || null,
@@ -162,9 +165,9 @@ export default function NewPersonScreen() {
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">Cancel</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.sage, fontSize: 14 }}>Cancel</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-warm-black">Add person</Text>
+        <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 16 }}>Add person</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -172,17 +175,25 @@ export default function NewPersonScreen() {
         {error != null && <ErrorBanner message={error} />}
 
         <TextField
-          label="Name *"
-          value={name}
-          onChangeText={setName}
-          placeholder="Full name"
+          label="First name *"
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+        <TextField
+          label="Last name"
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name (optional)"
           autoCapitalize="words"
           returnKeyType="next"
         />
 
         {/* Category */}
         <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Relationship type *</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 8 }}>Relationship type *</Text>
           <View className="flex-row gap-2">
             {CATEGORIES.map((cat) => (
               <PillButton
@@ -260,7 +271,7 @@ export default function NewPersonScreen() {
 
         {/* Frequency */}
         <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">
+          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 8 }}>
             How often should you stay in touch?
           </Text>
           <View className="flex-row flex-wrap gap-2">
@@ -277,7 +288,7 @@ export default function NewPersonScreen() {
 
         {/* Location with Mapbox autocomplete */}
         <View className="mb-4">
-          <Text className="mb-1 text-sm font-medium text-warm-black">Location</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 4 }}>Location</Text>
           <View
             className="flex-row items-center rounded-xl border bg-white px-3"
             style={{ borderColor: "#E5E7EB", minHeight: 44 }}

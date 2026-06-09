@@ -32,6 +32,13 @@ type LocationGroup = {
   people: MapPerson[]
 }
 
+type MapRegion = {
+  latitude: number
+  longitude: number
+  latitudeDelta: number
+  longitudeDelta: number
+}
+
 function locationKey(person: MapPerson) {
   const latitude = Number(person.latitude)
   const longitude = Number(person.longitude)
@@ -62,7 +69,33 @@ function buildGroups(people: MapPerson[]): LocationGroup[] {
   return [...groups.values()].sort((a, b) => b.people.length - a.people.length)
 }
 
-function getInitialRegion() {
+function computeFitRegion(groups: LocationGroup[]): MapRegion | null {
+  if (groups.length === 0) return null
+  if (groups.length === 1) {
+    return {
+      latitude: groups[0].latitude,
+      longitude: groups[0].longitude,
+      latitudeDelta: 5,
+      longitudeDelta: 5,
+    }
+  }
+  const lats = groups.map((g) => g.latitude)
+  const lngs = groups.map((g) => g.longitude)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const latDelta = Math.max((maxLat - minLat) * 1.4, 2)
+  const lngDelta = Math.max((maxLng - minLng) * 1.4, 2)
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: latDelta,
+    longitudeDelta: lngDelta,
+  }
+}
+
+function getDefaultRegion(): MapRegion {
   return {
     latitude: 20,
     longitude: 0,
@@ -81,6 +114,7 @@ export default function RootsMapScreen() {
   const [query, setQuery] = useState("")
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
   const [geocodeSuggestions, setGeocodeSuggestions] = useState<MapboxFeature[]>([])
+  const [mapInitialRegion, setMapInitialRegion] = useState<MapRegion>(getDefaultRegion())
 
   const load = useCallback(async () => {
     try {
@@ -97,7 +131,12 @@ export default function RootsMapScreen() {
         .order("name", { ascending: true })
 
       if (peopleError) throw peopleError
-      setPeople(data ?? [])
+      const loaded = data ?? []
+      setPeople(loaded)
+
+      const initialGroups = buildGroups(loaded)
+      const fitRegion = computeFitRegion(initialGroups)
+      if (fitRegion) setMapInitialRegion(fitRegion)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load your roots.")
     } finally {
@@ -230,7 +269,7 @@ export default function RootsMapScreen() {
           <MapView
             ref={mapRef}
             style={{ flex: 1 }}
-            initialRegion={getInitialRegion()}
+            initialRegion={mapInitialRegion}
             showsUserLocation={false}
             showsMyLocationButton={false}
             accessibilityLabel="Map of saved Roots locations"
@@ -240,9 +279,11 @@ export default function RootsMapScreen() {
               <Marker
                 key={group.key}
                 coordinate={{ latitude: group.latitude, longitude: group.longitude }}
+                tracksViewChanges={false}
                 onPress={() => setSelectedGroupKey(group.key)}
               >
                 <View
+                  pointerEvents="none"
                   className="h-10 w-10 items-center justify-center rounded-full border-[3px] border-white shadow-lg"
                   style={{ backgroundColor: selectedGroupKey === group.key ? colors.amber : colors.forest }}
                 >

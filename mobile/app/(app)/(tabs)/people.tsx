@@ -2,8 +2,11 @@ import { useCallback, useMemo, useState } from "react"
 import {
   ActionSheetIOS,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   Share,
   Text,
   TextInput,
@@ -71,6 +74,7 @@ function matchesStatusFilter(person: Person, filter: string | null): boolean {
   const days = getNextDueDays(person)
   if (filter === "overdue") return days != null && days <= 0
   if (filter === "due_this_week") return days != null && days >= 1 && days <= 7
+  if (filter === "follow_up") return days != null && days <= 7
   if (filter === "coming_up") return days != null && days >= 8
   if (filter === "not_contacted") return person.last_contacted_at == null
   return true
@@ -391,6 +395,7 @@ export default function PeopleScreen() {
         visible={filterSheetVisible}
         activeFilter={activeFilter}
         locationFilter={locationFilter}
+        people={people}
         onSelectFilter={setActiveFilter}
         onLocationChange={setLocationFilter}
         onClose={() => setFilterSheetVisible(false)}
@@ -403,6 +408,7 @@ function FilterSheet({
   visible,
   activeFilter,
   locationFilter,
+  people,
   onSelectFilter,
   onLocationChange,
   onClose,
@@ -410,101 +416,170 @@ function FilterSheet({
   visible: boolean
   activeFilter: string | null
   locationFilter: string
+  people: Person[]
   onSelectFilter: (filter: string | null) => void
   onLocationChange: (text: string) => void
   onClose: () => void
 }) {
   const insets = useSafeAreaInsets()
 
+  const availableLocations = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const person of people) {
+      const loc = person.location?.trim()
+      if (loc && !seen.has(loc.toLowerCase())) {
+        seen.add(loc.toLowerCase())
+        result.push(loc)
+      }
+    }
+    return result.sort()
+  }, [people])
+
+  const filteredLocations = useMemo(() => {
+    if (!locationFilter.trim()) return availableLocations
+    const normalized = locationFilter.trim().toLowerCase()
+    return availableLocations.filter((loc) => loc.toLowerCase().includes(normalized))
+  }, [availableLocations, locationFilter])
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        className="flex-1 justify-end bg-black/40"
-        onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss filter sheet"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
         <Pressable
-          className="rounded-t-[30px] bg-white px-6 pt-5"
-          style={{ paddingBottom: Math.max(insets.bottom + 20, 36) }}
-          onStartShouldSetResponder={() => true}
+          style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss filter sheet"
         >
-          <View className="mb-5 items-center">
-            <View className="h-1.5 w-20 rounded-full bg-stone-200" />
-          </View>
-          <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="mb-4 text-xl">
-            Filter
-          </Text>
-
-          {STATUS_FILTERS.map((option) => (
-            <TouchableOpacity
-              key={option.key}
-              accessibilityRole="button"
-              accessibilityLabel={option.label}
-              onPress={() => onSelectFilter(activeFilter === option.key ? null : option.key)}
-              className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
-                activeFilter === option.key ? "border-forest bg-forest" : "border-stone-200 bg-white"
-              }`}
+          <Pressable
+            style={{
+              backgroundColor: "white",
+              borderTopLeftRadius: 30,
+              borderTopRightRadius: 30,
+              paddingBottom: Math.max(insets.bottom + 20, 36),
+            }}
+            onStartShouldSetResponder={() => true}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 }}
             >
-              <Text
-                style={{ fontFamily: fonts.medium }}
-                className={`text-sm ${activeFilter === option.key ? "text-white" : "text-warm-black"}`}
-              >
-                {option.label}
+              <View className="mb-5 items-center">
+                <View className="h-1.5 w-20 rounded-full bg-stone-200" />
+              </View>
+              <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="mb-4 text-xl">
+                Filter
               </Text>
-              {activeFilter === option.key ? (
-                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+
+              {STATUS_FILTERS.map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={option.label}
+                  onPress={() => onSelectFilter(activeFilter === option.key ? null : option.key)}
+                  className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
+                    activeFilter === option.key ? "border-forest bg-forest" : "border-stone-200 bg-white"
+                  }`}
+                >
+                  <Text
+                    style={{ fontFamily: fonts.medium }}
+                    className={`text-sm ${activeFilter === option.key ? "text-white" : "text-warm-black"}`}
+                  >
+                    {option.label}
+                  </Text>
+                  {activeFilter === option.key ? (
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+
+              <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
+                Filter by location
+              </Text>
+              <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
+                <Ionicons name="location-outline" size={16} color="#60646D" />
+                <TextInput
+                  value={locationFilter}
+                  onChangeText={onLocationChange}
+                  placeholder="City, country…"
+                  placeholderTextColor="#777A83"
+                  className="ml-2 flex-1 text-sm"
+                  style={{ fontFamily: fonts.body, color: colors.ink }}
+                />
+                {locationFilter ? (
+                  <TouchableOpacity onPress={() => onLocationChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={16} color={colors.muted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {filteredLocations.length > 0 ? (
+                <View className="mt-2 overflow-hidden rounded-xl border border-stone-200 bg-white">
+                  {filteredLocations.map((loc, index) => (
+                    <TouchableOpacity
+                      key={loc}
+                      accessibilityRole="button"
+                      accessibilityLabel={loc}
+                      onPress={() => onLocationChange(loc)}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        backgroundColor: locationFilter === loc ? colors.mint : "white",
+                        borderBottomWidth: index < filteredLocations.length - 1 ? 1 : 0,
+                        borderBottomColor: "#F5F5F4",
+                      }}
+                    >
+                      <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }} numberOfLines={1}>
+                        {loc}
+                      </Text>
+                      {locationFilter === loc ? (
+                        <Ionicons name="checkmark" size={16} color={colors.forest} />
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : locationFilter.trim() && availableLocations.length > 0 ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-2">
+                  No saved locations match "{locationFilter}"
+                </Text>
               ) : null}
-            </TouchableOpacity>
-          ))}
 
-          <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
-            Filter by location
-          </Text>
-          <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
-            <Ionicons name="location-outline" size={16} color="#60646D" />
-            <TextInput
-              value={locationFilter}
-              onChangeText={onLocationChange}
-              placeholder="City, country…"
-              placeholderTextColor="#777A83"
-              className="ml-2 flex-1 text-sm"
-              style={{ fontFamily: fonts.body, color: colors.ink }}
-            />
-            {locationFilter ? (
-              <TouchableOpacity onPress={() => onLocationChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={16} color={colors.muted} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          <View className="mt-5 flex-row gap-3">
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Clear filters"
-              onPress={() => {
-                onSelectFilter(null)
-                onLocationChange("")
-              }}
-              className="min-h-11 flex-1 items-center justify-center rounded-xl border border-stone-200"
-            >
-              <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
-                Clear
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Apply filters"
-              onPress={onClose}
-              className="min-h-11 flex-1 items-center justify-center rounded-xl bg-forest"
-            >
-              <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
-                Done
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <View className="mt-5 flex-row gap-3">
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear filters"
+                  onPress={() => {
+                    onSelectFilter(null)
+                    onLocationChange("")
+                  }}
+                  className="min-h-11 flex-1 items-center justify-center rounded-xl border border-stone-200"
+                >
+                  <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
+                    Clear
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Apply filters"
+                  onPress={onClose}
+                  className="min-h-11 flex-1 items-center justify-center rounded-xl bg-forest"
+                >
+                  <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
+                    Done
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

@@ -236,7 +236,7 @@ export default function DashboardScreen() {
             <SectionTitle
               title="People to follow up with"
               actionLabel="View all"
-              onAction={() => router.push("/people")}
+              onAction={() => router.push("/people?status=follow_up")}
             />
             {dashboard.followUps.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
@@ -268,11 +268,6 @@ export default function DashboardScreen() {
                       ) : null}
                       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                         {formatLastTalked(person.last_contacted_at)}
-                      </Text>
-                    </View>
-                    <View className="mr-3 max-w-[34%] rounded-xl bg-mint px-4 py-3">
-                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-sm leading-5">
-                        {person.notes?.trim() || "Check in and see how things are going."}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={24} color={colors.muted} />
@@ -395,18 +390,23 @@ function MetricCard({
       accessibilityLabel={label}
       className="flex-1"
     >
-      <SoftCard className="min-h-16 flex-row items-center justify-center px-3 py-3">
-        <View className="mr-2 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
-          <Ionicons name={icon} size={20} color={toneColors.icon} />
+      <SoftCard className="items-center px-2 py-3">
+        <View
+          className="mb-1.5 h-8 w-8 items-center justify-center rounded-full"
+          style={{ backgroundColor: toneColors.bg }}
+        >
+          <Ionicons name={icon} size={16} color={toneColors.icon} />
         </View>
-        <View>
-          <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl leading-6">
-            {value}
-          </Text>
-          <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-xs">
-            {label}
-          </Text>
-        </View>
+        <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl leading-6">
+          {value}
+        </Text>
+        <Text
+          style={{ fontFamily: fonts.body, color: colors.ink }}
+          className="mt-0.5 text-center text-[10px] leading-3"
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
       </SoftCard>
     </TouchableOpacity>
   )
