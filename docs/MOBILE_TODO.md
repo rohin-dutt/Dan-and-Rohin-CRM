@@ -107,6 +107,10 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
   - Plan: add a single `restore_crm_snapshot(payload jsonb,
     replace_existing boolean)` RPC and move destructive restore through one
     transaction before mobile launch.
+- [x] Design note storage separately from logged touch points.
+  - Notes now use a dedicated user-owned `person_notes` table. Logged
+    `interactions` remain real touch points for last-contacted, follow-ups,
+    streaks, dashboard stats, and counters.
 - [x] Design mobile export/import API shape if the web file flows are not
       reused directly.
   - Mobile trusted APIs reuse the web JSON export, contacts import, and
@@ -230,6 +234,9 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 - [ ] Dashboard sections: overdue, due soon, coming up, recent, neglected.
 - [ ] Dashboard birthday reminders.
+- [x] Dashboard upcoming moments.
+  - Home now shows birthdays plus user-created important moments within the
+    next 14 days, sorted by closest upcoming date.
 - [ ] People search.
 - [ ] People filters.
 - [ ] People sort.
@@ -286,7 +293,11 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [x] Add notification preferences to Settings.
   - Mobile Settings now exposes follow-up and birthday push preferences backed
     by the `settings` push columns.
-- [ ] Build trusted sender for due follow-ups and birthdays.
+- [ ] Build trusted sender for due follow-ups, birthdays, and important
+      moments.
+  - Schema now supports `notification_deliveries.kind = 'important_moment'`
+    and mobile can store important moments. Scheduled delivery still requires
+    trusted sender/cron implementation and deployment configuration.
 - [ ] Add delivery logging or idempotency protection.
 - [ ] Add timezone handling.
 - [ ] Add quiet-hours or send-window behavior if approved.
@@ -307,7 +318,8 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Decide whether cached private data is encrypted at rest.
 - [ ] Define retention window and maximum cached history.
 - [ ] Define cache schema versioning and migration approach.
-- [ ] Cache people, tags, person_tags, interactions, and settings.
+- [ ] Cache people, tags, person_tags, touch-point interactions,
+      person_notes, and settings.
 - [ ] Derive dashboard/follow-up data locally from cache.
 - [ ] Show offline and stale indicators.
 - [ ] Allow app launch while offline with cached data.

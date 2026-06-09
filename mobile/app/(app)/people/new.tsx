@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { Alert, Text, TextInput, TouchableOpacity, View, type AlertButton } from "react-native"
+import { Alert, Switch, Text, TextInput, TouchableOpacity, View, type AlertButton } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
@@ -17,6 +17,7 @@ const CATEGORIES = [
 ] as const
 
 type CategoryLabel = (typeof CATEGORIES)[number]["label"]
+type MomentDraft = { label: string; date: string; recurs_yearly: boolean }
 
 async function getOrCreateTag(
   userId: string,
@@ -126,6 +127,7 @@ export default function NewPersonScreen() {
   const [longitude, setLongitude] = useState<number | null>(null)
   const [locationSuggestions, setLocationSuggestions] = useState<MapboxFeature[]>([])
   const [notes, setNotes] = useState("")
+  const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
 
   const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -166,6 +168,20 @@ export default function NewPersonScreen() {
     )
   }
 
+  function addImportantMoment() {
+    setImportantMoments((current) => [...current, { label: "", date: "", recurs_yearly: true }])
+  }
+
+  function updateImportantMoment(index: number, patch: Partial<MomentDraft>) {
+    setImportantMoments((current) =>
+      current.map((moment, momentIndex) => (momentIndex === index ? { ...moment, ...patch } : moment)),
+    )
+  }
+
+  function removeImportantMoment(index: number) {
+    setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
+  }
+
   async function handleSave() {
     const cleanName = fullName.trim().replace(/\s+/g, " ")
     if (!cleanName) {
@@ -174,6 +190,14 @@ export default function NewPersonScreen() {
     }
     if (!category) {
       setCategoryError("Choose Friend, Family, or Professional.")
+      return
+    }
+    const cleanMoments = importantMoments
+      .map((moment) => ({ ...moment, label: moment.label.trim(), date: moment.date.trim() }))
+      .filter((moment) => moment.label || moment.date)
+    const invalidMoment = cleanMoments.find((moment) => !moment.label || !/^\d{4}-\d{2}-\d{2}$/.test(moment.date))
+    if (invalidMoment) {
+      setError("Important moments need a label and date in YYYY-MM-DD format.")
       return
     }
 
@@ -222,6 +246,19 @@ export default function NewPersonScreen() {
               .insert({ person_id: person.id, tag_id: tagId })
           }
         }
+      }
+
+      if (person && cleanMoments.length > 0) {
+        const { error: momentsError } = await supabase.from("important_moments").insert(
+          cleanMoments.map((moment) => ({
+            user_id: userId,
+            person_id: person.id,
+            label: moment.label,
+            date: moment.date,
+            recurs_yearly: moment.recurs_yearly,
+          })),
+        )
+        if (momentsError) throw momentsError
       }
 
       router.back()
@@ -423,6 +460,65 @@ export default function NewPersonScreen() {
                 placeholder="YYYY-MM-DD"
                 keyboardType="numbers-and-punctuation"
               />
+
+              <View className="mb-5">
+                <View className="mb-3 flex-row items-center justify-between">
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-[15px]">
+                    Important moments
+                  </Text>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add important moment" onPress={addImportantMoment}>
+                    <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+                      Add
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {importantMoments.length === 0 ? (
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm leading-5">
+                    Add dates like an anniversary or graduation.
+                  </Text>
+                ) : (
+                  importantMoments.map((moment, index) => (
+                    <View key={index} className="mb-3 rounded-xl border border-stone-200 bg-white p-3">
+                      <View className="flex-row items-center justify-between">
+                        <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} className="text-sm">
+                          Moment {index + 1}
+                        </Text>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove important moment" onPress={() => removeImportantMoment(index)}>
+                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                        </TouchableOpacity>
+                      </View>
+                      <TextInput
+                        value={moment.label}
+                        onChangeText={(text) => updateImportantMoment(index, { label: text })}
+                        placeholder="Anniversary, graduation..."
+                        placeholderTextColor="#8F96A3"
+                        className="mt-3 rounded-xl border border-stone-200 px-3 py-3 text-sm"
+                        style={{ fontFamily: fonts.body, color: colors.ink }}
+                      />
+                      <TextInput
+                        value={moment.date}
+                        onChangeText={(text) => updateImportantMoment(index, { date: text })}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor="#8F96A3"
+                        keyboardType="numbers-and-punctuation"
+                        className="mt-2 rounded-xl border border-stone-200 px-3 py-3 text-sm"
+                        style={{ fontFamily: fonts.body, color: colors.ink }}
+                      />
+                      <View className="mt-3 flex-row items-center justify-between">
+                        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-sm">
+                          Repeat yearly
+                        </Text>
+                        <Switch
+                          value={moment.recurs_yearly}
+                          onValueChange={(value) => updateImportantMoment(index, { recurs_yearly: value })}
+                          trackColor={{ false: colors.border, true: colors.sage }}
+                          thumbColor="#FFFFFF"
+                        />
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
 
               <View className="mb-5">
                 <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-2 text-[15px]">

@@ -1,4 +1,4 @@
-import type { Person, Interaction } from "./types.ts";
+import type { ImportantMoment, Person, Interaction } from "./types.ts";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -55,6 +55,11 @@ export function shouldTouchLastContacted(
   return interactionDate >= current;
 }
 
+export function isTouchPoint(interaction: { is_touch_point?: boolean; type?: string | null }): boolean {
+  if (interaction.is_touch_point === false) return false;
+  return String(interaction.type ?? "").trim().toLowerCase() !== "note";
+}
+
 export function pluralize(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
@@ -102,6 +107,7 @@ export function categorizePeople(
 } {
   const followUpByPerson = new Map<string, string>();
   for (const interaction of interactions) {
+    if (!isTouchPoint(interaction)) continue;
     if (!interaction.follow_up_needed || !interaction.follow_up_date) continue;
     const status = interaction.follow_up_status ?? "open";
     if (status === "done" || status === "snoozed") continue;
@@ -173,31 +179,32 @@ export function getFollowUpState(
   return "due";
 }
 
-export function getFollowUpQueue(
-  interactions: Interaction[],
+export function getFollowUpQueue<T extends Interaction>(
+  interactions: T[],
   todayValue: Date = new Date()
 ): {
-  overdue: Interaction[];
-  due_today: Interaction[];
-  due: Interaction[];
-  snoozed: Interaction[];
-  done: Interaction[];
+  overdue: T[];
+  due_today: T[];
+  due: T[];
+  snoozed: T[];
+  done: T[];
 } {
   const queue = {
-    overdue: [] as Interaction[],
-    due_today: [] as Interaction[],
-    due: [] as Interaction[],
-    snoozed: [] as Interaction[],
-    done: [] as Interaction[],
+    overdue: [] as T[],
+    due_today: [] as T[],
+    due: [] as T[],
+    snoozed: [] as T[],
+    done: [] as T[],
   };
 
   for (const interaction of interactions) {
+    if (!isTouchPoint(interaction)) continue;
     if (!interaction.follow_up_needed) continue;
     const state = getFollowUpState(interaction, todayValue);
     queue[state as keyof typeof queue].push(interaction);
   }
 
-  const byDate = (a: Interaction, b: Interaction) =>
+  const byDate = (a: T, b: T) =>
     String(a.follow_up_date ?? a.follow_up_snoozed_until ?? a.date).localeCompare(
       String(b.follow_up_date ?? b.follow_up_snoozed_until ?? b.date)
     );
@@ -236,6 +243,98 @@ export function getBirthdayReminders(
     .sort((a, b) => a.daysUntil - b.daysUntil);
 }
 
+export type UpcomingMomentItem =
+  | {
+      id: string;
+      kind: "birthday";
+      person: Person;
+      label: "Birthday";
+      sourceDate: string;
+      nextDate: Date;
+      daysUntil: number;
+    }
+  | {
+      id: string;
+      kind: "important_moment";
+      person: Person;
+      moment: ImportantMoment;
+      label: string;
+      sourceDate: string;
+      nextDate: Date;
+      daysUntil: number;
+    };
+
+function nextMomentDate(
+  sourceDateValue: string | Date | null | undefined,
+  todayValue: Date,
+  recursYearly: boolean
+): { nextDate: Date; daysUntil: number } | null {
+  const sourceDate = toDay(sourceDateValue);
+  const today = toDay(todayValue);
+  if (!sourceDate || !today) return null;
+
+  let nextDate = recursYearly
+    ? new Date(today.getFullYear(), sourceDate.getMonth(), sourceDate.getDate())
+    : new Date(sourceDate);
+
+  if (recursYearly && nextDate < today) {
+    nextDate = new Date(today.getFullYear() + 1, sourceDate.getMonth(), sourceDate.getDate());
+  }
+
+  const daysUntil = Math.ceil((nextDate.getTime() - today.getTime()) / MS_PER_DAY);
+  if (daysUntil < 0) return null;
+  return { nextDate, daysUntil };
+}
+
+export function getUpcomingMoments(
+  people: Person[],
+  importantMoments: ImportantMoment[] = [],
+  todayValue: Date = new Date(),
+  windowDays = 14
+): UpcomingMomentItem[] {
+  const peopleById = new Map(people.map((person) => [person.id, person]));
+  const birthdayItems = people
+    .filter((person) => person.birthday)
+    .map((person) => {
+      const next = nextMomentDate(person.birthday, todayValue, true);
+      if (!next || next.daysUntil > windowDays) return null;
+      return {
+        id: `birthday-${person.id}`,
+        kind: "birthday" as const,
+        person,
+        label: "Birthday" as const,
+        sourceDate: person.birthday ?? "",
+        nextDate: next.nextDate,
+        daysUntil: next.daysUntil,
+      };
+    })
+    .filter((item): item is Extract<UpcomingMomentItem, { kind: "birthday" }> => item !== null);
+
+  const customItems = importantMoments
+    .map((moment) => {
+      const person = peopleById.get(moment.person_id);
+      if (!person) return null;
+      const next = nextMomentDate(moment.date, todayValue, moment.recurs_yearly);
+      if (!next || next.daysUntil > windowDays) return null;
+      return {
+        id: moment.id,
+        kind: "important_moment" as const,
+        person,
+        moment,
+        label: moment.label,
+        sourceDate: moment.date,
+        nextDate: next.nextDate,
+        daysUntil: next.daysUntil,
+      };
+    })
+    .filter((item): item is Extract<UpcomingMomentItem, { kind: "important_moment" }> => item !== null);
+
+  return [...birthdayItems, ...customItems].sort((a, b) => {
+    if (a.daysUntil !== b.daysUntil) return a.daysUntil - b.daysUntil;
+    return a.person.name.localeCompare(b.person.name, undefined, { sensitivity: "base" });
+  });
+}
+
 export function getNeedsAttention(people: Person[]): Person | null {
   let mostOverdue: Person | null = null;
   let minDays = 0;
@@ -256,6 +355,7 @@ export function getMostContacted(
   if (!interactions.length) return null;
   const counts = new Map<string, number>();
   for (const interaction of interactions) {
+    if (!isTouchPoint(interaction)) continue;
     counts.set(interaction.person_id, (counts.get(interaction.person_id) ?? 0) + 1);
   }
   let maxCount = 0;
@@ -285,7 +385,7 @@ export function getTotalContacts(people: Person[]): number {
 }
 
 export function getTotalInteractions(interactions: Interaction[]): number {
-  return interactions.length;
+  return interactions.filter(isTouchPoint).length;
 }
 
 export function normalizeContactText(value: unknown): string {

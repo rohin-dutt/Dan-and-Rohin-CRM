@@ -18,7 +18,7 @@
       "buildNumber": "2026060201",
       "infoPlist": {
         "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
-        "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up and birthday reminders."
+        "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up, birthday, and important moment reminders."
       },
       "privacyManifests": {
         "NSPrivacyCollectedDataTypes": [],

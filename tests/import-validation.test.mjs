@@ -49,6 +49,17 @@ test("import validation accepts exported people, tags, interactions, and person 
           created_at: "2026-05-13T00:00:00.000Z",
         },
       ],
+      person_notes: [
+        {
+          id: "note-1",
+          user_id: "source-user",
+          person_id: "person-1",
+          body: "Imported note",
+          note_date: "2026-05-13",
+          created_at: "2026-05-13T00:00:00.000Z",
+          updated_at: "2026-05-13T00:00:00.000Z",
+        },
+      ],
       person_tags: [{ person_id: "person-1", tag_id: "tag-1" }],
     })
   );
@@ -56,7 +67,29 @@ test("import validation accepts exported people, tags, interactions, and person 
   assert.equal(payload.people?.[0]?.name, "Imported Person");
   assert.equal(payload.tags?.[0]?.name, "Imported Tag");
   assert.equal(payload.interactions?.[0]?.person_id, "person-1");
+  assert.equal(payload.person_notes?.[0]?.body, "Imported note");
   assert.equal(payload.person_tags?.[0]?.tag_id, "tag-1");
+});
+
+test("import validation accepts older exports without person notes", () => {
+  const payload = parsePersonalCrmExport(
+    JSON.stringify({
+      people: [
+        {
+          id: "person-1",
+          user_id: "source-user",
+          name: "Imported Person",
+          contact_frequency_days: 30,
+          created_at: "2026-05-13T00:00:00.000Z",
+        },
+      ],
+      tags: [],
+      interactions: [],
+      person_tags: [],
+    })
+  );
+
+  assert.deepEqual(payload.person_notes, []);
 });
 
 test("import validation rejects files missing required top-level arrays", () => {
@@ -138,6 +171,29 @@ test("import validation rejects malformed nested records", () => {
         })
       ),
     /unknown person/
+  );
+
+  assert.throws(
+    () =>
+      parsePersonalCrmExport(
+        JSON.stringify({
+          people: [],
+          tags: [],
+          interactions: [],
+          person_notes: [
+            {
+              id: "note-1",
+              user_id: "source-user",
+              person_id: "missing-person",
+              body: "Imported note",
+              created_at: "2026-05-13T00:00:00.000Z",
+              updated_at: "2026-05-13T00:00:00.000Z",
+            },
+          ],
+          person_tags: [],
+        })
+      ),
+    /note for an unknown person/
   );
 
   assert.throws(

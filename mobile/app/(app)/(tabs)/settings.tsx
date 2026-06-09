@@ -189,7 +189,10 @@ export default function SettingsScreen() {
     if (!settings) return
     setToggling(true)
     try {
-      const currentlyOn = settings.push_followups_enabled || settings.push_birthdays_enabled
+      const currentlyOn =
+        settings.push_followups_enabled ||
+        settings.push_birthdays_enabled ||
+        settings.push_important_moments_enabled
       if (currentlyOn) {
         await revokePushToken()
       } else {
@@ -198,6 +201,7 @@ export default function SettingsScreen() {
       await updateSettingsPatch({
         push_followups_enabled: !currentlyOn,
         push_birthdays_enabled: !currentlyOn,
+        push_important_moments_enabled: !currentlyOn,
       })
       setOk("Push notification settings updated.")
     } catch (e) {
@@ -315,7 +319,11 @@ export default function SettingsScreen() {
 
   if (loading) return <LoadingState />
 
-  const pushOn = Boolean(settings?.push_followups_enabled || settings?.push_birthdays_enabled)
+  const pushOn = Boolean(
+    settings?.push_followups_enabled ||
+      settings?.push_birthdays_enabled ||
+      settings?.push_important_moments_enabled,
+  )
   const emailDigestOn = Boolean(settings?.email_reminders_enabled)
 
   return (
@@ -419,7 +427,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="notifications-outline"
             title="Push notifications"
-            description="Follow-ups and birthdays"
+            description="Follow-ups, birthdays, and important moments"
             value={pushOn ? "On" : "Off"}
             disabled={toggling || !settings}
             onPress={togglePushNotifications}
@@ -432,6 +440,20 @@ export default function SettingsScreen() {
             value={emailDigestOn ? "On" : "Off"}
             disabled={toggling || !settings}
             onPress={toggleEmailDigest}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Invite a Friend" subtitle="Share Roots with someone who would use it.">
+          <SettingsRow
+            icon="share-outline"
+            title="Invite a friend"
+            description="Send the current Roots website link"
+            onPress={() =>
+              Share.share({
+                message:
+                  "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it - check it out at https://useroots.app",
+              }).catch(() => null)
+            }
           />
         </SettingsSection>
 

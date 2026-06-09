@@ -1,13 +1,8 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ActionSheetIOS,
   FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
-  Share,
   Text,
   TextInput,
   TouchableOpacity,
@@ -15,15 +10,16 @@ import {
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, PersonAvatar, SearchBox, SoftCard, StatusDot } from "@/components/RootsUI"
+import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import type { Interaction, Person, PersonTag, Tag } from "@/types"
+import { loadImportantMomentsForUser } from "@/lib/important-moments"
+import type { ImportantMoment, Interaction, Person, PersonTag, Tag } from "@/types"
 import { colors, fonts } from "@/constants/theme"
-import { formatDate, getNextDueDays, getRelationshipStatus } from "@roots/shared"
+import { formatDate, getNextDueDays, getRelationshipStatus, getUpcomingMoments, isTouchPoint } from "@roots/shared"
 
 type SortKey = "last_contacted" | "name" | "most_contacted" | "recently_added"
 type CategoryFilter = "All" | "Friends" | "Family" | "Professional"
@@ -37,7 +33,7 @@ const CATEGORIES: Array<{ label: CategoryFilter; icon: keyof typeof Ionicons.gly
 
 const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: "last_contacted", label: "Last Contacted" },
-  { key: "name", label: "Name A–Z" },
+  { key: "name", label: "Sort by First Name" },
   { key: "most_contacted", label: "Most Contacted" },
   { key: "recently_added", label: "Recently Added" },
 ]
@@ -53,11 +49,18 @@ function normalize(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? ""
 }
 
+function parseMultiParam(value: string | string[] | undefined): string[] {
+  const raw = Array.isArray(value) ? value.join(",") : value ?? ""
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 function matchesSearch(person: Person, rawQuery: string) {
   const query = rawQuery.trim().toLowerCase()
   if (!query) return true
-  return [person.name, person.company, person.role, person.location, person.relationship_type]
-    .some((value) => normalize(value).includes(query))
+  return normalize(person.name).includes(query)
 }
 
 function matchesCategory(person: Person, category: CategoryFilter) {
@@ -69,15 +72,17 @@ function matchesCategory(person: Person, category: CategoryFilter) {
   )
 }
 
-function matchesStatusFilter(person: Person, filter: string | null): boolean {
-  if (!filter) return true
+function matchesStatusFilter(person: Person, filters: string[]): boolean {
+  if (filters.length === 0) return true
   const days = getNextDueDays(person)
-  if (filter === "overdue") return days != null && days <= 0
-  if (filter === "due_this_week") return days != null && days >= 1 && days <= 7
-  if (filter === "follow_up") return days != null && days <= 7
-  if (filter === "coming_up") return days != null && days >= 8
-  if (filter === "not_contacted") return person.last_contacted_at == null
-  return true
+  return filters.some((filter) => {
+    if (filter === "overdue") return days != null && days <= 0
+    if (filter === "due_this_week") return days != null && days >= 1 && days <= 7
+    if (filter === "follow_up") return days != null && days <= 7
+    if (filter === "coming_up") return days != null && days >= 8
+    if (filter === "not_contacted") return person.last_contacted_at == null
+    return false
+  })
 }
 
 function statusDotForPerson(person: Person): "red" | "amber" | "green" | "gray" {
@@ -108,24 +113,31 @@ function personImageUrl(person: Person) {
 
 export default function PeopleScreen() {
   const router = useRouter()
-  const params = useLocalSearchParams<{ status?: string; location?: string }>()
+  const params = useLocalSearchParams<{ status?: string | string[]; location?: string | string[]; moments?: string }>()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [personTags, setPersonTags] = useState<PersonTag[]>([])
+  const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("last_contacted")
   const [category, setCategory] = useState<CategoryFilter>("All")
-  const [activeFilter, setActiveFilter] = useState<string | null>(
-    typeof params.status === "string" ? params.status : null,
-  )
-  const [locationFilter, setLocationFilter] = useState(
-    typeof params.location === "string" ? params.location : "",
-  )
+  const [statusFilters, setStatusFilters] = useState<string[]>(parseMultiParam(params.status))
+  const [tagFilters, setTagFilters] = useState<string[]>([])
+  const [locationFilters, setLocationFilters] = useState<string[]>(parseMultiParam(params.location))
+  const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
+
+  useEffect(() => {
+    setStatusFilters(parseMultiParam(params.status))
+  }, [params.status])
+
+  useEffect(() => {
+    setLocationFilters(parseMultiParam(params.location))
+  }, [params.location])
 
   const load = useCallback(async () => {
     try {
@@ -135,10 +147,11 @@ export default function PeopleScreen() {
       } = await supabase.auth.getSession()
       if (!session) return
 
-      const [peopleRes, tagsRes, personTagsRes] = await Promise.all([
+      const [peopleRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", session.user.id),
         supabase.from("tags").select("*").eq("user_id", session.user.id).order("name", { ascending: true }),
         supabase.from("person_tags").select("person_id, tag_id"),
+        loadImportantMomentsForUser(session.user.id),
       ])
 
       if (peopleRes.error) throw peopleRes.error
@@ -149,6 +162,7 @@ export default function PeopleScreen() {
       setPeople(loadedPeople)
       setTags(tagsRes.data ?? [])
       setPersonTags(personTagsRes.data ?? [])
+      setImportantMoments(loadedMoments)
 
       if (loadedPeople.length) {
         const { data: loadedInteractions, error: interactionError } = await supabase
@@ -192,17 +206,50 @@ export default function PeopleScreen() {
   const interactionCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const interaction of interactions) {
+      if (!isTouchPoint(interaction)) continue
       counts.set(interaction.person_id, (counts.get(interaction.person_id) ?? 0) + 1)
     }
     return counts
   }, [interactions])
 
+  const latestTouchByPerson = useMemo(() => {
+    const latest = new Map<string, Interaction>()
+    for (const interaction of interactions) {
+      if (!isTouchPoint(interaction)) continue
+      const current = latest.get(interaction.person_id)
+      if (!current) {
+        latest.set(interaction.person_id, interaction)
+        continue
+      }
+      const interactionDateTime = new Date(`${interaction.date}T12:00:00`).getTime()
+      const currentDateTime = new Date(`${current.date}T12:00:00`).getTime()
+      if (
+        interactionDateTime > currentDateTime ||
+        (interactionDateTime === currentDateTime &&
+          new Date(interaction.created_at).getTime() > new Date(current.created_at).getTime())
+      ) {
+        latest.set(interaction.person_id, interaction)
+      }
+    }
+    return latest
+  }, [interactions])
+
+  const upcomingMomentPersonIds = useMemo(
+    () => new Set(getUpcomingMoments(people, importantMoments, new Date(), 14).map((moment) => moment.person.id)),
+    [importantMoments, people],
+  )
+
   const sorted = useMemo(() => {
     const filtered = people.filter((person) => {
       if (!matchesSearch(person, search)) return false
       if (!matchesCategory(person, category)) return false
-      if (!matchesStatusFilter(person, activeFilter)) return false
-      if (locationFilter.trim() && !normalize(person.location).includes(normalize(locationFilter))) return false
+      if (!matchesStatusFilter(person, statusFilters)) return false
+      if (params.moments === "upcoming" && !upcomingMomentPersonIds.has(person.id)) return false
+      if (tagFilters.length > 0) {
+        const assignedTagIds = new Set((tagsByPerson.get(person.id) ?? []).map((tag) => tag.id))
+        if (!tagFilters.some((tagId) => assignedTagIds.has(tagId))) return false
+      }
+      if (locationFilters.length > 0 && !locationFilters.some((loc) => normalize(person.location) === normalize(loc))) return false
       return true
     })
 
@@ -217,14 +264,19 @@ export default function PeopleScreen() {
         if (!b.created_at) return -1
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       }
-      if (!a.last_contacted_at && !b.last_contacted_at) return a.name.localeCompare(b.name)
-      if (!a.last_contacted_at) return 1
-      if (!b.last_contacted_at) return -1
-      return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
+      const aLatest = latestTouchByPerson.get(a.id)
+      const bLatest = latestTouchByPerson.get(b.id)
+      if (!aLatest && !bLatest) return a.name.localeCompare(b.name)
+      if (!aLatest) return 1
+      if (!bLatest) return -1
+      const bDateTime = new Date(`${bLatest.date}T12:00:00`).getTime()
+      const aDateTime = new Date(`${aLatest.date}T12:00:00`).getTime()
+      if (bDateTime !== aDateTime) return bDateTime - aDateTime
+      return new Date(bLatest.created_at).getTime() - new Date(aLatest.created_at).getTime()
     })
-  }, [activeFilter, category, interactionCounts, locationFilter, people, search, sort])
+  }, [category, interactionCounts, latestTouchByPerson, locationFilters, params.moments, people, search, sort, statusFilters, tagFilters, tagsByPerson, upcomingMomentPersonIds])
 
-  const hasActiveFilter = !!(activeFilter || locationFilter.trim())
+  const hasActiveFilter = statusFilters.length > 0 || tagFilters.length > 0 || locationFilters.length > 0 || params.moments === "upcoming"
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last Contacted"
 
   function openSortSheet() {
@@ -242,17 +294,6 @@ export default function PeopleScreen() {
     )
   }
 
-  async function shareApp() {
-    try {
-      await Share.share({
-        message:
-          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at tryrootsapp.com",
-      })
-    } catch {
-      // user dismissed share sheet
-    }
-  }
-
   if (loading) return <LoadingState />
 
   return (
@@ -262,20 +303,6 @@ export default function PeopleScreen() {
         titleIcon="heart-outline"
         subtitle="The people who matter most."
       />
-
-      <TouchableOpacity
-        onPress={shareApp}
-        accessibilityRole="button"
-        accessibilityLabel="Invite a friend"
-        activeOpacity={0.76}
-        className="mx-5 mb-3 flex-row items-center rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm"
-      >
-        <Ionicons name="share-outline" size={18} color={colors.forest} />
-        <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="ml-2 flex-1 text-sm">
-          Invite a friend
-        </Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-      </TouchableOpacity>
 
       <View className="px-5">
         {error ? <ErrorBanner message={error} /> : null}
@@ -393,11 +420,37 @@ export default function PeopleScreen() {
 
       <FilterSheet
         visible={filterSheetVisible}
-        activeFilter={activeFilter}
-        locationFilter={locationFilter}
+        statusFilters={statusFilters}
+        tagFilters={tagFilters}
+        locationFilters={locationFilters}
+        locationSearch={locationSearch}
         people={people}
-        onSelectFilter={setActiveFilter}
-        onLocationChange={setLocationFilter}
+        tags={tags}
+        onToggleStatus={(filter) =>
+          setStatusFilters((current) =>
+            current.includes(filter) ? current.filter((item) => item !== filter) : [...current, filter],
+          )
+        }
+        onToggleTag={(tagId) =>
+          setTagFilters((current) =>
+            current.includes(tagId) ? current.filter((item) => item !== tagId) : [...current, tagId],
+          )
+        }
+        onToggleLocation={(location) =>
+          setLocationFilters((current) =>
+            current.some((item) => normalize(item) === normalize(location))
+              ? current.filter((item) => normalize(item) !== normalize(location))
+              : [...current, location],
+          )
+        }
+        onLocationSearchChange={setLocationSearch}
+        onClear={() => {
+          setStatusFilters([])
+          setTagFilters([])
+          setLocationFilters([])
+          setLocationSearch("")
+          if (params.moments === "upcoming") router.replace("/people")
+        }}
         onClose={() => setFilterSheetVisible(false)}
       />
     </Screen>
@@ -406,23 +459,33 @@ export default function PeopleScreen() {
 
 function FilterSheet({
   visible,
-  activeFilter,
-  locationFilter,
+  statusFilters,
+  tagFilters,
+  locationFilters,
+  locationSearch,
   people,
-  onSelectFilter,
-  onLocationChange,
+  tags,
+  onToggleStatus,
+  onToggleTag,
+  onToggleLocation,
+  onLocationSearchChange,
+  onClear,
   onClose,
 }: {
   visible: boolean
-  activeFilter: string | null
-  locationFilter: string
+  statusFilters: string[]
+  tagFilters: string[]
+  locationFilters: string[]
+  locationSearch: string
   people: Person[]
-  onSelectFilter: (filter: string | null) => void
-  onLocationChange: (text: string) => void
+  tags: Tag[]
+  onToggleStatus: (filter: string) => void
+  onToggleTag: (tagId: string) => void
+  onToggleLocation: (location: string) => void
+  onLocationSearchChange: (text: string) => void
+  onClear: () => void
   onClose: () => void
 }) {
-  const insets = useSafeAreaInsets()
-
   const availableLocations = useMemo(() => {
     const seen = new Set<string>()
     const result: string[] = []
@@ -437,32 +500,13 @@ function FilterSheet({
   }, [people])
 
   const filteredLocations = useMemo(() => {
-    if (!locationFilter.trim()) return availableLocations
-    const normalized = locationFilter.trim().toLowerCase()
+    if (!locationSearch.trim()) return availableLocations
+    const normalized = locationSearch.trim().toLowerCase()
     return availableLocations.filter((loc) => loc.toLowerCase().includes(normalized))
-  }, [availableLocations, locationFilter])
+  }, [availableLocations, locationSearch])
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <Pressable
-          style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss filter sheet"
-        >
-          <Pressable
-            style={{
-              backgroundColor: "white",
-              borderTopLeftRadius: 30,
-              borderTopRightRadius: 30,
-              paddingBottom: Math.max(insets.bottom + 20, 36),
-            }}
-            onStartShouldSetResponder={() => true}
-          >
+    <BottomSheetModal visible={visible} onClose={onClose} accessibilityLabel="Dismiss filter sheet">
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -479,23 +523,56 @@ function FilterSheet({
                 <TouchableOpacity
                   key={option.key}
                   accessibilityRole="button"
+                  accessibilityState={{ selected: statusFilters.includes(option.key) }}
                   accessibilityLabel={option.label}
-                  onPress={() => onSelectFilter(activeFilter === option.key ? null : option.key)}
+                  onPress={() => onToggleStatus(option.key)}
                   className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
-                    activeFilter === option.key ? "border-forest bg-forest" : "border-stone-200 bg-white"
+                    statusFilters.includes(option.key) ? "border-forest bg-forest" : "border-stone-200 bg-white"
                   }`}
                 >
                   <Text
                     style={{ fontFamily: fonts.medium }}
-                    className={`text-sm ${activeFilter === option.key ? "text-white" : "text-warm-black"}`}
+                    className={`text-sm ${statusFilters.includes(option.key) ? "text-white" : "text-warm-black"}`}
                   >
                     {option.label}
                   </Text>
-                  {activeFilter === option.key ? (
+                  {statusFilters.includes(option.key) ? (
                     <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                   ) : null}
                 </TouchableOpacity>
               ))}
+
+              {tags.length > 0 ? (
+                <>
+                  <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
+                    Filter by tag
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {tags.map((tag) => {
+                      const selected = tagFilters.includes(tag.id)
+                      return (
+                        <TouchableOpacity
+                          key={tag.id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          accessibilityLabel={`Tag ${tag.name}`}
+                          onPress={() => onToggleTag(tag.id)}
+                          className={`min-h-10 rounded-full border px-3 ${
+                            selected ? "border-forest bg-forest" : "border-stone-200 bg-white"
+                          }`}
+                        >
+                          <Text
+                            style={{ fontFamily: fonts.medium }}
+                            className={`py-2 text-sm ${selected ? "text-white" : "text-warm-black"}`}
+                          >
+                            {tag.name}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </>
+              ) : null}
 
               <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
                 Filter by location
@@ -503,15 +580,15 @@ function FilterSheet({
               <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
                 <Ionicons name="location-outline" size={16} color="#60646D" />
                 <TextInput
-                  value={locationFilter}
-                  onChangeText={onLocationChange}
+                  value={locationSearch}
+                  onChangeText={onLocationSearchChange}
                   placeholder="City, country…"
                   placeholderTextColor="#777A83"
                   className="ml-2 flex-1 text-sm"
                   style={{ fontFamily: fonts.body, color: colors.ink }}
                 />
-                {locationFilter ? (
-                  <TouchableOpacity onPress={() => onLocationChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                {locationSearch ? (
+                  <TouchableOpacity onPress={() => onLocationSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Ionicons name="close-circle" size={16} color={colors.muted} />
                   </TouchableOpacity>
                 ) : null}
@@ -523,15 +600,16 @@ function FilterSheet({
                     <TouchableOpacity
                       key={loc}
                       accessibilityRole="button"
+                      accessibilityState={{ selected: locationFilters.some((item) => normalize(item) === normalize(loc)) }}
                       accessibilityLabel={loc}
-                      onPress={() => onLocationChange(loc)}
+                      onPress={() => onToggleLocation(loc)}
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "space-between",
                         paddingHorizontal: 16,
                         paddingVertical: 12,
-                        backgroundColor: locationFilter === loc ? colors.mint : "white",
+                        backgroundColor: locationFilters.some((item) => normalize(item) === normalize(loc)) ? colors.mint : "white",
                         borderBottomWidth: index < filteredLocations.length - 1 ? 1 : 0,
                         borderBottomColor: "#F5F5F4",
                       }}
@@ -539,15 +617,15 @@ function FilterSheet({
                       <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }} numberOfLines={1}>
                         {loc}
                       </Text>
-                      {locationFilter === loc ? (
+                      {locationFilters.some((item) => normalize(item) === normalize(loc)) ? (
                         <Ionicons name="checkmark" size={16} color={colors.forest} />
                       ) : null}
                     </TouchableOpacity>
                   ))}
                 </View>
-              ) : locationFilter.trim() && availableLocations.length > 0 ? (
+              ) : locationSearch.trim() && availableLocations.length > 0 ? (
                 <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-2">
-                  No saved locations match "{locationFilter}"
+                  No saved locations match "{locationSearch}"
                 </Text>
               ) : null}
 
@@ -555,10 +633,7 @@ function FilterSheet({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel="Clear filters"
-                  onPress={() => {
-                    onSelectFilter(null)
-                    onLocationChange("")
-                  }}
+                  onPress={onClear}
                   className="min-h-11 flex-1 items-center justify-center rounded-xl border border-stone-200"
                 >
                   <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
@@ -577,10 +652,7 @@ function FilterSheet({
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-    </Modal>
+    </BottomSheetModal>
   )
 }
 
@@ -623,9 +695,17 @@ function PersonCard({
                     {[person.relationship_type, person.company].filter(Boolean).join(" · ")}
                   </Text>
                 ) : null}
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mt-1 text-sm">
-                  Last talked {formatDate(person.last_contacted_at)}
-                </Text>
+                <View className="mt-1 flex-row items-center">
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mr-2 flex-1 text-sm">
+                    Last talked {formatDate(person.last_contacted_at)}
+                  </Text>
+                  <View className="flex-row items-center">
+                    <Ionicons name="chatbubble-outline" size={18} color={colors.ink} />
+                    <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="ml-1 text-sm">
+                      {interactionCount}
+                    </Text>
+                  </View>
+                </View>
               </View>
               <View className="rounded-xl px-3 py-2" style={{ backgroundColor: tone.bg }}>
                 <Text style={{ fontFamily: fonts.medium, color: tone.text }} className="text-sm">
@@ -637,19 +717,14 @@ function PersonCard({
             <View className="mt-3 flex-row items-center justify-between">
               <View className="mr-3 flex-1 flex-row flex-wrap gap-2">
                 {fallbackTags.map((tag, index) => (
-                  <View key={`${person.id}-${tag.id}-${index}`} className="flex-row items-center rounded-lg px-2 py-1" style={{ backgroundColor: index === 1 ? "#F2EEFA" : index === 2 ? "#FFF3DE" : colors.mint }}>
-                    <Ionicons name={index === 0 ? "pricetag-outline" : index === 1 ? "bulb-outline" : "cafe-outline"} size={14} color={index === 1 ? colors.purple : colors.forest} />
-                    <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="ml-1 max-w-20 text-xs">
+                  <View key={`${person.id}-${tag.id}-${index}`} className="rounded-lg px-2 py-1" style={{ backgroundColor: index === 1 ? "#F2EEFA" : index === 2 ? "#FFF3DE" : colors.mint }}>
+                    <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="max-w-20 text-xs">
                       {tag.name}
                     </Text>
                   </View>
                 ))}
               </View>
               <View className="flex-row items-center">
-                <Ionicons name="chatbubble-outline" size={18} color={colors.ink} />
-                <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="ml-1 text-sm">
-                  {interactionCount}
-                </Text>
                 <Ionicons name="chevron-forward" size={21} color={colors.muted} />
               </View>
             </View>

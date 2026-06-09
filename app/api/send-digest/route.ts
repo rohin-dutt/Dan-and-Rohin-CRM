@@ -1,7 +1,7 @@
 import { Resend } from "resend"
 import { createServiceRoleClient } from "@/lib/trusted-api-auth"
 import { weeklyDigestEmail } from "@/lib/email-templates"
-import { getBirthdayReminders, categorizePeople } from "@roots/shared"
+import { getBirthdayReminders, categorizePeople, isTouchPoint } from "@roots/shared"
 import { apiError } from "@/lib/api-errors"
 
 export async function POST(request: Request) {
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       const { overdue, dueThisWeek } = categorizePeople(
         people,
         new Date(),
-        followUps ?? []
+        (followUps ?? []).filter(isTouchPoint)
       )
 
       const digestPeople = [

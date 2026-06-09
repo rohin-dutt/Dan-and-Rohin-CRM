@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Switch, Text, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -9,9 +9,10 @@ import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
+import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import { colors } from "@/constants/theme"
 import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import type { Person, Tag } from "@/types"
+import type { ImportantMoment, Person, Tag } from "@/types"
 
 const CATEGORIES = [
   { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
@@ -20,6 +21,7 @@ const CATEGORIES = [
 ] as const
 
 type CategoryLabel = (typeof CATEGORIES)[number]["label"]
+type MomentDraft = Pick<ImportantMoment, "label" | "date" | "recurs_yearly">
 
 async function getOrCreateTag(
   userId: string,
@@ -54,6 +56,7 @@ export default function EditPersonScreen() {
   const [categoryError, setCategoryError] = useState<string | null>(null)
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
 
   const [name, setName] = useState("")
   const [category, setCategory] = useState<CategoryLabel | null>(null)
@@ -75,10 +78,11 @@ export default function EditPersonScreen() {
         } = await supabase.auth.getSession()
         if (!session) return
 
-        const [personRes, tagsRes, personTagsRes] = await Promise.all([
+        const [personRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
           supabase.from("people").select("*").eq("id", id).single(),
           supabase.from("tags").select("*").eq("user_id", session.user.id),
           supabase.from("person_tags").select("tag_id").eq("person_id", id),
+          loadImportantMomentsForPerson(id),
         ])
 
         if (personRes.error) throw personRes.error
@@ -100,6 +104,13 @@ export default function EditPersonScreen() {
 
         setAllTags(tagsRes.data ?? [])
         setSelectedTagIds((personTagsRes.data ?? []).map((pt) => pt.tag_id))
+        setImportantMoments(
+          loadedMoments.map((moment) => ({
+            label: moment.label,
+            date: moment.date,
+            recurs_yearly: moment.recurs_yearly,
+          })),
+        )
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load person")
       } finally {
@@ -112,6 +123,20 @@ export default function EditPersonScreen() {
   const isProfessional = category === "Professional"
   const isFriendOrFamily = category === "Friend" || category === "Family"
 
+  function addImportantMoment() {
+    setImportantMoments((current) => [...current, { label: "", date: "", recurs_yearly: true }])
+  }
+
+  function updateImportantMoment(index: number, patch: Partial<MomentDraft>) {
+    setImportantMoments((current) =>
+      current.map((moment, momentIndex) => (momentIndex === index ? { ...moment, ...patch } : moment)),
+    )
+  }
+
+  function removeImportantMoment(index: number) {
+    setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       setError("Name is required")
@@ -119,6 +144,14 @@ export default function EditPersonScreen() {
     }
     if (!category) {
       setCategoryError("Choose Friend, Family, or Professional.")
+      return
+    }
+    const cleanMoments = importantMoments
+      .map((moment) => ({ ...moment, label: moment.label.trim(), date: moment.date.trim() }))
+      .filter((moment) => moment.label || moment.date)
+    const invalidMoment = cleanMoments.find((moment) => !moment.label || !/^\d{4}-\d{2}-\d{2}$/.test(moment.date))
+    if (invalidMoment) {
+      setError("Important moments need a label and date in YYYY-MM-DD format.")
       return
     }
 
@@ -169,6 +202,21 @@ export default function EditPersonScreen() {
         await supabase.from("person_tags").insert(
           finalTagIds.map((tagId) => ({ person_id: id, tag_id: tagId })),
         )
+      }
+
+      const { error: deleteMomentsError } = await supabase.from("important_moments").delete().eq("person_id", id)
+      if (deleteMomentsError) throw deleteMomentsError
+      if (cleanMoments.length > 0) {
+        const { error: insertMomentsError } = await supabase.from("important_moments").insert(
+          cleanMoments.map((moment) => ({
+            user_id: session.user.id,
+            person_id: id,
+            label: moment.label,
+            date: moment.date,
+            recurs_yearly: moment.recurs_yearly,
+          })),
+        )
+        if (insertMomentsError) throw insertMomentsError
       }
 
       router.back()
@@ -270,6 +318,53 @@ export default function EditPersonScreen() {
             returnKeyType="next"
           />
         )}
+
+        <View className="mb-4">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-sm font-medium text-warm-black">Important moments</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add important moment" onPress={addImportantMoment}>
+              <Text className="text-sm font-semibold text-sage">Add</Text>
+            </TouchableOpacity>
+          </View>
+          {importantMoments.length === 0 ? (
+            <Text className="text-sm text-gray-500">Add dates like an anniversary or graduation.</Text>
+          ) : (
+            importantMoments.map((moment, index) => (
+              <View key={index} className="mb-3 rounded-xl border border-gray-200 bg-white p-3">
+                <View className="mb-2 flex-row items-center justify-between">
+                  <Text className="text-sm font-semibold text-warm-black">Moment {index + 1}</Text>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove important moment" onPress={() => removeImportantMoment(index)}>
+                    <Text className="text-sm font-semibold text-red-600">Remove</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextField
+                  label="Label"
+                  value={moment.label}
+                  onChangeText={(text) => updateImportantMoment(index, { label: text })}
+                  placeholder="Anniversary, graduation..."
+                  returnKeyType="next"
+                />
+                <TextField
+                  label="Date"
+                  value={moment.date}
+                  onChangeText={(text) => updateImportantMoment(index, { date: text })}
+                  placeholder="YYYY-MM-DD"
+                  keyboardType="numbers-and-punctuation"
+                  returnKeyType="next"
+                />
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-warm-black">Repeat yearly</Text>
+                  <Switch
+                    value={moment.recurs_yearly}
+                    onValueChange={(value) => updateImportantMoment(index, { recurs_yearly: value })}
+                    trackColor={{ false: colors.border, true: colors.sage }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </View>
+            ))
+          )}
+        </View>
 
         <TextField
           label="Email"

@@ -8,9 +8,11 @@ import { Divider, IconTile, PersonAvatar, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import type { Person, Interaction, Tag } from "@/types"
+import { loadImportantMomentsForPerson } from "@/lib/important-moments"
+import { loadPersonNotesForPerson } from "@/lib/person-notes"
+import type { ImportantMoment, Person, Interaction, PersonNote, Tag } from "@/types"
 import { colors, fonts } from "@/constants/theme"
-import { formatDate, getNextDueDays, getFollowUpState } from "@roots/shared"
+import { formatDate, getNextDueDays, getFollowUpState, isTouchPoint } from "@roots/shared"
 
 type ProfileTab = "Timeline" | "About" | "Notes" | "Follow-ups"
 
@@ -60,7 +62,7 @@ function compactDate(value: string | null | undefined) {
 
 function displayDate(value: string | null | undefined) {
   if (!value) return "No date"
-  const date = new Date(`${value}T12:00:00`)
+  const date = value.includes("T") ? new Date(value) : new Date(`${value}T12:00:00`)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date)
 }
@@ -295,13 +297,15 @@ export default function PersonDetailScreen() {
   const [error, setError] = useState<string | null>(null)
   const [person, setPerson] = useState<Person | null>(null)
   const [interactions, setInteractions] = useState<Interaction[]>([])
+  const [personNotes, setPersonNotes] = useState<PersonNote[]>([])
+  const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [activeTab, setActiveTab] = useState<ProfileTab>("Timeline")
 
   const load = useCallback(async () => {
     try {
       setError(null)
-      const [personRes, interactionsRes, tagsRes] = await Promise.all([
+      const [personRes, interactionsRes, tagsRes, loadedMoments, loadedNotes] = await Promise.all([
         supabase.from("people").select("*").eq("id", id).single(),
         supabase
           .from("interactions")
@@ -309,10 +313,14 @@ export default function PersonDetailScreen() {
           .eq("person_id", id)
           .order("date", { ascending: false }),
         supabase.from("person_tags").select("tag_id, tags(*)").eq("person_id", id),
+        loadImportantMomentsForPerson(id),
+        loadPersonNotesForPerson(id),
       ])
       if (personRes.error) throw personRes.error
       setPerson(personRes.data)
       setInteractions(interactionsRes.data ?? [])
+      setImportantMoments(loadedMoments)
+      setPersonNotes(loadedNotes)
       setTags(
         ((tagsRes.data ?? []) as PersonTagRow[])
           .map(getTagFromJoin)
@@ -374,33 +382,66 @@ export default function PersonDetailScreen() {
     load()
   }
 
+  async function updatePersonNote(noteId: string, body: string) {
+    const trimmed = body.trim()
+    if (!trimmed) return
+    const { data, error: noteError } = await supabase
+      .from("person_notes")
+      .update({ body: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", noteId)
+      .select("*")
+      .single()
+    if (noteError) {
+      setError(noteError.message)
+      return
+    }
+    setPersonNotes((prev) => prev.map((note) => (note.id === noteId ? data : note)))
+  }
+
+  function promptEditNote(note: PersonNote) {
+    Alert.prompt(
+      "Edit note",
+      undefined,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Save",
+          onPress: (value: string | undefined) => {
+            if (value != null) void updatePersonNote(note.id, value)
+          },
+        },
+      ],
+      "plain-text",
+      note.body,
+    )
+  }
+
+  function confirmDeleteNote(noteId: string) {
+    Alert.alert("Delete note", "Delete this note?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const { error: noteError } = await supabase.from("person_notes").delete().eq("id", noteId)
+          if (noteError) {
+            setError(noteError.message)
+            return
+          }
+          setPersonNotes((prev) => prev.filter((note) => note.id !== noteId))
+        },
+      },
+    ])
+  }
+
   const openFollowUps = useMemo(
-    () => interactions.filter((i) => i.follow_up_needed && getFollowUpState(i) !== "done"),
+    () => interactions.filter((i) => isTouchPoint(i) && i.follow_up_needed && getFollowUpState(i) !== "done"),
     [interactions],
   )
 
-  const noteItems = useMemo(() => {
-    const interactionNotes = interactions
-      .filter((interaction) => interaction.notes?.trim())
-      .map((interaction) => ({
-        id: interaction.id,
-        date: interaction.date,
-        notes: interaction.notes?.trim() ?? "",
-      }))
+  const touchPointInteractions = useMemo(() => interactions.filter(isTouchPoint), [interactions])
 
-    if (person?.notes?.trim()) {
-      return [
-        {
-          id: "person-notes",
-          date: person.created_at,
-          notes: person.notes.trim(),
-        },
-        ...interactionNotes,
-      ]
-    }
-
-    return interactionNotes
-  }, [interactions, person])
+  const noteItems = useMemo(() => personNotes, [personNotes])
 
   if (loading) return <LoadingState />
 
@@ -422,6 +463,15 @@ export default function PersonDetailScreen() {
 
   const personalRows: InfoRow[] = []
   if (person.birthday) personalRows.push({ icon: "calendar-outline", label: "Birthday", value: compactDate(person.birthday), actionIcon: "chevron-forward", tone: "purple" })
+  importantMoments.forEach((moment) => {
+    personalRows.push({
+      icon: "sparkles-outline",
+      label: moment.label,
+      value: `${compactDate(moment.date)}${moment.recurs_yearly ? " - yearly" : ""}`,
+      actionIcon: "chevron-forward",
+      tone: "green",
+    })
+  })
   if (person.how_met) personalRows.push({ icon: "people-outline", label: "How we met", value: person.how_met, actionIcon: "chevron-forward", tone: "amber" })
   if (person.relationship_type) personalRows.push({ icon: "heart-outline", label: "Relationship type", value: person.relationship_type, actionIcon: "chevron-forward", tone: "red" })
   personalRows.push({ icon: "time-outline", label: "Contact frequency", value: formatFrequency(person.contact_frequency_days), actionIcon: "chevron-forward", tone: "amber" })
@@ -480,7 +530,7 @@ export default function PersonDetailScreen() {
         <StatStrip
           lastTalked={formatLastTalked(person.last_contacted_at)}
           nextAction={formatNextAction(nextDueDays)}
-          interactionsCount={interactions.length}
+          interactionsCount={touchPointInteractions.length}
           openFollowUpsCount={openFollowUps.length}
         />
 
@@ -488,13 +538,13 @@ export default function PersonDetailScreen() {
 
         {activeTab === "Timeline" ? (
           <View className="mt-6">
-            {interactions.length > 0 ? (
+            {touchPointInteractions.length > 0 ? (
               <View>
-                {interactions.slice(0, 6).map((interaction, index) => (
+                {touchPointInteractions.slice(0, 6).map((interaction, index) => (
                   <View key={interaction.id} className="flex-row">
                     <View className="items-center">
                       <IconTile icon={interactionIcon(interaction.type)} size={44} />
-                      {index < Math.min(interactions.length, 6) - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
+                      {index < Math.min(touchPointInteractions.length, 6) - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
                     </View>
                     <View className="ml-4 flex-1 pb-6">
                       <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
@@ -525,7 +575,7 @@ export default function PersonDetailScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <EmptyState title="No interactions yet" body="Log a call, text, meeting, or note to start this contact's timeline." />
+              <EmptyState title="No interactions yet" body="Log a call, text, or meeting to start this contact's timeline." />
             )}
 
             <View className="mt-5 flex-row gap-3">
@@ -533,7 +583,7 @@ export default function PersonDetailScreen() {
                 <Button title="Log Interaction" onPress={() => router.push(`/people/${id}/log`)} />
               </View>
               <View className="flex-1">
-                <Button title="Add Note" onPress={() => router.push(`/people/${id}/log`)} variant="secondary" />
+                <Button title="Add Note" onPress={() => router.push(`/people/${id}/log?action=note`)} variant="secondary" />
               </View>
             </View>
           </View>
@@ -594,36 +644,48 @@ export default function PersonDetailScreen() {
             {noteItems.length > 0 ? (
               <View className="gap-4">
                 {noteItems.map((note) => (
-                  <SoftCard key={note.id} className="flex-row items-center p-4">
+                  <SoftCard key={note.id} className="p-4">
+                    <View className="flex-row items-center">
                     <IconTile icon="document-text-outline" size={58} />
                     <View className="ml-4 flex-1">
                       <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
-                        {displayDate(note.date)}
+                        {displayDate(note.note_date ?? note.created_at)}
                       </Text>
                       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6" numberOfLines={3}>
-                        {note.notes}
+                        {note.body}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+                    </View>
+                    <View className="mt-4 flex-row gap-2">
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit note"
+                        onPress={() => promptEditNote(note)}
+                        className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+                          Edit
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Delete note"
+                        onPress={() => confirmDeleteNote(note.id)}
+                        className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: "#B91C1C" }} className="text-sm">
+                          Delete
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </SoftCard>
                 ))}
               </View>
             ) : (
-              <EmptyState title="No notes yet" body="Notes from this contact's profile and interactions will appear here." />
+              <EmptyState title="No notes yet" body="Notes you save about this person will appear here." />
             )}
             <View className="mt-6">
-              <Button title="Add Note" onPress={() => router.push(`/people/${id}/log`)} />
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="View all interactions"
-                onPress={() => router.push(`/people/${id}/log`)}
-                className="mt-4 flex-row items-center justify-center"
-              >
-                <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-base">
-                  View all interactions
-                </Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.forest} />
-              </TouchableOpacity>
+              <Button title="Add Note" onPress={() => router.push(`/people/${id}/log?action=note`)} />
             </View>
           </View>
         ) : null}

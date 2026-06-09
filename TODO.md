@@ -424,6 +424,26 @@ Do not start until stabilization milestones are complete.
 
 ## External / Repository Work
 
+- [ ] Release the June 9, 2026 mobile schema migrations to the linked Supabase
+      project through the required database preflight.
+  - Pending local migrations:
+    `20260609090000_important_moments_and_note_touchpoints.sql` and
+    `20260609193834_separate_person_notes.sql`.
+  - These add important moments, the dedicated `person_notes` table, note
+    backfill/repair, and last-contact recomputation from real touch-point
+    interactions only.
+  - Do not apply remotely without first running the release preflight
+    (`npx.cmd supabase migration list` and
+    `npx.cmd supabase db push --dry-run`) or documenting the approved fallback
+    if local CLI auth/linking is unavailable.
+- [ ] Configure/deploy scheduled mobile push sender for follow-ups, birthdays,
+      and important moments.
+  - Current implementation: mobile can register push tokens, store
+    important moments, and the schema supports privacy-safe
+    `notification_deliveries.kind = 'important_moment'`.
+  - Remaining external/backend work: extend the trusted sender and scheduler
+    (for example Vercel Cron) to select due important moments, send Expo/APNs
+    notifications, and write delivery audit rows.
 - [ ] Push the repository to GitHub.
   - Remote readiness inspected on May 14, 2026: `origin` is configured for
     fetch and push at `https://github.com/rohin-dutt/Dan-and-Rohin-CRM`, and

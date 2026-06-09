@@ -1,10 +1,6 @@
 import { useCallback, useMemo, useState } from "react"
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -12,11 +8,11 @@ import {
   View,
 } from "react-native"
 import { useRouter } from "expo-router"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { colors, fonts } from "@/constants/theme"
 import { Divider, IconTile } from "@/components/RootsUI"
+import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { PillButton } from "@/components/PillButton"
 import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
 
@@ -30,7 +26,6 @@ type PersonOption = {
 
 export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const router = useRouter()
-  const insets = useSafeAreaInsets()
 
   const [pickerMode, setPickerMode] = useState<QuickAddMode | null>(null)
   const [people, setPeople] = useState<PersonOption[]>([])
@@ -164,16 +159,13 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         data: { session },
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
-      const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
-        p_person_id: selectedPerson.id,
-        p_type: "Other",
-        p_date: todayInputValue(),
-        p_notes: noteText.trim(),
-        p_follow_up_needed: false,
-        p_follow_up_date: null,
+      const { error: insertError } = await supabase.from("person_notes").insert({
+        user_id: session.user.id,
+        person_id: selectedPerson.id,
+        body: noteText.trim(),
+        note_date: todayInputValue(),
       })
-      if (rpcError) throw rpcError
-      await updateStreakAfterAction(supabase)
+      if (insertError) throw insertError
       closeForm()
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save note")
@@ -185,17 +177,8 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
   return (
     <>
       {/* ── Action sheet ──────────────────────────────────────────── */}
-      <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
-        <Pressable
-          className="flex-1 justify-end bg-black/45"
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss quick add menu"
-        >
-          <Pressable
-            className="rounded-t-[30px] bg-white px-6 pt-6"
-            style={{ paddingBottom: Math.max(insets.bottom + 20, 36) }}
-          >
+      <BottomSheetModal visible={visible} onClose={onClose} animationType="fade" backdropOpacity={0.45} avoidKeyboard={false} accessibilityLabel="Dismiss quick add menu">
+          <View className="px-6 pt-6">
             <View className="mb-8 items-center">
               <View className="h-1.5 w-24 rounded-full bg-stone-200" />
             </View>
@@ -240,35 +223,17 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                 Cancel
               </Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+      </BottomSheetModal>
 
       {/* ── Single-step form modal ─────────────────────────────────── */}
-      <Modal
-        animationType="slide"
-        transparent
+      <BottomSheetModal
         visible={pickerMode != null}
-        onRequestClose={closeForm}
+        onClose={closeForm}
+        backdropOpacity={0.3}
+        sheetStyle={{ maxHeight: "90%" }}
+        accessibilityLabel="Dismiss quick add form"
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <Pressable
-            style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.3)" }}
-            onPress={closeForm}
-          >
-            <Pressable
-              onStartShouldSetResponder={() => true}
-              style={{
-                backgroundColor: "white",
-                borderTopLeftRadius: 30,
-                borderTopRightRadius: 30,
-                maxHeight: "90%",
-                paddingBottom: Math.max(insets.bottom + 16, 32),
-              }}
-            >
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
@@ -667,10 +632,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                   )}
                 </TouchableOpacity>
               </ScrollView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheetModal>
     </>
   )
 }

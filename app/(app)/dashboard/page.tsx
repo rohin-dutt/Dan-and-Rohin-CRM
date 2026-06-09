@@ -10,6 +10,7 @@ import {
   type FollowUpInteraction,
 } from "./_components/dashboard-sections";
 import { supabase } from "@/lib/supabase";
+import { isTouchPoint } from "@roots/shared";
 import type { Interaction, Person } from "@/types/index";
 
 export default function DashboardPage() {
@@ -110,7 +111,7 @@ export default function DashboardPage() {
         );
 
         setFollowUps(
-          (followUpData ?? []).map((interaction) => ({
+          (followUpData ?? []).filter(isTouchPoint).map((interaction) => ({
             ...interaction,
             follow_up_status: interaction.follow_up_status ?? "open",
             follow_up_snoozed_until:
@@ -121,9 +122,9 @@ export default function DashboardPage() {
 
         const { data: allInteractionsData } = await supabase
           .from("interactions")
-          .select("id, person_id")
+          .select("id, person_id, type, is_touch_point")
           .in("person_id", personIds);
-        setAllInteractions((allInteractionsData ?? []) as unknown as Interaction[]);
+        setAllInteractions(((allInteractionsData ?? []) as unknown as Interaction[]).filter(isTouchPoint));
       }
 
       setLoading(false);

@@ -254,7 +254,8 @@ Preferred Phase 1 approach:
 - Validate the uploaded JSON in TypeScript before calling the RPC.
 - Inside the RPC, derive the user from `auth.uid()`, optionally delete the
   user's existing people and tags when `replace_existing = true`, then insert
-  or upsert tags, people, interactions, and person tags in dependency order.
+  or upsert tags, people, touch-point interactions, person notes, and person
+  tags in dependency order.
 - Force every imported owner field to `auth.uid()` and reject person/tag
   relationships that are not present in the same payload or already owned by
   the user.
@@ -341,7 +342,8 @@ Cache:
 - people
 - tags
 - person_tags
-- interactions
+- interactions, limited to real touch points
+- person_notes
 - settings
 
 The app should derive dashboard and follow-up views from cached data when
@@ -397,6 +399,7 @@ Push notifications should support:
 - due follow-up reminders
 - overdue follow-up reminders
 - birthday reminders
+- important-moment reminders
 - deep links into person detail and relevant People filters
 
 Push token storage should be per user/device. Tokens should be cleaned up when
@@ -419,6 +422,24 @@ Push backend decision: scheduled push sending starts in the existing
 Next.js/Vercel backend. Use a protected route plus a trusted scheduler, such as
 Vercel Cron, when scheduled delivery is implemented.
 
+Important moments use the user-owned `important_moments` table. Mobile can
+create, edit, delete, and display those rows now. The schema also supports
+privacy-safe `notification_deliveries.kind = 'important_moment'`, but actual
+scheduled delivery still requires the trusted sender/cron job to include that
+kind.
+
+## Notes And Touch Points
+
+Mobile stores note-only records in the user-owned `person_notes` table. Notes
+are not interactions, do not call `create_interaction_and_touch_person`, and do
+not update `people.last_contacted_at`.
+
+`interactions` is reserved for logged calls, texts, meetings, chats, emails,
+coffee, and similar relationship touch points. Dashboard stats, People sort,
+Last talked, follow-up queues, streaks, and interaction counters must use only
+touch-point interactions. Person detail timelines show touch points; the Notes
+tab shows `person_notes`.
+
 ## Data Management
 
 Mobile must support:
@@ -427,6 +448,11 @@ Mobile must support:
 - import/update
 - restore/replace
 - account deletion
+
+Exports and restore/import payloads include `person_notes` separately from
+`interactions`. Restore/import keeps backward compatibility by converting
+legacy `type = "Note"` or `is_touch_point = false` interaction payload rows
+into `person_notes`.
 
 Restore/replace should be atomic before mobile launch. Prefer a database RPC or
 trusted server route so partial restores cannot leave mixed user data.

@@ -12,7 +12,8 @@ import {
   PersonSummary,
 } from "./_components/person-detail-sections";
 import { supabase } from "@/lib/supabase";
-import type { Interaction, Person, Tag } from "@/types/index";
+import { isTouchPoint, todayInputValue } from "@roots/shared";
+import type { Interaction, Person, PersonNote, Tag } from "@/types/index";
 
 function normalizeInteraction(interaction: Interaction): Interaction {
   return {
@@ -33,6 +34,7 @@ export default function PersonDetailPage() {
   const [confirmDeletePerson, setConfirmDeletePerson] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [personNotes, setPersonNotes] = useState<PersonNote[]>([]);
   const [interactionsLoading, setInteractionsLoading] = useState(true);
   const [personTags, setPersonTags] = useState<Tag[]>([]);
   const [editingInteractionId, setEditingInteractionId] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export default function PersonDetailPage() {
       setPerson(personData);
       setLoading(false);
 
-      const [interactionsRes, tagsRes] = await Promise.all([
+      const [interactionsRes, tagsRes, notesRes] = await Promise.all([
         supabase
           .from("interactions")
           .select("*")
@@ -90,19 +92,26 @@ export default function PersonDetailPage() {
           .from("person_tags")
           .select("tags(id, name, color)")
           .eq("person_id", params.id),
+        supabase
+          .from("person_notes")
+          .select("*")
+          .eq("person_id", params.id)
+          .order("created_at", { ascending: false }),
       ]);
 
-      if (interactionsRes.error || tagsRes.error) {
+      if (interactionsRes.error || tagsRes.error || notesRes.error) {
         setPageError(
           interactionsRes.error?.message ??
             tagsRes.error?.message ??
+            notesRes.error?.message ??
             "Failed to load person details."
         );
         setInteractionsLoading(false);
         return;
       }
 
-      setInteractions((interactionsRes.data ?? []).map(normalizeInteraction));
+      setInteractions((interactionsRes.data ?? []).filter(isTouchPoint).map(normalizeInteraction));
+      setPersonNotes(notesRes.data ?? []);
       setInteractionsLoading(false);
 
       const rows = (tagsRes.data ?? []) as unknown as { tags: Tag[] | Tag }[];
@@ -160,33 +169,69 @@ export default function PersonDetailPage() {
     if (!person) return;
     setAddingNote(true);
 
-    const today = new Date();
-    const dateStr = today.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    const noteWithDate = `[${dateStr}] ${note}`;
-    const updatedNotes = person.notes
-      ? `${person.notes}\n\n---\n\n${noteWithDate}`
-      : noteWithDate;
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error } = await supabase
-      .from("people")
-      .update({ notes: updatedNotes })
-      .eq("id", person.id)
-      .eq("user_id", user?.id ?? "");
+    if (!user) {
+      setAddingNote(false);
+      router.push("/auth/login");
+      return;
+    }
 
-    if (!error) {
-      setPerson((prev) => (prev ? { ...prev, notes: updatedNotes } : prev));
+    const { data, error } = await supabase
+      .from("person_notes")
+      .insert({
+        user_id: user.id,
+        person_id: person.id,
+        body: note,
+        note_date: todayInputValue(),
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      setPageError(error.message);
+    } else if (data) {
+      setPageError(null);
+      setPersonNotes((prev) => [data, ...prev]);
     }
 
     setAddingNote(false);
+  }
+
+  async function handleUpdateNote(noteId: string, body: string) {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+
+    const { data, error } = await supabase
+      .from("person_notes")
+      .update({ body: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", noteId)
+      .select("*")
+      .single();
+
+    if (error) {
+      setPageError(error.message);
+      return;
+    }
+
+    setPageError(null);
+    setPersonNotes((prev) =>
+      prev.map((note) => (note.id === noteId ? data : note))
+    );
+  }
+
+  async function handleDeleteNote(noteId: string) {
+    const { error } = await supabase.from("person_notes").delete().eq("id", noteId);
+
+    if (error) {
+      setPageError(error.message);
+      return;
+    }
+
+    setPageError(null);
+    setPersonNotes((prev) => prev.filter((note) => note.id !== noteId));
   }
 
   async function recalculateLastContacted() {
@@ -403,7 +448,10 @@ export default function PersonDetailPage() {
         person={person}
         personTags={personTags}
         interactions={interactions}
+        personNotes={personNotes}
         onAddNote={handleAddNote}
+        onUpdateNote={handleUpdateNote}
+        onDeleteNote={handleDeleteNote}
         addingNote={addingNote}
       />
 

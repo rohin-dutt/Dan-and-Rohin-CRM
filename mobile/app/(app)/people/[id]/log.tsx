@@ -29,6 +29,10 @@ export default function LogInteractionScreen() {
       setError("Date is required")
       return
     }
+    if (isNoteMode && !notes.trim()) {
+      setError("Note text is required")
+      return
+    }
 
     setSaving(true)
     setError(null)
@@ -39,18 +43,28 @@ export default function LogInteractionScreen() {
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
 
-      const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
-        p_person_id: id,
-        p_type: interactionType,
-        p_date: date.trim(),
-        p_notes: notes.trim() || null,
-        p_follow_up_needed: followUpEnabled,
-        p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
-      })
+      if (isNoteMode) {
+        const { error: insertError } = await supabase.from("person_notes").insert({
+          user_id: session.user.id,
+          person_id: id,
+          body: notes.trim(),
+          note_date: date.trim(),
+        })
+        if (insertError) throw insertError
+      } else {
+        const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
+          p_person_id: id,
+          p_type: interactionType,
+          p_date: date.trim(),
+          p_notes: notes.trim() || null,
+          p_follow_up_needed: followUpEnabled,
+          p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
+        })
 
-      if (rpcError) throw rpcError
+        if (rpcError) throw rpcError
 
-      await updateStreakAfterAction(supabase)
+        await updateStreakAfterAction(supabase)
+      }
 
       router.back()
     } catch (e) {
@@ -76,20 +90,21 @@ export default function LogInteractionScreen() {
       <View className="px-5 pb-8">
         {error != null && <ErrorBanner message={error} />}
 
-        {/* Interaction type */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Type</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {INTERACTION_TYPES.map((type) => (
-              <PillButton
-                key={type}
-                label={type}
-                selected={interactionType === type}
-                onPress={() => setInteractionType(type)}
-              />
-            ))}
+        {!isNoteMode ? (
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-warm-black mb-2">Type</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {INTERACTION_TYPES.map((type) => (
+                <PillButton
+                  key={type}
+                  label={type}
+                  selected={interactionType === type}
+                  onPress={() => setInteractionType(type)}
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <TextField
           label="Date"
@@ -110,7 +125,7 @@ export default function LogInteractionScreen() {
           returnKeyType="default"
         />
 
-        {/* Follow-up toggle */}
+        {!isNoteMode ? (
         <View className="mb-4">
           <View className="flex-row items-center justify-between py-2">
             <View className="flex-1 mr-4">
@@ -138,6 +153,7 @@ export default function LogInteractionScreen() {
             />
           )}
         </View>
+        ) : null}
 
         <Button title={isNoteMode ? "Save note" : "Save"} onPress={handleSave} loading={saving} />
       </View>

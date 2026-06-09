@@ -10,7 +10,7 @@ import {
 } from "@roots/shared";
 import { formatBirthdayDate, formatDate } from "@/lib/date-utils";
 import { INTERACTION_TYPES } from "@/lib/form-utils";
-import type { Interaction, Person, Tag } from "@/types/index";
+import type { Interaction, Person, PersonNote, Tag } from "@/types/index";
 
 function FollowUpToast({ message }: { message: string }) {
   return (
@@ -250,13 +250,19 @@ export function PersonSummary({
   person,
   personTags,
   interactions,
+  personNotes,
   onAddNote,
+  onUpdateNote,
+  onDeleteNote,
   addingNote,
 }: {
   person: Person;
   personTags: Tag[];
   interactions: Interaction[];
+  personNotes: PersonNote[];
   onAddNote: (note: string) => Promise<void>;
+  onUpdateNote: (noteId: string, body: string) => Promise<void>;
+  onDeleteNote: (noteId: string) => Promise<void>;
   addingNote: boolean;
 }) {
   const [showDetails, setShowDetails] = useState(false);
@@ -371,10 +377,47 @@ export function PersonSummary({
 
       <section className="mt-8">
         <h2 className="text-xl font-semibold">Notes</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground whitespace-pre-wrap">
-          {person.notes ||
-            "Add context, conversation threads, or anything useful for the next reach-out."}
-        </p>
+        {personNotes.length === 0 ? (
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+            Add context, conversation threads, or anything useful for the next reach-out.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {personNotes.slice(0, 5).map((note) => (
+              <article key={note.id} className="rounded-lg border border-border bg-background p-3">
+                <p className="text-sm leading-6 text-foreground whitespace-pre-wrap">{note.body}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {formatDate(note.note_date ?? note.created_at)}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const updated = window.prompt("Edit note", note.body);
+                        if (updated == null) return;
+                        await onUpdateNote(note.id, updated);
+                      }}
+                      className="text-xs font-medium text-primary hover:text-primary/80"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm("Delete this note?")) return;
+                        await onDeleteNote(note.id);
+                      }}
+                      className="text-xs font-medium text-red-600 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
         <div className="mt-4">
           <QuickNoteForm onAddNote={onAddNote} addingNote={addingNote} />
         </div>
