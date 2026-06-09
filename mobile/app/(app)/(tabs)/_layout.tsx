@@ -63,7 +63,7 @@ export default function TabsLayout() {
             },
           }}
           options={{
-            title: "Add",
+            tabBarLabel: () => null,
             tabBarIcon: () => (
               <View className="h-14 w-14 items-center justify-center rounded-full bg-forest shadow-lg">
                 <Ionicons name="add" color="#FFFFFF" size={34} />
@@ -76,7 +76,7 @@ export default function TabsLayout() {
           options={{
             title: "Your Roots",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="location" color={color} size={size + 2} />
+              <Ionicons name="map-outline" color={color} size={size + 2} />
             ),
           }}
         />

@@ -1,12 +1,15 @@
-import { useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { useRef, useState } from "react"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
+import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
+import { colors, fonts } from "@/constants/theme"
 import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 
 const CATEGORIES = [
@@ -56,10 +59,38 @@ export default function NewPersonScreen() {
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(30)
   const [location, setLocation] = useState("")
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<MapboxFeature[]>([])
   const [notes, setNotes] = useState("")
+
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isProfessional = category === "Professional"
   const isFriendOrFamily = category === "Friend" || category === "Family"
+
+  function handleLocationChange(text: string) {
+    setLocation(text)
+    setLatitude(null)
+    setLongitude(null)
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
+    if (!text.trim()) {
+      setLocationSuggestions([])
+      return
+    }
+    geocodeTimerRef.current = setTimeout(() => {
+      void geocodePlace(text).then((results) => {
+        setLocationSuggestions(results.slice(0, 5))
+      })
+    }, 400)
+  }
+
+  function handleLocationSuggestionSelect(feature: MapboxFeature) {
+    setLocation(feature.place_name)
+    setLatitude(feature.center[1])
+    setLongitude(feature.center[0])
+    setLocationSuggestions([])
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -95,6 +126,8 @@ export default function NewPersonScreen() {
           birthday: birthday.trim() || null,
           how_met: howMet.trim() || null,
           location: location.trim() || null,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
           notes: notes.trim() || null,
           contact_frequency_days: frequencyDays,
           relationship_type: category ?? null,
@@ -242,13 +275,44 @@ export default function NewPersonScreen() {
           </View>
         </View>
 
-        <TextField
-          label="Location"
-          value={location}
-          onChangeText={setLocation}
-          placeholder="City, country"
-          returnKeyType="next"
-        />
+        {/* Location with Mapbox autocomplete */}
+        <View className="mb-4">
+          <Text className="mb-1 text-sm font-medium text-warm-black">Location</Text>
+          <View
+            className="flex-row items-center rounded-xl border bg-white px-3"
+            style={{ borderColor: "#E5E7EB", minHeight: 44 }}
+          >
+            <TextInput
+              value={location}
+              onChangeText={handleLocationChange}
+              placeholder="City, country"
+              placeholderTextColor="#9CA3AF"
+              className="flex-1 text-sm"
+              style={{ fontFamily: fonts.body, color: colors.ink, paddingVertical: 10 }}
+              returnKeyType="next"
+            />
+            {latitude !== null ? (
+              <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
+            ) : null}
+          </View>
+          {locationSuggestions.length > 0 ? (
+            <View className="mt-1 rounded-xl border border-stone-200 bg-white shadow-lg" style={{ zIndex: 20 }}>
+              {locationSuggestions.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={index}
+                  accessibilityRole="button"
+                  accessibilityLabel={suggestion.place_name}
+                  onPress={() => handleLocationSuggestionSelect(suggestion)}
+                  className={`px-4 py-3 ${index < locationSuggestions.length - 1 ? "border-b border-stone-100" : ""}`}
+                >
+                  <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="text-sm">
+                    {suggestion.place_name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+        </View>
 
         <TextField
           label="Notes"

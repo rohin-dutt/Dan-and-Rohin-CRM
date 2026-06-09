@@ -24,12 +24,14 @@ export function LogoMark({ size = 34, muted = false }: { size?: number; muted?: 
 export function BrandHeader({
   title,
   subtitle,
+  titleIcon,
   actionIcon,
   actionLabel,
   onAction,
 }: {
   title: string
   subtitle?: string
+  titleIcon?: keyof typeof Ionicons.glyphMap
   actionIcon?: keyof typeof Ionicons.glyphMap
   actionLabel?: string
   onAction?: () => void
@@ -48,7 +50,11 @@ export function BrandHeader({
               {title}
             </Text>
             <View className="ml-2 mt-1">
-              <LogoMark size={24} muted />
+              {titleIcon ? (
+                <Ionicons name={titleIcon} size={24} color={colors.sage} />
+              ) : (
+                <LogoMark size={24} muted />
+              )}
             </View>
           </View>
           {subtitle ? (

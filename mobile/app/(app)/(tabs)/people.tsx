@@ -1,7 +1,18 @@
 import { useCallback, useMemo, useState } from "react"
-import { FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
+import {
+  ActionSheetIOS,
+  FlatList,
+  Modal,
+  Pressable,
+  Share,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, PersonAvatar, SearchBox, SoftCard, StatusDot } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
@@ -11,7 +22,7 @@ import type { Interaction, Person, PersonTag, Tag } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { formatDate, getNextDueDays, getRelationshipStatus } from "@roots/shared"
 
-type SortKey = "last_contacted" | "name"
+type SortKey = "last_contacted" | "name" | "most_contacted" | "recently_added"
 type CategoryFilter = "All" | "Friends" | "Family" | "Professional"
 
 const CATEGORIES: Array<{ label: CategoryFilter; icon: keyof typeof Ionicons.glyphMap }> = [
@@ -19,6 +30,20 @@ const CATEGORIES: Array<{ label: CategoryFilter; icon: keyof typeof Ionicons.gly
   { label: "Friends", icon: "people-outline" },
   { label: "Family", icon: "home-outline" },
   { label: "Professional", icon: "briefcase-outline" },
+]
+
+const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
+  { key: "last_contacted", label: "Last Contacted" },
+  { key: "name", label: "Name A–Z" },
+  { key: "most_contacted", label: "Most Contacted" },
+  { key: "recently_added", label: "Recently Added" },
+]
+
+const STATUS_FILTERS: Array<{ key: string; label: string }> = [
+  { key: "overdue", label: "Overdue" },
+  { key: "due_this_week", label: "Due This Week" },
+  { key: "coming_up", label: "Coming Up" },
+  { key: "not_contacted", label: "Not Yet Contacted" },
 ]
 
 function normalize(value: string | null | undefined) {
@@ -39,6 +64,16 @@ function matchesCategory(person: Person, category: CategoryFilter) {
   return ["professional", "work", "colleague", "business"].some((term) =>
     normalize(`${person.relationship_type ?? ""} ${person.company ?? ""} ${person.role ?? ""}`).includes(term),
   )
+}
+
+function matchesStatusFilter(person: Person, filter: string | null): boolean {
+  if (!filter) return true
+  const days = getNextDueDays(person)
+  if (filter === "overdue") return days != null && days <= 0
+  if (filter === "due_this_week") return days != null && days >= 1 && days <= 7
+  if (filter === "coming_up") return days != null && days >= 8
+  if (filter === "not_contacted") return person.last_contacted_at == null
+  return true
 }
 
 function statusDotForPerson(person: Person): "red" | "amber" | "green" | "gray" {
@@ -69,7 +104,8 @@ function personImageUrl(person: Person) {
 
 export default function PeopleScreen() {
   const router = useRouter()
-  const params = useLocalSearchParams<{ status?: string }>()
+  const params = useLocalSearchParams<{ status?: string; location?: string }>()
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
@@ -79,9 +115,13 @@ export default function PeopleScreen() {
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("last_contacted")
   const [category, setCategory] = useState<CategoryFilter>("All")
-  const [statusFiltering, setStatusFiltering] = useState(false)
-
-  const statusParam = typeof params.status === "string" ? params.status : null
+  const [activeFilter, setActiveFilter] = useState<string | null>(
+    typeof params.status === "string" ? params.status : null,
+  )
+  const [locationFilter, setLocationFilter] = useState(
+    typeof params.location === "string" ? params.location : "",
+  )
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -157,30 +197,81 @@ export default function PeopleScreen() {
     const filtered = people.filter((person) => {
       if (!matchesSearch(person, search)) return false
       if (!matchesCategory(person, category)) return false
-      if (statusFiltering && statusParam && getRelationshipStatus(person) !== statusParam) return false
+      if (!matchesStatusFilter(person, activeFilter)) return false
+      if (locationFilter.trim() && !normalize(person.location).includes(normalize(locationFilter))) return false
       return true
     })
 
     return [...filtered].sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      if (sort === "most_contacted") {
+        return (interactionCounts.get(b.id) ?? 0) - (interactionCounts.get(a.id) ?? 0)
+      }
+      if (sort === "recently_added") {
+        if (!a.created_at && !b.created_at) return 0
+        if (!a.created_at) return 1
+        if (!b.created_at) return -1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      }
       if (!a.last_contacted_at && !b.last_contacted_at) return a.name.localeCompare(b.name)
       if (!a.last_contacted_at) return 1
       if (!b.last_contacted_at) return -1
       return new Date(b.last_contacted_at).getTime() - new Date(a.last_contacted_at).getTime()
     })
-  }, [category, people, search, sort, statusFiltering, statusParam])
+  }, [activeFilter, category, interactionCounts, locationFilter, people, search, sort])
+
+  const hasActiveFilter = !!(activeFilter || locationFilter.trim())
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last Contacted"
+
+  function openSortSheet() {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ["Cancel", ...SORT_OPTIONS.map((o) => o.label)],
+        cancelButtonIndex: 0,
+      },
+      (buttonIndex) => {
+        if (buttonIndex > 0) {
+          const option = SORT_OPTIONS[buttonIndex - 1]
+          if (option) setSort(option.key)
+        }
+      },
+    )
+  }
+
+  async function shareApp() {
+    try {
+      await Share.share({
+        message:
+          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at tryrootsapp.com",
+      })
+    } catch {
+      // user dismissed share sheet
+    }
+  }
 
   if (loading) return <LoadingState />
 
   return (
     <Screen scrollable={false}>
       <BrandHeader
-        title="People"
+        title="Your People"
+        titleIcon="heart-outline"
         subtitle="The people who matter most."
-        actionIcon="add"
-        actionLabel="Add person"
-        onAction={() => router.push("/people/new")}
       />
+
+      <TouchableOpacity
+        onPress={shareApp}
+        accessibilityRole="button"
+        accessibilityLabel="Invite a friend"
+        activeOpacity={0.76}
+        className="mx-5 mb-3 flex-row items-center rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm"
+      >
+        <Ionicons name="share-outline" size={18} color={colors.forest} />
+        <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="ml-2 flex-1 text-sm">
+          Invite a friend
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+      </TouchableOpacity>
 
       <View className="px-5">
         {error ? <ErrorBanner message={error} /> : null}
@@ -227,14 +318,14 @@ export default function PeopleScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="More filters"
-            onPress={() => setStatusFiltering((value) => !value)}
+            onPress={() => setFilterSheetVisible(true)}
             className={`min-h-11 flex-row items-center rounded-full border px-4 ${
-              statusFiltering ? "border-forest bg-forest" : "border-stone-200 bg-white"
+              hasActiveFilter ? "border-forest bg-forest" : "border-stone-200 bg-white"
             }`}
           >
-            <Ionicons name="filter-outline" size={17} color={statusFiltering ? "#FFFFFF" : colors.ink} />
-            <Text style={{ fontFamily: fonts.medium }} className={`ml-2 text-sm ${statusFiltering ? "text-white" : "text-warm-black"}`}>
-              More
+            <Ionicons name="filter-outline" size={17} color={hasActiveFilter ? "#FFFFFF" : colors.ink} />
+            <Text style={{ fontFamily: fonts.medium }} className={`ml-2 text-sm ${hasActiveFilter ? "text-white" : "text-warm-black"}`}>
+              {hasActiveFilter ? "Filtered" : "More"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -242,25 +333,28 @@ export default function PeopleScreen() {
         <View className="mt-5 flex-row items-center justify-between">
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Toggle people sort"
-            onPress={() => setSort((current) => current === "last_contacted" ? "name" : "last_contacted")}
+            accessibilityLabel="Change sort order"
+            onPress={openSortSheet}
             className="min-h-10 flex-row items-center"
           >
             <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-base">
-              Sort by {sort === "last_contacted" ? "last contacted" : "name"}
+              Sort: {currentSortLabel}
             </Text>
             <Ionicons name="chevron-down" size={18} color={colors.ink} />
           </TouchableOpacity>
 
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Toggle status filters"
-            onPress={() => setStatusFiltering((value) => !value)}
+            accessibilityLabel="Open filters"
+            onPress={() => setFilterSheetVisible(true)}
             className="min-h-10 flex-row items-center"
           >
-            <Ionicons name="options-outline" size={20} color={colors.ink} />
-            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="ml-2 text-base">
-              Filters
+            <Ionicons name="options-outline" size={20} color={hasActiveFilter ? colors.forest : colors.ink} />
+            <Text
+              style={{ fontFamily: fonts.body, color: hasActiveFilter ? colors.forest : colors.ink }}
+              className="ml-2 text-base"
+            >
+              {hasActiveFilter ? "Filtered" : "Filters"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -268,10 +362,11 @@ export default function PeopleScreen() {
 
       {sorted.length === 0 ? (
         <EmptyPanel
-          title={search || category !== "All" || statusFiltering ? "No results" : "No people yet"}
-          body={search || category !== "All" || statusFiltering
-            ? "Try a different search, category, or filter."
-            : "Add someone you want to stay in touch with."
+          title={search || category !== "All" || hasActiveFilter ? "No results" : "No people yet"}
+          body={
+            search || category !== "All" || hasActiveFilter
+              ? "Try a different search, category, or filter."
+              : "Add someone you want to stay in touch with."
           }
         />
       ) : (
@@ -291,7 +386,126 @@ export default function PeopleScreen() {
           )}
         />
       )}
+
+      <FilterSheet
+        visible={filterSheetVisible}
+        activeFilter={activeFilter}
+        locationFilter={locationFilter}
+        onSelectFilter={setActiveFilter}
+        onLocationChange={setLocationFilter}
+        onClose={() => setFilterSheetVisible(false)}
+      />
     </Screen>
+  )
+}
+
+function FilterSheet({
+  visible,
+  activeFilter,
+  locationFilter,
+  onSelectFilter,
+  onLocationChange,
+  onClose,
+}: {
+  visible: boolean
+  activeFilter: string | null
+  locationFilter: string
+  onSelectFilter: (filter: string | null) => void
+  onLocationChange: (text: string) => void
+  onClose: () => void
+}) {
+  const insets = useSafeAreaInsets()
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        className="flex-1 justify-end bg-black/40"
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss filter sheet"
+      >
+        <Pressable
+          className="rounded-t-[30px] bg-white px-6 pt-5"
+          style={{ paddingBottom: Math.max(insets.bottom + 20, 36) }}
+          onStartShouldSetResponder={() => true}
+        >
+          <View className="mb-5 items-center">
+            <View className="h-1.5 w-20 rounded-full bg-stone-200" />
+          </View>
+          <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="mb-4 text-xl">
+            Filter
+          </Text>
+
+          {STATUS_FILTERS.map((option) => (
+            <TouchableOpacity
+              key={option.key}
+              accessibilityRole="button"
+              accessibilityLabel={option.label}
+              onPress={() => onSelectFilter(activeFilter === option.key ? null : option.key)}
+              className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
+                activeFilter === option.key ? "border-forest bg-forest" : "border-stone-200 bg-white"
+              }`}
+            >
+              <Text
+                style={{ fontFamily: fonts.medium }}
+                className={`text-sm ${activeFilter === option.key ? "text-white" : "text-warm-black"}`}
+              >
+                {option.label}
+              </Text>
+              {activeFilter === option.key ? (
+                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+              ) : null}
+            </TouchableOpacity>
+          ))}
+
+          <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
+            Filter by location
+          </Text>
+          <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
+            <Ionicons name="location-outline" size={16} color="#60646D" />
+            <TextInput
+              value={locationFilter}
+              onChangeText={onLocationChange}
+              placeholder="City, country…"
+              placeholderTextColor="#777A83"
+              className="ml-2 flex-1 text-sm"
+              style={{ fontFamily: fonts.body, color: colors.ink }}
+            />
+            {locationFilter ? (
+              <TouchableOpacity onPress={() => onLocationChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <View className="mt-5 flex-row gap-3">
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Clear filters"
+              onPress={() => {
+                onSelectFilter(null)
+                onLocationChange("")
+              }}
+              className="min-h-11 flex-1 items-center justify-center rounded-xl border border-stone-200"
+            >
+              <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
+                Clear
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Apply filters"
+              onPress={onClose}
+              className="min-h-11 flex-1 items-center justify-center rounded-xl bg-forest"
+            >
+              <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
+                Done
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 
@@ -311,9 +525,9 @@ function PersonCard({
   const fallbackTags = visibleTags.length
     ? visibleTags
     : [
-      ...(person.relationship_type ? [{ id: "relationship", name: person.relationship_type, color: colors.mint, user_id: person.user_id, created_at: person.created_at }] : []),
-      ...(person.role ? [{ id: "role", name: person.role, color: "#F2EEFA", user_id: person.user_id, created_at: person.created_at }] : []),
-    ].slice(0, 3)
+        ...(person.relationship_type ? [{ id: "relationship", name: person.relationship_type, color: colors.mint, user_id: person.user_id, created_at: person.created_at }] : []),
+        ...(person.role ? [{ id: "role", name: person.role, color: "#F2EEFA", user_id: person.user_id, created_at: person.created_at }] : []),
+      ].slice(0, 3)
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel={`Open ${person.name}`}>

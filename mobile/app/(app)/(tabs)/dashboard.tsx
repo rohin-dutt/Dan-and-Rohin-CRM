@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase"
 import type { Interaction, Person, Settings } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import {
-  categorizePeople,
   getBirthdayReminders,
   getMostContacted,
   getNextDueDays,
@@ -128,12 +127,19 @@ export default function DashboardScreen() {
   )
 
   const dashboard = useMemo(() => {
-    const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), interactions)
-    const dueToday = people.filter((person) => {
+    const overdueList = people.filter((person) => {
       const days = getNextDueDays(person)
       return days != null && days <= 0
     })
-    const followUps = [...dueToday, ...overdue, ...dueThisWeek]
+    const dueThisWeekList = people.filter((person) => {
+      const days = getNextDueDays(person)
+      return days != null && days >= 1 && days <= 7
+    })
+    const comingUpList = people.filter((person) => {
+      const days = getNextDueDays(person)
+      return days != null && days >= 8
+    })
+    const followUps = [...overdueList, ...dueThisWeekList]
       .filter((person, index, list) => list.findIndex((candidate) => candidate.id === person.id) === index)
       .slice(0, 3)
     const recentNotes = interactions
@@ -145,9 +151,9 @@ export default function DashboardScreen() {
       }))
 
     return {
-      dueToday,
-      dueThisWeek,
-      comingUp,
+      overdueList,
+      dueThisWeekList,
+      comingUpList,
       followUps,
       birthdays: getBirthdayReminders(people, new Date(), 30).slice(0, 3),
       recentNotes,
@@ -161,7 +167,7 @@ export default function DashboardScreen() {
   return (
     <Screen>
       <View className="px-5 pt-4 pb-2">
-        <View className="flex-row items-start justify-between">
+        <View className="flex-row items-start">
           <View className="flex-1">
             <View className="flex-row items-center">
               <Text
@@ -177,15 +183,16 @@ export default function DashboardScreen() {
             <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[15px]">
               {getGreeting(firstName)}
             </Text>
+            {settings?.current_streak ? (
+              <Text style={{ fontFamily: fonts.medium, color: colors.amber }} className="mt-1 text-sm">
+                {settings.current_streak} day streak 🔥
+              </Text>
+            ) : (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                Start your streak — log a chat today 🌱
+              </Text>
+            )}
           </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Open Roots overview"
-            onPress={() => router.push("/roots-map")}
-            className="mt-1 h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white shadow-sm"
-          >
-            <Ionicons name="leaf" size={20} color={colors.forest} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -203,9 +210,26 @@ export default function DashboardScreen() {
       ) : (
         <>
           <View className="mt-5 flex-row gap-3 px-5">
-            <MetricCard icon="checkmark-circle" value={dashboard.dueToday.length} label="due today" />
-            <MetricCard icon="time" value={dashboard.dueThisWeek.length} label="due this week" tone="amber" />
-            <MetricCard icon="calendar-outline" value={dashboard.comingUp.length} label="coming up" tone="blue" />
+            <MetricCard
+              icon="alert-circle"
+              value={dashboard.overdueList.length}
+              label="Overdue"
+              onPress={() => router.push("/people?status=overdue")}
+            />
+            <MetricCard
+              icon="time"
+              value={dashboard.dueThisWeekList.length}
+              label="Due This Week"
+              tone="amber"
+              onPress={() => router.push("/people?status=due_this_week")}
+            />
+            <MetricCard
+              icon="calendar-outline"
+              value={dashboard.comingUpList.length}
+              label="Coming Up"
+              tone="blue"
+              onPress={() => router.push("/people?status=coming_up")}
+            />
           </View>
 
           <SoftCard className="mx-5 mt-5 p-5">
@@ -258,71 +282,69 @@ export default function DashboardScreen() {
             )}
           </SoftCard>
 
-          <View className="mt-5 flex-row gap-4 px-5">
-            <SoftCard className="flex-1 p-4">
-              <SectionTitle title="Upcoming birthdays" actionLabel="View all" onAction={() => router.push("/people")} />
-              {dashboard.birthdays.length === 0 ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                  No birthdays in the next month.
-                </Text>
-              ) : (
-                dashboard.birthdays.map(({ person, daysUntil }, index) => (
+          <SoftCard className="mx-5 mt-5 p-4">
+            <SectionTitle title="Upcoming birthdays" actionLabel="View all" onAction={() => router.push("/people")} />
+            {dashboard.birthdays.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                No birthdays in the next month.
+              </Text>
+            ) : (
+              dashboard.birthdays.map(({ person, daysUntil }, index) => (
+                <TouchableOpacity
+                  key={person.id}
+                  onPress={() => router.push(`/people/${person.id}`)}
+                  className={`flex-row items-center ${index > 0 ? "mt-5" : ""}`}
+                >
+                  <IconTile
+                    icon="calendar-outline"
+                    color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
+                    background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
+                    size={38}
+                  />
+                  <View className="ml-3 flex-1">
+                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
+                      {person.name}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                      {daysUntil === 0 ? "Today" : `In ${daysUntil} days`} · {formatBirthdayDate(person.birthday)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </SoftCard>
+
+          <SoftCard className="mx-5 mt-5 p-4">
+            <SectionTitle title="Recent notes" actionLabel="View all" onAction={() => router.push("/people")} />
+            {dashboard.recentNotes.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                Notes you log will appear here.
+              </Text>
+            ) : (
+              dashboard.recentNotes.map(({ interaction, person }, index) => (
+                <View key={interaction.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
                   <TouchableOpacity
-                    key={person.id}
-                    onPress={() => router.push(`/people/${person.id}`)}
-                    className={`flex-row items-center ${index > 0 ? "mt-5" : ""}`}
+                    onPress={() => person && router.push(`/people/${person.id}`)}
+                    activeOpacity={0.76}
+                    className="flex-row"
                   >
-                    <IconTile
-                      icon="calendar-outline"
-                      color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
-                      background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
-                      size={38}
-                    />
+                    <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
                     <View className="ml-3 flex-1">
                       <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
-                        {person.name}
+                        {person ? `Note with ${person.name}` : "Recent note"}
                       </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                        {daysUntil === 0 ? "Today" : `In ${daysUntil} days`} · {formatBirthdayDate(person.birthday)}
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
+                        {interaction.notes}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                        {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${interaction.date}T12:00:00`))}
                       </Text>
                     </View>
                   </TouchableOpacity>
-                ))
-              )}
-            </SoftCard>
-
-            <SoftCard className="flex-1 p-4">
-              <SectionTitle title="Recent notes" actionLabel="View all" onAction={() => router.push("/people")} />
-              {dashboard.recentNotes.length === 0 ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                  Notes you log will appear here.
-                </Text>
-              ) : (
-                dashboard.recentNotes.map(({ interaction, person }, index) => (
-                  <View key={interaction.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
-                    <TouchableOpacity
-                      onPress={() => person && router.push(`/people/${person.id}`)}
-                      activeOpacity={0.76}
-                      className="flex-row"
-                    >
-                      <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
-                      <View className="ml-3 flex-1">
-                        <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
-                          {person ? `Note with ${person.name}` : "Recent note"}
-                        </Text>
-                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
-                          {interaction.notes}
-                        </Text>
-                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                          {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${interaction.date}T12:00:00`))}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </SoftCard>
-          </View>
+                </View>
+              ))
+            )}
+          </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-5">
             <SectionTitle title="Your summary" />
@@ -339,11 +361,6 @@ export default function DashboardScreen() {
                 label="Most contacted"
               />
             </View>
-            {settings?.current_streak ? (
-              <Text style={{ fontFamily: fonts.medium, color: colors.amber }} className="mt-5 text-sm">
-                {settings.current_streak} day streak
-              </Text>
-            ) : null}
           </SoftCard>
         </>
       )}
@@ -356,11 +373,13 @@ function MetricCard({
   value,
   label,
   tone = "green",
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   value: number
   label: string
   tone?: "green" | "amber" | "blue"
+  onPress?: () => void
 }) {
   const toneColors = {
     green: { bg: colors.mint, icon: colors.forest },
@@ -369,19 +388,27 @@ function MetricCard({
   }[tone]
 
   return (
-    <SoftCard className="min-h-16 flex-1 flex-row items-center justify-center px-3 py-3">
-      <View className="mr-2 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
-        <Ionicons name={icon} size={20} color={toneColors.icon} />
-      </View>
-      <View>
-        <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl leading-6">
-          {value}
-        </Text>
-        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-xs">
-          {label}
-        </Text>
-      </View>
-    </SoftCard>
+    <TouchableOpacity
+      activeOpacity={0.76}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className="flex-1"
+    >
+      <SoftCard className="min-h-16 flex-row items-center justify-center px-3 py-3">
+        <View className="mr-2 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: toneColors.bg }}>
+          <Ionicons name={icon} size={20} color={toneColors.icon} />
+        </View>
+        <View>
+          <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-xl leading-6">
+            {value}
+          </Text>
+          <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-xs">
+            {label}
+          </Text>
+        </View>
+      </SoftCard>
+    </TouchableOpacity>
   )
 }
 
