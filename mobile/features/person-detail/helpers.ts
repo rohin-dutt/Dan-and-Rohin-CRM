@@ -1,0 +1,30 @@
+import type { Ionicons } from "@expo/vector-icons"
+import type { Tag } from "@/types"
+
+export type PersonTagRow = {
+  tags: Tag | Tag[] | null
+}
+
+export function getTagFromJoin(row: PersonTagRow): Tag | null {
+  if (Array.isArray(row.tags)) return row.tags[0] ?? null
+  return row.tags
+}
+
+export function formatNextAction(days: number | null): string {
+  if (days == null) return "No cadence"
+  if (days < 0) return `${Math.abs(days)}d overdue`
+  if (days === 0) return "Due today"
+  if (days === 1) return "Due tomorrow"
+  return `Due in ${days}d`
+}
+
+export function interactionIcon(type: string): keyof typeof Ionicons.glyphMap {
+  const normalized = type.trim().toLowerCase()
+  if (normalized.includes("call") || normalized.includes("phone")) return "call-outline"
+  if (normalized.includes("text") || normalized.includes("message")) return "chatbubble-outline"
+  if (normalized.includes("coffee")) return "cafe-outline"
+  if (normalized.includes("meeting") || normalized.includes("meet")) return "people-outline"
+  if (normalized.includes("email")) return "mail-outline"
+  if (normalized.includes("note")) return "document-text-outline"
+  return "chatbubbles-outline"
+}

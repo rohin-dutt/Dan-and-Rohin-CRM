@@ -136,6 +136,15 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [x] Confirm service-role operations never run in the mobile app.
   - Server-only service-role client creation is isolated behind trusted API
     code after request authentication.
+- [ ] Make mobile person save/update truly atomic through an RPC or trusted
+      route.
+  - June 10, 2026: mobile add/edit/onboarding person writes (people row,
+    relationship tag, person_tags replacement, important_moments replacement)
+    are centralized in `mobile/lib/people-data.ts` with per-step error checks
+    and surfaced partial-failure errors, but the steps are still separate
+    client writes. A failure after the person row write can leave a person
+    without tags/moments until the user retries. True transactionality needs
+    a `save_person_with_relations`-style RPC or trusted route.
 
 ## Phase 2: Shared Core Extraction
 
@@ -169,10 +178,12 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Add app icon and splash screen.
 - [ ] Add NativeWind v4.
 - [ ] Create base design tokens.
-- [x] Create `PrivacyInfo.xcprivacy` placeholder if required by selected native
-      dependencies or accessed APIs.
-  - Expo app config now includes an iOS privacy manifest placeholder,
-    Contacts/Notifications purpose strings, and `userInterfaceStyle`.
+- [x] Declare iOS privacy manifest values in app config.
+  - `mobile/app.json` sets `ios.privacyManifests` (no collected data types, no
+    tracking), Contacts/Notifications purpose strings, and
+    `userInterfaceStyle`. There is no standalone `PrivacyInfo.xcprivacy` file
+    in the repo; Expo prebuild/EAS generates it from app config. Verifying the
+    generated manifest in a real build remains open in Phase 12.
 - [ ] Create base components:
   - [ ] Screen
   - [ ] Button
@@ -259,8 +270,16 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Settings account tab.
 - [x] Settings notification preferences.
   - Mobile Settings exposes a combined push notification preference toggle
-    backed by follow-up, birthday, and important-moment push columns.
+    backed by follow-up, birthday, and important-moment push columns. The row
+    copy states that reminder delivery is not live yet because no scheduled
+    push sender exists. The email digest toggle was removed from mobile
+    Settings on June 10, 2026 because email reminders are out of scope for
+    mobile v1 and no email sender exists; `settings.email_reminders_enabled`
+    remains a web/compatibility-only column.
 - [ ] Settings tag management.
+  - Mobile Settings now labels tag management as not available in the app yet
+    and points users to a person's edit screen; the dedicated management UI
+    remains open.
 - [ ] Unsaved-change handling for edit/create flows.
 
 ## Phase 8: Native Contacts Import
@@ -396,6 +415,35 @@ For mobile-specific work, also run the selected Expo checks, mobile unit tests,
 and mobile E2E checks where available. Complete real-device TestFlight QA when
 the feature touches auth, native permissions, push, offline behavior, import,
 restore, or account deletion.
+
+## June 10, 2026 Structure/Readiness Cleanup Pass Notes
+
+- Removed tracked Expo start logs (`mobile/expo-start.err.log`,
+  `mobile/expo-start.out.log`) and added `*.out.log`/`*.err.log` ignore rules
+  to `mobile/.gitignore`.
+- Extracted shared mobile helpers: portable date and important-moment draft
+  helpers in `packages/shared` (with root tests in
+  `tests/shared-helpers.test.mjs`), relationship categories in
+  `mobile/constants/categories.ts`, contact frequency options/labels in
+  `mobile/constants/frequencies.ts`, display-date formatting in
+  `mobile/lib/format-dates.ts`, get-or-create tag in `mobile/lib/tags.ts`,
+  and the person save/update flow in `mobile/lib/people-data.ts`.
+- Split oversized screens into `mobile/features/*` modules (person-detail,
+  people-list, dashboard, settings, quick-add, person-form) because Expo
+  Router has no Next.js-style `_components` private-folder convention inside
+  `mobile/app/`.
+- Mutation reliability: person-detail follow-up done/snooze, note edit/delete,
+  person delete, tag creation, and onboarding/person-form multi-step saves now
+  check Supabase errors and surface user-visible feedback; double-submit
+  guards added to save handlers.
+- Data loading: dashboard and people-list interaction fetches now select
+  explicit summary columns instead of `*`; dashboard/people derivation moved
+  into pure helpers so server-side summaries or pagination can replace them
+  later. People list pagination is deferred as a future scale item.
+- Settings honesty: push notification row states delivery is not live, the
+  email digest toggle was removed (out of mobile v1 scope), tag management is
+  labeled as not yet built, and import/restore file picks are validated with
+  clear error messages before upload.
 
 ## June 8, 2026 Mobile Review Fix Pass Notes
 

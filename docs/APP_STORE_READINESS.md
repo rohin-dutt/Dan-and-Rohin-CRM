@@ -110,8 +110,12 @@ Required decisions:
 
 ## Privacy Manifest And SDK Review
 
-- [x] `PrivacyInfo.xcprivacy` exists if required by app behavior or selected
-      native dependencies.
+- [ ] `PrivacyInfo.xcprivacy` verified in a generated/archived build.
+  - Current state: there is no standalone `PrivacyInfo.xcprivacy` file in the
+    repo. Privacy manifest values live in `mobile/app.json` under
+    `ios.privacyManifests` (no collected data types, no tracking). Expo
+    prebuild/EAS generates the native manifest from that config; verifying the
+    generated manifest in a real build remains open.
 - [ ] Collected data declarations match App Store privacy answers.
 - [ ] Required-reason API usage is declared where applicable.
 - [ ] Third-party SDK privacy manifests are present where required.

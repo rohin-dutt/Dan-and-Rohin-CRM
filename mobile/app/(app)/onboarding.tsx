@@ -1,89 +1,16 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
-import DateTimePicker from "@react-native-community/datetimepicker"
-import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
-import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import { colors, fonts } from "@/constants/theme"
-import { INTERACTION_TYPES } from "@roots/shared"
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-]
-
-function toLocalDateString(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, "0")
-  const d = String(date.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
-
-function formatDateDisplay(date: Date): string {
-  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-}
-
-function InlineDatePicker({
-  date,
-  placeholder,
-  open,
-  onToggle,
-  onChange,
-  onDone,
-  maximumDate,
-}: {
-  date: Date | null
-  placeholder: string
-  open: boolean
-  onToggle: () => void
-  onChange: (date: Date) => void
-  onDone: () => void
-  maximumDate?: Date
-}) {
-  return (
-    <View>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel={placeholder}
-        onPress={onToggle}
-        className="flex-row items-center border rounded-xl px-3 py-2.5 bg-white"
-        style={{ borderColor: open ? colors.forest : "#E5E7EB" }}
-      >
-        <Ionicons name="calendar-outline" size={16} color={date ? colors.forest : "#9CA3AF"} style={{ marginRight: 8 }} />
-        <Text style={{ fontFamily: fonts.body, color: date ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}>
-          {date ? formatDateDisplay(date) : placeholder}
-        </Text>
-        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
-      </TouchableOpacity>
-      {open ? (
-        <View className="mt-2 overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.forest }}>
-          <DateTimePicker
-            value={date ?? new Date()}
-            mode="date"
-            display="spinner"
-            onChange={(_, picked) => {
-              if (picked) onChange(picked)
-            }}
-            maximumDate={maximumDate}
-          />
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Done selecting date"
-            onPress={onDone}
-            style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
-          >
-            <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-    </View>
-  )
-}
+import { InlineDateField } from "@/components/InlineDateField"
+import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
+import { RELATIONSHIP_CATEGORIES } from "@/constants/categories"
+import { CONTACT_FREQUENCY_OPTIONS } from "@/constants/frequencies"
+import { INTERACTION_TYPES, toLocalDateString } from "@roots/shared"
 
 export default function OnboardingScreen() {
   const router = useRouter()
@@ -148,7 +75,7 @@ export default function OnboardingScreen() {
       setFormError("First name is required.")
       return
     }
-    if (!userId) return
+    if (!userId || saving) return
     setSaving(true)
     setFormError(null)
 
@@ -157,53 +84,34 @@ export default function OnboardingScreen() {
     const hasBirthday = selectedCategory === "Friend" || isFamily
     const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(" ")
 
-    const { data, error: insertError } = await supabase
-      .from("people")
-      .insert({
-        user_id: userId,
-        name,
-        how_met: howMet.trim() || null,
-        contact_frequency_days: selectedFreq,
-        company: isProfessional && company.trim() ? company.trim() : null,
-        role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
-        relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
+    let personId: string
+    try {
+      personId = await createPersonWithRelations({
+        userId,
+        person: {
+          name,
+          how_met: howMet.trim() || null,
+          contact_frequency_days: selectedFreq,
+          company: isProfessional && company.trim() ? company.trim() : null,
+          role: isProfessional && role.trim() ? role.trim() : null,
+          birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
+          relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
+        },
+        categoryLabel: selectedCategory || null,
       })
-      .select()
-      .single()
-
-    if (insertError || !data) {
-      setFormError(insertError?.message ?? "Failed to save. Please try again.")
-      setSaving(false)
-      return
-    }
-
-    if (selectedCategory) {
-      const catPill = ONBOARDING_CATEGORY_PILLS.find((p) => p.label === selectedCategory)
-      if (catPill) {
-        const { data: existing } = await supabase
-          .from("tags")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("name", catPill.tagName)
-          .limit(1)
-
-        let tagId: string | null = existing?.[0]?.id ?? null
-        if (!tagId) {
-          const { data: newTag } = await supabase
-            .from("tags")
-            .insert({ user_id: userId, name: catPill.tagName, color: catPill.tagColor })
-            .select("id")
-            .single()
-          tagId = newTag?.id ?? null
-        }
-        if (tagId) {
-          await supabase.from("person_tags").insert({ person_id: data.id, tag_id: tagId })
-        }
+    } catch (e) {
+      if (e instanceof PersonRelationsError) {
+        // Person was saved; category tag assignment is best-effort during
+        // onboarding, so continue instead of blocking the flow.
+        personId = e.personId
+      } else {
+        setFormError(e instanceof Error ? e.message : "Failed to save. Please try again.")
+        setSaving(false)
+        return
       }
     }
 
-    setSavedPersonId(data.id)
+    setSavedPersonId(personId)
     setLastSavedFirstName(trimmedFirst)
     resetForm()
     setSaving(false)
@@ -305,7 +213,7 @@ export default function OnboardingScreen() {
 
           <Text className="text-sm font-medium text-warm-black mb-2">Relationship type</Text>
           <View className="flex-row flex-wrap gap-2 mb-4">
-            {ONBOARDING_CATEGORY_PILLS.map(({ label }) => (
+            {RELATIONSHIP_CATEGORIES.map(({ label }) => (
               <PillButton
                 key={label}
                 label={label}
@@ -339,7 +247,7 @@ export default function OnboardingScreen() {
           {showBirthday && (
             <View className="mb-4">
               <Text className="text-sm font-medium text-warm-black mb-1">Birthday</Text>
-              <InlineDatePicker
+              <InlineDateField
                 date={birthday}
                 placeholder="Select birthday"
                 open={showBirthdayPicker}
@@ -375,7 +283,7 @@ export default function OnboardingScreen() {
 
           <Text className="text-sm font-medium text-warm-black mb-2">Stay in touch</Text>
           <View className="flex-row flex-wrap gap-2 mb-6">
-            {ONBOARDING_FREQ_OPTIONS.map(({ label, value }) => (
+            {CONTACT_FREQUENCY_OPTIONS.map(({ label, value }) => (
               <PillButton
                 key={value}
                 label={label}
@@ -419,7 +327,7 @@ export default function OnboardingScreen() {
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-warm-black mb-1">When?</Text>
-          <InlineDatePicker
+          <InlineDateField
             date={interactionDate}
             placeholder="Select date"
             open={showInteractionDatePicker}

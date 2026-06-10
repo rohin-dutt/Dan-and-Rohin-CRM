@@ -350,7 +350,7 @@ export function getNeedsAttention(people: Person[]): Person | null {
 
 export function getMostContacted(
   people: Person[],
-  interactions: Interaction[]
+  interactions: Array<Pick<Interaction, "person_id" | "is_touch_point" | "type">>
 ): Person | null {
   if (!interactions.length) return null;
   const counts = new Map<string, number>();
@@ -384,7 +384,9 @@ export function getTotalContacts(people: Person[]): number {
   return people.length;
 }
 
-export function getTotalInteractions(interactions: Interaction[]): number {
+export function getTotalInteractions(
+  interactions: Array<Pick<Interaction, "is_touch_point" | "type">>
+): number {
   return interactions.filter(isTouchPoint).length;
 }
 

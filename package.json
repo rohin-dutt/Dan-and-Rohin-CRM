@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/crm-rules.test.mjs && node tests/date-utils.test.mjs && node tests/import-validation.test.mjs",
+    "test": "node tests/crm-rules.test.mjs && node tests/date-utils.test.mjs && node tests/import-validation.test.mjs && node tests/shared-helpers.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:signed-in": "node tests/e2e/run-authenticated-e2e.mjs"
   },

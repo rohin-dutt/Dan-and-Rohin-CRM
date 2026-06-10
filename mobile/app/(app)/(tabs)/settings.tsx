@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react"
-import { Alert, Linking, Share, Text, TouchableOpacity, View } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
-import * as DocumentPicker from "expo-document-picker"
-import * as FileSystem from "expo-file-system/legacy"
+import { Alert, Linking, Share, Text, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
-import { BrandHeader, Divider, IconTile, SoftCard } from "@/components/RootsUI"
+import { BrandHeader, Divider } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { clearLocalPrivateData } from "@/lib/private-data"
 import { registerPushToken, revokePushToken } from "@/lib/push-notifications"
-import { callTrustedApi } from "@/lib/trusted-api"
-import { colors, fonts } from "@/constants/theme"
+import { displayNameFromMetadata } from "@/lib/user-metadata"
+import { fonts } from "@/constants/theme"
+import { InlineForm, SettingsRow, SettingsSection } from "@/features/settings/components"
+import { useDataManagement } from "@/features/settings/use-data-management"
 import type { Settings } from "@/types"
 
 type Status = { ok: boolean; message: string } | null
@@ -31,11 +30,20 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
   const [toggling, setToggling] = useState(false)
-  const [dataWorking, setDataWorking] = useState(false)
-  const [deletingAccount, setDeletingAccount] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+
+  function setOk(message: string) {
+    setStatus({ ok: true, message })
+    setError(null)
+  }
+
+  function setFailure(message: string) {
+    setStatus({ ok: false, message })
+  }
+
+  const dataManagement = useDataManagement({ onSuccess: setOk, onFailure: setFailure })
 
   useEffect(() => {
     async function load() {
@@ -45,15 +53,7 @@ export default function SettingsScreen() {
         } = await supabase.auth.getSession()
         if (!session) return
         setEmail(session.user.email ?? "")
-        setDisplayName(
-          typeof session.user.user_metadata?.full_name === "string"
-            ? session.user.user_metadata.full_name
-            : typeof session.user.user_metadata?.name === "string"
-              ? session.user.user_metadata.name
-              : typeof session.user.user_metadata?.display_name === "string"
-                ? session.user.user_metadata.display_name
-                : "",
-        )
+        setDisplayName(displayNameFromMetadata(session.user.user_metadata))
 
         const { data } = await supabase
           .from("settings")
@@ -80,15 +80,6 @@ export default function SettingsScreen() {
     load()
   }, [])
 
-  function setOk(message: string) {
-    setStatus({ ok: true, message })
-    setError(null)
-  }
-
-  function setFailure(message: string) {
-    setStatus({ ok: false, message })
-  }
-
   async function handleSignOut() {
     Alert.alert("Log out", "Sign out of your Roots account?", [
       { text: "Cancel", style: "cancel" },
@@ -96,9 +87,11 @@ export default function SettingsScreen() {
         text: "Log out",
         style: "destructive",
         onPress: async () => {
+          // Token revocation is best-effort; sign-out must not be blocked by it.
           await revokePushToken().catch(() => null)
           await clearLocalPrivateData()
-          await supabase.auth.signOut()
+          const { error: signOutError } = await supabase.auth.signOut()
+          if (signOutError) setFailure(signOutError.message)
         },
       },
     ])
@@ -182,21 +175,8 @@ export default function SettingsScreen() {
     setError(null)
   }
 
-  async function toggleEmailDigest() {
-    if (!settings) return
-    setToggling(true)
-    try {
-      await updateSettingsPatch({ email_reminders_enabled: !settings.email_reminders_enabled })
-      setOk("Email digest settings updated.")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update email digest.")
-    } finally {
-      setToggling(false)
-    }
-  }
-
   async function togglePushNotifications() {
-    if (!settings) return
+    if (!settings || toggling) return
     setToggling(true)
     try {
       const currentlyOn =
@@ -213,118 +193,12 @@ export default function SettingsScreen() {
         push_birthdays_enabled: !currentlyOn,
         push_important_moments_enabled: !currentlyOn,
       })
-      setOk("Push notification settings updated.")
+      setOk("Push notification preference saved.")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update push notifications.")
     } finally {
       setToggling(false)
     }
-  }
-
-  async function exportData() {
-    setDataWorking(true)
-    setStatus(null)
-    try {
-      const payload = await callTrustedApi("/api/export", { method: "GET" })
-      await Share.share({
-        title: "Roots export",
-        message: JSON.stringify(payload, null, 2),
-      })
-      setOk("Export generated.")
-    } catch (e) {
-      setFailure(e instanceof Error ? e.message : "Failed to export data.")
-    } finally {
-      setDataWorking(false)
-    }
-  }
-
-  async function pickJsonPayload() {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "application/json",
-      copyToCacheDirectory: true,
-    })
-    if (result.canceled) return null
-    const asset = result.assets[0]
-    if (!asset?.uri) return null
-    const text = await FileSystem.readAsStringAsync(asset.uri)
-    return JSON.parse(text) as unknown
-  }
-
-  async function importData() {
-    setDataWorking(true)
-    setStatus(null)
-    try {
-      const payload = await pickJsonPayload()
-      if (!payload) return
-      await callTrustedApi("/api/import/restore", {
-        body: { payload, replace_existing: false },
-      })
-      setOk("Import complete.")
-    } catch (e) {
-      setFailure(e instanceof Error ? e.message : "Failed to import data.")
-    } finally {
-      setDataWorking(false)
-    }
-  }
-
-  async function restoreData() {
-    Alert.alert(
-      "Restore and replace?",
-      "This replaces your current Roots data with the selected export file.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Choose file",
-          style: "destructive",
-          onPress: async () => {
-            setDataWorking(true)
-            setStatus(null)
-            try {
-              const payload = await pickJsonPayload()
-              if (!payload) return
-              await callTrustedApi("/api/import/restore", {
-                body: { payload, replace_existing: true },
-              })
-              setOk("Restore complete.")
-            } catch (e) {
-              setFailure(e instanceof Error ? e.message : "Failed to restore data.")
-            } finally {
-              setDataWorking(false)
-            }
-          },
-        },
-      ],
-    )
-  }
-
-  async function handleDeleteAccount() {
-    Alert.alert(
-      "Delete account",
-      "This permanently deletes your Roots account and private CRM data. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete account",
-          style: "destructive",
-          onPress: async () => {
-            setDeletingAccount(true)
-            setError(null)
-            try {
-              await callTrustedApi("/api/account/delete", {
-                method: "POST",
-                body: { confirm: "DELETE" },
-              })
-              await clearLocalPrivateData()
-              await supabase.auth.signOut()
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Failed to delete account.")
-            } finally {
-              setDeletingAccount(false)
-            }
-          },
-        },
-      ],
-    )
   }
 
   if (loading) return <LoadingState />
@@ -334,7 +208,6 @@ export default function SettingsScreen() {
       settings?.push_birthdays_enabled ||
       settings?.push_important_moments_enabled,
   )
-  const emailDigestOn = Boolean(settings?.email_reminders_enabled)
 
   return (
     <Screen>
@@ -437,19 +310,10 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="notifications-outline"
             title="Push notifications"
-            description="Follow-ups, birthdays, and important moments"
+            description="Saves your reminder preference and registers this device. Reminder delivery is still in development and not live yet."
             value={pushOn ? "On" : "Off"}
             disabled={toggling || !settings}
             onPress={togglePushNotifications}
-          />
-          <Divider />
-          <SettingsRow
-            icon="mail-outline"
-            title="Email digest"
-            description="Weekly relationship summary"
-            value={emailDigestOn ? "On" : "Off"}
-            disabled={toggling || !settings}
-            onPress={toggleEmailDigest}
           />
         </SettingsSection>
 
@@ -472,24 +336,24 @@ export default function SettingsScreen() {
             icon="cloud-download-outline"
             title="Export data"
             description="Download a copy of your data"
-            disabled={dataWorking}
-            onPress={exportData}
+            disabled={dataManagement.dataWorking}
+            onPress={dataManagement.exportData}
           />
           <Divider />
           <SettingsRow
             icon="cloud-upload-outline"
             title="Import data"
             description="Import or update from a file"
-            disabled={dataWorking}
-            onPress={importData}
+            disabled={dataManagement.dataWorking}
+            onPress={dataManagement.importData}
           />
           <Divider />
           <SettingsRow
             icon="refresh-outline"
             title="Restore / Replace"
             description="Replace all your data with a backup"
-            disabled={dataWorking}
-            onPress={restoreData}
+            disabled={dataManagement.dataWorking}
+            onPress={dataManagement.restoreData}
           />
         </SettingsSection>
 
@@ -497,8 +361,13 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="pricetag-outline"
             title="Manage tags"
-            description="Create, edit, and organize your tags"
-            onPress={() => Alert.alert("Manage tags", "Tag management is available from people profile flows today.")}
+            description="Not available in the app yet — add or remove tags from a person's edit screen"
+            onPress={() =>
+              Alert.alert(
+                "Manage tags",
+                "Dedicated tag management has not been built in the mobile app yet. You can add or remove a person's tags from their edit screen, or manage all tags on the website.",
+              )
+            }
           />
         </SettingsSection>
 
@@ -524,96 +393,15 @@ export default function SettingsScreen() {
           <View className="mt-3 rounded-xl bg-red-50">
             <SettingsRow
               icon="trash-outline"
-              title={deletingAccount ? "Deleting account..." : "Delete account"}
+              title={dataManagement.deletingAccount ? "Deleting account..." : "Delete account"}
               description="Permanently delete your account and all data"
               danger
-              disabled={deletingAccount}
-              onPress={handleDeleteAccount}
+              disabled={dataManagement.deletingAccount}
+              onPress={dataManagement.deleteAccount}
             />
           </View>
         </SettingsSection>
       </View>
     </Screen>
   )
-}
-
-function SettingsSection({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string
-  subtitle: string
-  children: React.ReactNode
-}) {
-  return (
-    <SoftCard className="mb-4 p-4">
-      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-lg">
-        {title}
-      </Text>
-      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-sm">
-        {subtitle}
-      </Text>
-      <View className="mt-3">{children}</View>
-    </SoftCard>
-  )
-}
-
-function SettingsRow({
-  icon,
-  title,
-  description,
-  value,
-  danger,
-  disabled,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  title: string
-  description?: string
-  value?: string
-  danger?: boolean
-  disabled?: boolean
-  onPress: () => void
-}) {
-  return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      disabled={disabled}
-      onPress={onPress}
-      activeOpacity={0.74}
-      className={`min-h-16 flex-row items-center py-2 ${disabled ? "opacity-50" : ""}`}
-    >
-      <IconTile
-        icon={icon}
-        size={44}
-        color={danger ? colors.danger : colors.forest}
-        background={danger ? "#FDECE8" : colors.mint}
-      />
-      <View className="ml-4 flex-1">
-        <Text
-          style={{ fontFamily: fonts.bold, color: danger ? colors.danger : colors.ink }}
-          className="text-base"
-        >
-          {title}
-        </Text>
-        {description ? (
-          <Text style={{ fontFamily: fonts.body, color: danger ? "#7A271A" : colors.muted }} className="mt-1 text-sm">
-            {description}
-          </Text>
-        ) : null}
-      </View>
-      {value ? (
-        <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="mr-2 text-base">
-          {value}
-        </Text>
-      ) : null}
-      <Ionicons name="chevron-forward" size={22} color={colors.muted} />
-    </TouchableOpacity>
-  )
-}
-
-function InlineForm({ children }: { children: React.ReactNode }) {
-  return <View className="mb-3 rounded-2xl bg-stone-50 p-3">{children}</View>
 }

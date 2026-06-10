@@ -1,77 +1,30 @@
-import { useEffect, useRef, useState } from "react"
-import { Modal, Pressable, Switch, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { useEffect, useState } from "react"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import DateTimePicker from "@react-native-community/datetimepicker"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
-import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
+import { updatePersonWithRelations } from "@/lib/people-data"
 import { colors, fonts } from "@/constants/theme"
-import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import type { ImportantMoment, Person, Tag } from "@/types"
-
-const CATEGORIES = [
-  { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
-  { label: "Family", tagName: "Family", tagColor: "#2563EB" },
-  { label: "Professional", tagName: "Professional", tagColor: "#D97706" },
-] as const
-
-type CategoryLabel = (typeof CATEGORIES)[number]["label"]
-type MomentDraft = Pick<ImportantMoment, "label" | "date" | "recurs_yearly">
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-]
-
-function toLocalDateString(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, "0")
-  const d = String(date.getDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
-
-function formatDateDisplay(date: Date): string {
-  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-}
-
-function parseLocalDate(value: string): Date | null {
-  const parts = value.split("-").map(Number)
-  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null
-  return new Date(parts[0]!, parts[1]! - 1, parts[2])
-}
-
-async function getOrCreateTag(
-  userId: string,
-  name: string,
-  color: string,
-): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from("tags")
-    .select("id")
-    .eq("user_id", userId)
-    .ilike("name", name)
-    .maybeSingle()
-
-  if (existing) return existing.id
-
-  const { data: created } = await supabase
-    .from("tags")
-    .insert({ user_id: userId, name, color })
-    .select("id")
-    .single()
-
-  return created?.id ?? null
-}
-
-function freqLabel(days: number) {
-  return ONBOARDING_FREQ_OPTIONS.find((option) => option.value === days)?.label ?? `Every ${days} days`
-}
+import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
+import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
+import {
+  normalizeMomentDrafts,
+  parseLocalDateString,
+  toLocalDateString,
+  type ImportantMomentDraft,
+} from "@roots/shared"
+import { BirthdayField } from "@/features/person-form/BirthdayField"
+import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
+import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
+import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
+import type { Person, Tag } from "@/types"
 
 export default function EditPersonScreen() {
   const router = useRouter()
@@ -83,54 +36,22 @@ export default function EditPersonScreen() {
   const [categoryError, setCategoryError] = useState<string | null>(null)
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
-  const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
-  const [momentPickerIndex, setMomentPickerIndex] = useState<number | null>(null)
+  const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
-  const [category, setCategory] = useState<CategoryLabel | null>(null)
+  const [category, setCategory] = useState<RelationshipCategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
   const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
-  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [email, setEmail] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(30)
-  const [location, setLocation] = useState("")
-  const [latitude, setLatitude] = useState<number | null>(null)
-  const [longitude, setLongitude] = useState<number | null>(null)
-  const [locationSuggestions, setLocationSuggestions] = useState<MapboxFeature[]>([])
   const [notes, setNotes] = useState("")
 
-  // Freq dropdown
-  const freqButtonRef = useRef<View>(null)
-  const [freqDropdownVisible, setFreqDropdownVisible] = useState(false)
-  const [freqDropdownPos, setFreqDropdownPos] = useState({ x: 0, y: 0 })
-
-  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function handleLocationChange(text: string) {
-    setLocation(text)
-    setLatitude(null)
-    setLongitude(null)
-    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
-    if (!text.trim()) {
-      setLocationSuggestions([])
-      return
-    }
-    geocodeTimerRef.current = setTimeout(() => {
-      void geocodePlace(text).then((results) => {
-        setLocationSuggestions(results.slice(0, 5))
-      })
-    }, 400)
-  }
-
-  function handleLocationSuggestionSelect(feature: MapboxFeature) {
-    setLocation(feature.place_name)
-    setLatitude(feature.center[1])
-    setLongitude(feature.center[0])
-    setLocationSuggestions([])
-  }
+  const freqMenu = useAnchoredMenu()
+  const locationField = useLocationAutocomplete()
+  const { resetLocation } = locationField
 
   useEffect(() => {
     async function load() {
@@ -148,6 +69,8 @@ export default function EditPersonScreen() {
         ])
 
         if (personRes.error) throw personRes.error
+        if (tagsRes.error) throw tagsRes.error
+        if (personTagsRes.error) throw personTagsRes.error
         const p: Person = personRes.data
 
         // Split name into first/last
@@ -160,19 +83,14 @@ export default function EditPersonScreen() {
         setEmail(p.email ?? "")
         setHowMet(p.how_met ?? "")
         setFrequencyDays(p.contact_frequency_days ?? 30)
-        setLocation(p.location ?? "")
-        setLatitude(p.latitude ?? null)
-        setLongitude(p.longitude ?? null)
+        resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
         setNotes(p.notes ?? "")
 
         if (p.birthday) {
-          const parts = p.birthday.split("-").map(Number)
-          if (parts.length === 3) {
-            setBirthdayDate(new Date(parts[0]!, parts[1]! - 1, parts[2]))
-          }
+          setBirthdayDate(parseLocalDateString(p.birthday))
         }
 
-        const cat = CATEGORIES.find((c) => c.label === p.relationship_type)
+        const cat = findRelationshipCategory(p.relationship_type)
         if (cat) setCategory(cat.label)
 
         setAllTags(tagsRes.data ?? [])
@@ -191,38 +109,13 @@ export default function EditPersonScreen() {
       }
     }
     load()
-  }, [id])
+  }, [id, resetLocation])
 
   const isProfessional = category === "Professional"
   const isFriendOrFamily = category === "Friend" || category === "Family"
 
-  function addImportantMoment() {
-    setImportantMoments((current) => [...current, { label: "", date: "", recurs_yearly: true }])
-  }
-
-  function updateImportantMoment(index: number, patch: Partial<MomentDraft>) {
-    setImportantMoments((current) =>
-      current.map((moment, momentIndex) => (momentIndex === index ? { ...moment, ...patch } : moment)),
-    )
-  }
-
-  function removeImportantMoment(index: number) {
-    setMomentPickerIndex(null)
-    setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
-  }
-
-  function handleFreqPress() {
-    if (freqDropdownVisible) {
-      setFreqDropdownVisible(false)
-      return
-    }
-    freqButtonRef.current?.measure((_, __, ___, height, pageX, pageY) => {
-      setFreqDropdownPos({ x: pageX, y: pageY + height })
-      setFreqDropdownVisible(true)
-    })
-  }
-
   async function handleSave() {
+    if (saving) return
     if (!firstName.trim()) {
       setError("First name is required")
       return
@@ -236,11 +129,8 @@ export default function EditPersonScreen() {
       return
     }
     const cleanName = `${firstName.trim()} ${lastName.trim()}`
-    const cleanMoments = importantMoments
-      .map((moment) => ({ ...moment, label: moment.label.trim(), date: moment.date.trim() }))
-      .filter((moment) => moment.label || moment.date)
-    const invalidMoment = cleanMoments.find((moment) => !moment.label || !/^\d{4}-\d{2}-\d{2}$/.test(moment.date))
-    if (invalidMoment) {
+    const { moments: cleanMoments, valid } = normalizeMomentDrafts(importantMoments)
+    if (!valid) {
       setError("Important moments need both a label and a date.")
       return
     }
@@ -255,58 +145,28 @@ export default function EditPersonScreen() {
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
 
-      const { error: updateErr } = await supabase
-        .from("people")
-        .update({
+      const trimmedLocation = locationField.location.trim()
+      await updatePersonWithRelations({
+        userId: session.user.id,
+        personId: id,
+        person: {
           name: cleanName,
           email: email.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
           birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
           how_met: howMet.trim() || null,
-          location: location.trim() || null,
-          latitude: location.trim() ? latitude : null,
-          longitude: location.trim() ? longitude : null,
+          location: trimmedLocation || null,
+          latitude: trimmedLocation ? locationField.latitude : null,
+          longitude: trimmedLocation ? locationField.longitude : null,
           notes: notes.trim() || null,
           contact_frequency_days: frequencyDays,
           relationship_type: category ?? null,
-        })
-        .eq("id", id)
-
-      if (updateErr) throw updateErr
-
-      let finalTagIds = [...selectedTagIds]
-      if (category) {
-        const cat = CATEGORIES.find((c) => c.label === category)
-        if (cat) {
-          const tagId = await getOrCreateTag(session.user.id, cat.tagName, cat.tagColor)
-          if (tagId && !finalTagIds.includes(tagId)) {
-            finalTagIds = [...finalTagIds, tagId]
-          }
-        }
-      }
-
-      await supabase.from("person_tags").delete().eq("person_id", id)
-      if (finalTagIds.length > 0) {
-        await supabase.from("person_tags").insert(
-          finalTagIds.map((tagId) => ({ person_id: id, tag_id: tagId })),
-        )
-      }
-
-      const { error: deleteMomentsError } = await supabase.from("important_moments").delete().eq("person_id", id)
-      if (deleteMomentsError) throw deleteMomentsError
-      if (cleanMoments.length > 0) {
-        const { error: insertMomentsError } = await supabase.from("important_moments").insert(
-          cleanMoments.map((moment) => ({
-            user_id: session.user.id,
-            person_id: id,
-            label: moment.label,
-            date: moment.date,
-            recurs_yearly: moment.recurs_yearly,
-          })),
-        )
-        if (insertMomentsError) throw insertMomentsError
-      }
+        },
+        categoryLabel: category,
+        tagIds: selectedTagIds,
+        moments: cleanMoments,
+      })
 
       router.back()
     } catch (e) {
@@ -322,11 +182,16 @@ export default function EditPersonScreen() {
     } = await supabase.auth.getSession()
     if (!session) return
 
-    const { data } = await supabase
+    const { data, error: createError } = await supabase
       .from("tags")
       .insert({ user_id: session.user.id, name: tagName, color: colors.sage })
       .select("*")
       .single()
+
+    if (createError) {
+      setError(createError.message)
+      return
+    }
 
     if (data) {
       setAllTags((prev) => [...prev, data])
@@ -396,7 +261,7 @@ export default function EditPersonScreen() {
             Relationship type <Text style={{ color: "#B91C1C" }}>*</Text>
           </Text>
           <View className="flex-row gap-2">
-            {CATEGORIES.map((cat) => {
+            {RELATIONSHIP_CATEGORIES.map((cat) => {
               const selected = category === cat.label
               return (
                 <TouchableOpacity
@@ -478,169 +343,10 @@ export default function EditPersonScreen() {
         )}
 
         {/* Conditional: Birthday for Friend/Family */}
-        {isFriendOrFamily && (
-          <View className="mb-3">
-            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-              Birthday
-            </Text>
-            {birthdayDate ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#F0FDF4",
-                  borderRadius: 12,
-                  paddingHorizontal: 12,
-                  height: 44,
-                  borderWidth: 1,
-                  borderColor: "#BBF7D0",
-                }}
-              >
-                <Ionicons name="calendar-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
-                <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14, flex: 1 }}>
-                  {formatDateDisplay(birthdayDate)}
-                </Text>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear birthday"
-                  onPress={() => { setBirthdayDate(null); setShowBirthdayPicker(false) }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="close-circle" size={18} color={colors.forest} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Select birthday"
-                onPress={() => setShowBirthdayPicker((v) => !v)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  height: 44,
-                  borderWidth: 1,
-                  borderColor: showBirthdayPicker ? colors.forest : "#E5E7EB",
-                  borderRadius: 12,
-                  paddingHorizontal: 12,
-                  backgroundColor: "white",
-                }}
-              >
-                <Ionicons name="calendar-outline" size={16} color="#9CA3AF" style={{ marginRight: 8 }} />
-                <Text style={{ fontFamily: fonts.body, color: "#9CA3AF", fontSize: 14 }}>
-                  Select birthday
-                </Text>
-              </TouchableOpacity>
-            )}
-            {showBirthdayPicker && !birthdayDate ? (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderTopWidth: 0,
-                  borderColor: colors.forest,
-                  borderBottomLeftRadius: 12,
-                  borderBottomRightRadius: 12,
-                  backgroundColor: "white",
-                  overflow: "hidden",
-                }}
-              >
-                <DateTimePicker
-                  value={birthdayDate ?? new Date(1990, 0, 1)}
-                  mode="date"
-                  display="spinner"
-                  onChange={(_, date) => {
-                    if (date) setBirthdayDate(date)
-                  }}
-                />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Done selecting birthday"
-                  onPress={() => setShowBirthdayPicker(false)}
-                  style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
-                >
-                  <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-        )}
+        {isFriendOrFamily && <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />}
 
         {/* Important moments */}
-        <View className="mb-3">
-          <View className="mb-2 flex-row items-center justify-between">
-            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="text-sm">Important moments</Text>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add important moment" onPress={addImportantMoment}>
-              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">Add</Text>
-            </TouchableOpacity>
-          </View>
-          {importantMoments.length === 0 ? (
-            <Text className="text-sm text-gray-500">Add dates like an anniversary or graduation.</Text>
-          ) : (
-            importantMoments.map((moment, index) => (
-              <View key={index} className="mb-3 rounded-xl border border-gray-200 bg-white p-3">
-                <View className="mb-2 flex-row items-center justify-between">
-                  <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} className="text-sm">Moment {index + 1}</Text>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove important moment" onPress={() => removeImportantMoment(index)}>
-                    <Text className="text-sm font-semibold text-red-600">Remove</Text>
-                  </TouchableOpacity>
-                </View>
-                <TextInput
-                  accessibilityLabel="Moment label"
-                  value={moment.label}
-                  onChangeText={(text) => updateImportantMoment(index, { label: text })}
-                  placeholder="Anniversary, graduation..."
-                  placeholderTextColor="#9CA3AF"
-                  className="mb-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  style={{ fontFamily: fonts.body, color: colors.ink }}
-                  returnKeyType="next"
-                />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Select moment date"
-                  onPress={() => setMomentPickerIndex((current) => (current === index ? null : index))}
-                  className="mb-2 flex-row items-center rounded-xl border bg-white px-3 py-2.5"
-                  style={{ borderColor: momentPickerIndex === index ? colors.forest : "#E5E7EB" }}
-                >
-                  <Ionicons name="calendar-outline" size={16} color={moment.date ? colors.forest : "#9CA3AF"} style={{ marginRight: 8 }} />
-                  <Text
-                    style={{ fontFamily: fonts.body, color: moment.date ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}
-                  >
-                    {parseLocalDate(moment.date) ? formatDateDisplay(parseLocalDate(moment.date)!) : "Select date"}
-                  </Text>
-                  <Ionicons name={momentPickerIndex === index ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
-                </TouchableOpacity>
-                {momentPickerIndex === index ? (
-                  <View className="mb-2 overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.forest }}>
-                    <DateTimePicker
-                      value={parseLocalDate(moment.date) ?? new Date()}
-                      mode="date"
-                      display="spinner"
-                      onChange={(_, picked) => {
-                        if (picked) updateImportantMoment(index, { date: toLocalDateString(picked) })
-                      }}
-                    />
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityLabel="Done selecting moment date"
-                      onPress={() => setMomentPickerIndex(null)}
-                      style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
-                    >
-                      <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-warm-black">Repeat yearly</Text>
-                  <Switch
-                    value={moment.recurs_yearly}
-                    onValueChange={(value) => updateImportantMoment(index, { recurs_yearly: value })}
-                    trackColor={{ false: colors.border, true: colors.sage }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
-              </View>
-            ))
-          )}
-        </View>
+        <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
 
         {/* How you met */}
         <View className="mb-3">
@@ -662,11 +368,11 @@ export default function EditPersonScreen() {
           <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
             How often to stay in touch?
           </Text>
-          <View ref={freqButtonRef}>
+          <View ref={freqMenu.anchorRef}>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Choose keep in touch cadence"
-              onPress={handleFreqPress}
+              onPress={freqMenu.toggle}
               activeOpacity={0.78}
               style={{
                 flexDirection: "row",
@@ -681,9 +387,9 @@ export default function EditPersonScreen() {
               }}
             >
               <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
-                {freqLabel(frequencyDays)}
+                {frequencyLabel(frequencyDays)}
               </Text>
-              <Ionicons name={freqDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+              <Ionicons name={freqMenu.visible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -694,37 +400,24 @@ export default function EditPersonScreen() {
           <View className="flex-row items-center rounded-xl border border-gray-200 bg-white">
             <TextInput
               accessibilityLabel="Location"
-              value={location}
-              onChangeText={handleLocationChange}
+              value={locationField.location}
+              onChangeText={locationField.handleLocationChange}
               placeholder="City, country"
               placeholderTextColor="#9CA3AF"
               returnKeyType="next"
               className="flex-1 px-3 py-2.5 text-sm"
               style={{ fontFamily: fonts.body, color: colors.ink }}
             />
-            {latitude !== null ? (
+            {locationField.latitude !== null ? (
               <View className="pr-3">
                 <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
               </View>
             ) : null}
           </View>
-          {locationSuggestions.length > 0 ? (
-            <View className="mt-1.5 rounded-xl border border-gray-200 bg-white" style={{ zIndex: 20 }}>
-              {locationSuggestions.map((suggestion, index) => (
-                <TouchableOpacity
-                  key={`${suggestion.place_name}-${index}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={suggestion.place_name}
-                  onPress={() => handleLocationSuggestionSelect(suggestion)}
-                  className={`px-4 py-3 ${index < locationSuggestions.length - 1 ? "border-b border-stone-100" : ""}`}
-                >
-                  <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="text-sm">
-                    {suggestion.place_name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
+          <LocationSuggestionsList
+            suggestions={locationField.suggestions}
+            onSelect={locationField.selectSuggestion}
+          />
         </View>
 
         {/* Notes */}
@@ -762,58 +455,14 @@ export default function EditPersonScreen() {
         <Button title="Save changes" onPress={handleSave} loading={saving} />
       </View>
 
-      {/* Frequency dropdown modal */}
-      <Modal
-        visible={freqDropdownVisible}
-        transparent
-        animationType="none"
-        onRequestClose={() => setFreqDropdownVisible(false)}
-      >
-        <Pressable style={{ flex: 1 }} onPress={() => setFreqDropdownVisible(false)}>
-          <Pressable
-            style={{
-              position: "absolute",
-              top: freqDropdownPos.y + 4,
-              left: freqDropdownPos.x,
-              backgroundColor: "white",
-              borderRadius: 12,
-              minWidth: 200,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.12,
-              shadowRadius: 12,
-              elevation: 8,
-              overflow: "hidden",
-            }}
-          >
-            {ONBOARDING_FREQ_OPTIONS.map((option, index) => (
-              <TouchableOpacity
-                key={option.value}
-                accessibilityRole="button"
-                accessibilityLabel={option.label}
-                onPress={() => {
-                  setFrequencyDays(option.value)
-                  setFreqDropdownVisible(false)
-                }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingHorizontal: 16,
-                  paddingVertical: 13,
-                  borderBottomWidth: index < ONBOARDING_FREQ_OPTIONS.length - 1 ? 1 : 0,
-                  borderBottomColor: "#F5F4F2",
-                }}
-              >
-                <Text style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 14 }}>
-                  {option.label}
-                </Text>
-                {frequencyDays === option.value ? <Ionicons name="checkmark" size={16} color={colors.forest} /> : null}
-              </TouchableOpacity>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <AnchoredMenu
+        visible={freqMenu.visible}
+        position={freqMenu.position}
+        options={CONTACT_FREQUENCY_OPTIONS.map((option) => ({ key: option.value, label: option.label }))}
+        selectedKey={frequencyDays}
+        onSelect={setFrequencyDays}
+        onClose={freqMenu.close}
+      />
     </Screen>
   )
 }
