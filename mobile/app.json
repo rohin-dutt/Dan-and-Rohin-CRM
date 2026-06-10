@@ -13,7 +13,7 @@
       "backgroundColor": "#F0EBE1"
     },
     "ios": {
-      "bundleIdentifier": "com.roots.crm",
+      "bundleIdentifier": "com.useroots.app",
       "supportsTablet": false,
       "buildNumber": "2026060201",
       "infoPlist": {
