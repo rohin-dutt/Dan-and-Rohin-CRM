@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react"
-import { Share, Text, TouchableOpacity, View } from "react-native"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { DeviceEventEmitter, Share, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
@@ -137,6 +137,11 @@ export default function DashboardScreen() {
     }, [load]),
   )
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("noteAdded", load)
+    return () => sub.remove()
+  }, [load])
+
   const dashboard = useMemo(() => {
     const overdueList = people.filter((person) => {
       const days = getNextDueDays(person)
@@ -150,19 +155,16 @@ export default function DashboardScreen() {
       const days = getNextDueDays(person)
       return days != null && days >= 8
     })
-    const followUpList = [
-      ...overdueList.sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0)),
-      ...dueThisWeekList.sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0)),
-      ...comingUpList.sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0)),
-    ]
-      .filter((person, index, list) => list.findIndex((candidate) => candidate.id === person.id) === index)
-    const recentNotes = personNotes
+    const followUpList = [...overdueList, ...dueThisWeekList]
+      .sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0))
+    const recentNotes = [...personNotes]
       .sort((a, b) => {
-        const bTime = new Date(b.updated_at ?? b.created_at).getTime()
-        const aTime = new Date(a.updated_at ?? a.created_at).getTime()
-        return bTime - aTime
+        const aDate = a.note_date ?? a.created_at.slice(0, 10)
+        const bDate = b.note_date ?? b.created_at.slice(0, 10)
+        if (bDate !== aDate) return bDate.localeCompare(aDate)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       })
-      .slice(0, 2)
+      .slice(0, 3)
       .map((note) => ({
         note,
         person: people.find((person) => person.id === note.person_id) ?? null,
@@ -279,7 +281,7 @@ export default function DashboardScreen() {
             <SectionTitle
               title="People to follow up with"
               actionLabel="View all"
-              onAction={() => router.push("/people?status=overdue,due_this_week,coming_up")}
+              onAction={() => router.push("/people?status=overdue&status=due_this_week")}
             />
             {dashboard.followUps.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
@@ -322,7 +324,7 @@ export default function DashboardScreen() {
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel={`${dashboard.followUpExtraCount} more follow-ups`}
-                onPress={() => router.push("/people?status=overdue,due_this_week,coming_up")}
+                onPress={() => router.push("/people?status=overdue&status=due_this_week")}
                 className="mt-4"
               >
                 <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
@@ -377,7 +379,7 @@ export default function DashboardScreen() {
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-4">
-            <SectionTitle title="Recent notes" actionLabel="View all" onAction={() => router.push("/people")} />
+            <SectionTitle title="Recent notes" />
             {dashboard.recentNotes.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
                 Notes you log will appear here.

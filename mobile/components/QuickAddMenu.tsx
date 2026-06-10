@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import {
   ActivityIndicator,
+  DeviceEventEmitter,
   ScrollView,
   Text,
   TextInput,
@@ -166,6 +167,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         note_date: todayInputValue(),
       })
       if (insertError) throw insertError
+      DeviceEventEmitter.emit("noteAdded")
       closeForm()
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save note")
