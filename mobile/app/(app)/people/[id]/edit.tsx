@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react"
-import { Switch, Text, TouchableOpacity, View } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import { Modal, Pressable, Switch, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
+import DateTimePicker from "@react-native-community/datetimepicker"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
-import { TextField } from "@/components/TextField"
-import { PillButton } from "@/components/PillButton"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
-import { colors } from "@/constants/theme"
+import { colors, fonts } from "@/constants/theme"
 import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 import type { ImportantMoment, Person, Tag } from "@/types"
 
@@ -22,6 +22,22 @@ const CATEGORIES = [
 
 type CategoryLabel = (typeof CATEGORIES)[number]["label"]
 type MomentDraft = Pick<ImportantMoment, "label" | "date" | "recurs_yearly">
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function formatDateDisplay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+}
 
 async function getOrCreateTag(
   userId: string,
@@ -46,6 +62,10 @@ async function getOrCreateTag(
   return created?.id ?? null
 }
 
+function freqLabel(days: number) {
+  return ONBOARDING_FREQ_OPTIONS.find((option) => option.value === days)?.label ?? `Every ${days} days`
+}
+
 export default function EditPersonScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -58,17 +78,23 @@ export default function EditPersonScreen() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
 
-  const [name, setName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [category, setCategory] = useState<CategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthday, setBirthday] = useState("")
+  const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(30)
   const [location, setLocation] = useState("")
   const [notes, setNotes] = useState("")
+
+  // Freq dropdown
+  const freqButtonRef = useRef<View>(null)
+  const [freqDropdownVisible, setFreqDropdownVisible] = useState(false)
+  const [freqDropdownPos, setFreqDropdownPos] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     async function load() {
@@ -88,16 +114,25 @@ export default function EditPersonScreen() {
         if (personRes.error) throw personRes.error
         const p: Person = personRes.data
 
-        setName(p.name)
+        // Split name into first/last
+        const nameParts = p.name.trim().split(/\s+/)
+        setFirstName(nameParts[0] ?? "")
+        setLastName(nameParts.slice(1).join(" "))
+
         setCompany(p.company ?? "")
         setRole(p.role ?? "")
-        setBirthday(p.birthday ?? "")
         setEmail(p.email ?? "")
-        setPhone(p.phone ?? "")
         setHowMet(p.how_met ?? "")
         setFrequencyDays(p.contact_frequency_days ?? 30)
         setLocation(p.location ?? "")
         setNotes(p.notes ?? "")
+
+        if (p.birthday) {
+          const parts = p.birthday.split("-").map(Number)
+          if (parts.length === 3) {
+            setBirthdayDate(new Date(parts[0]!, parts[1]! - 1, parts[2]))
+          }
+        }
 
         const cat = CATEGORIES.find((c) => c.label === p.relationship_type)
         if (cat) setCategory(cat.label)
@@ -137,15 +172,31 @@ export default function EditPersonScreen() {
     setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
   }
 
+  function handleFreqPress() {
+    if (freqDropdownVisible) {
+      setFreqDropdownVisible(false)
+      return
+    }
+    freqButtonRef.current?.measure((_, __, ___, height, pageX, pageY) => {
+      setFreqDropdownPos({ x: pageX, y: pageY + height })
+      setFreqDropdownVisible(true)
+    })
+  }
+
   async function handleSave() {
-    if (!name.trim()) {
-      setError("Name is required")
+    if (!firstName.trim()) {
+      setError("First name is required")
+      return
+    }
+    if (!lastName.trim()) {
+      setError("Last name is required")
       return
     }
     if (!category) {
       setCategoryError("Choose Friend, Family, or Professional.")
       return
     }
+    const cleanName = `${firstName.trim()} ${lastName.trim()}`
     const cleanMoments = importantMoments
       .map((moment) => ({ ...moment, label: moment.label.trim(), date: moment.date.trim() }))
       .filter((moment) => moment.label || moment.date)
@@ -168,12 +219,11 @@ export default function EditPersonScreen() {
       const { error: updateErr } = await supabase
         .from("people")
         .update({
-          name: name.trim(),
+          name: cleanName,
           email: email.trim() || null,
-          phone: phone.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
-          birthday: birthday.trim() || null,
+          birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
           how_met: howMet.trim() || null,
           location: location.trim() || null,
           notes: notes.trim() || null,
@@ -184,7 +234,6 @@ export default function EditPersonScreen() {
 
       if (updateErr) throw updateErr
 
-      // If a category tag is selected, ensure it's in the selectedTagIds
       let finalTagIds = [...selectedTagIds]
       if (category) {
         const cat = CATEGORIES.find((c) => c.label === category)
@@ -196,7 +245,6 @@ export default function EditPersonScreen() {
         }
       }
 
-      // Replace all person_tags
       await supabase.from("person_tags").delete().eq("person_id", id)
       if (finalTagIds.length > 0) {
         await supabase.from("person_tags").insert(
@@ -250,80 +298,233 @@ export default function EditPersonScreen() {
   return (
     <Screen>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">Cancel</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-base">Cancel</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-warm-black">Edit person</Text>
+        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">Edit person</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <View className="px-5 pb-8">
+      <View className="px-5 pb-6">
         {error != null && <ErrorBanner message={error} />}
 
-        <TextField
-          label="Name *"
-          value={name}
-          onChangeText={setName}
-          placeholder="Full name"
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-
-        {/* Category */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Relationship type *</Text>
-          <View className="flex-row gap-2">
-            {CATEGORIES.map((cat) => (
-              <PillButton
-                key={cat.label}
-                label={cat.label}
-                selected={category === cat.label}
-                onPress={() => {
-                  setCategory(cat.label)
-                  setCategoryError(null)
-                }}
-              />
-            ))}
+        {/* Name row */}
+        <View className="mb-3 flex-row gap-2">
+          <View className="flex-1">
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+              First name <Text style={{ color: "#B91C1C" }}>*</Text>
+            </Text>
+            <TextInput
+              accessibilityLabel="First name"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First name"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              returnKeyType="next"
+              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
+              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+            />
           </View>
-          {categoryError && <Text className="text-xs text-red-500 mt-2">{categoryError}</Text>}
+          <View className="flex-1">
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+              Last name <Text style={{ color: "#B91C1C" }}>*</Text>
+            </Text>
+            <TextInput
+              accessibilityLabel="Last name"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last name"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              returnKeyType="next"
+              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
+              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+            />
+          </View>
         </View>
 
+        {/* Relationship type */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+            Relationship type <Text style={{ color: "#B91C1C" }}>*</Text>
+          </Text>
+          <View className="flex-row gap-2">
+            {CATEGORIES.map((cat) => {
+              const selected = category === cat.label
+              return (
+                <TouchableOpacity
+                  key={cat.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Relationship type ${cat.label}`}
+                  onPress={() => {
+                    setCategory(cat.label)
+                    setCategoryError(null)
+                  }}
+                  className="min-h-[42px] flex-1 items-center justify-center rounded-xl border px-2 py-2"
+                  style={{
+                    backgroundColor: selected ? colors.forest : "white",
+                    borderColor: selected ? colors.forest : "#E5E7EB",
+                  }}
+                >
+                  <Text
+                    style={{ fontFamily: fonts.medium, color: selected ? "white" : colors.ink }}
+                    className="text-sm"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+          {categoryError ? <Text className="mt-1 text-xs text-red-500">{categoryError}</Text> : null}
+        </View>
+
+        {/* Conditional: Professional fields */}
         {isProfessional && (
           <>
-            <TextField
-              label="Company"
-              value={company}
-              onChangeText={setCompany}
-              placeholder="Company name"
-              returnKeyType="next"
-            />
-            <TextField
-              label="Role"
-              value={role}
-              onChangeText={setRole}
-              placeholder="Job title"
-              returnKeyType="next"
-            />
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Email</Text>
+              <TextInput
+                accessibilityLabel="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="email@example.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Company</Text>
+              <TextInput
+                accessibilityLabel="Company"
+                value={company}
+                onChangeText={setCompany}
+                placeholder="Company name"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Role</Text>
+              <TextInput
+                accessibilityLabel="Role"
+                value={role}
+                onChangeText={setRole}
+                placeholder="Job title"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
           </>
         )}
 
+        {/* Conditional: Birthday for Friend/Family */}
         {isFriendOrFamily && (
-          <TextField
-            label="Birthday"
-            value={birthday}
-            onChangeText={setBirthday}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
-          />
+          <View className="mb-3">
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+              Birthday (optional)
+            </Text>
+            {birthdayDate ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#F0FDF4",
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  height: 44,
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                }}
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
+                <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14, flex: 1 }}>
+                  {formatDateDisplay(birthdayDate)}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear birthday"
+                  onPress={() => { setBirthdayDate(null); setShowBirthdayPicker(false) }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={colors.forest} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Select birthday"
+                onPress={() => setShowBirthdayPicker((v) => !v)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  height: 44,
+                  borderWidth: 1,
+                  borderColor: showBirthdayPicker ? colors.forest : "#E5E7EB",
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  backgroundColor: "white",
+                }}
+              >
+                <Ionicons name="calendar-outline" size={16} color="#9CA3AF" style={{ marginRight: 8 }} />
+                <Text style={{ fontFamily: fonts.body, color: "#9CA3AF", fontSize: 14 }}>
+                  Select birthday
+                </Text>
+              </TouchableOpacity>
+            )}
+            {showBirthdayPicker && !birthdayDate ? (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderTopWidth: 0,
+                  borderColor: colors.forest,
+                  borderBottomLeftRadius: 12,
+                  borderBottomRightRadius: 12,
+                  backgroundColor: "white",
+                  overflow: "hidden",
+                }}
+              >
+                <DateTimePicker
+                  value={birthdayDate ?? new Date(1990, 0, 1)}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_, date) => {
+                    if (date) setBirthdayDate(date)
+                  }}
+                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Done selecting birthday"
+                  onPress={() => setShowBirthdayPicker(false)}
+                  style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+                >
+                  <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
         )}
 
-        <View className="mb-4">
+        {/* Important moments */}
+        <View className="mb-3">
           <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-sm font-medium text-warm-black">Important moments</Text>
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="text-sm">Important moments</Text>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add important moment" onPress={addImportantMoment}>
-              <Text className="text-sm font-semibold text-sage">Add</Text>
+              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">Add</Text>
             </TouchableOpacity>
           </View>
           {importantMoments.length === 0 ? (
@@ -332,24 +533,30 @@ export default function EditPersonScreen() {
             importantMoments.map((moment, index) => (
               <View key={index} className="mb-3 rounded-xl border border-gray-200 bg-white p-3">
                 <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-sm font-semibold text-warm-black">Moment {index + 1}</Text>
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} className="text-sm">Moment {index + 1}</Text>
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove important moment" onPress={() => removeImportantMoment(index)}>
                     <Text className="text-sm font-semibold text-red-600">Remove</Text>
                   </TouchableOpacity>
                 </View>
-                <TextField
-                  label="Label"
+                <TextInput
+                  accessibilityLabel="Moment label"
                   value={moment.label}
                   onChangeText={(text) => updateImportantMoment(index, { label: text })}
                   placeholder="Anniversary, graduation..."
+                  placeholderTextColor="#9CA3AF"
+                  className="mb-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                  style={{ fontFamily: fonts.body, color: colors.ink }}
                   returnKeyType="next"
                 />
-                <TextField
-                  label="Date"
+                <TextInput
+                  accessibilityLabel="Moment date"
                   value={moment.date}
                   onChangeText={(text) => updateImportantMoment(index, { date: text })}
                   placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9CA3AF"
                   keyboardType="numbers-and-punctuation"
+                  className="mb-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                  style={{ fontFamily: fonts.body, color: colors.ink }}
                   returnKeyType="next"
                 />
                 <View className="flex-row items-center justify-between">
@@ -366,71 +573,87 @@ export default function EditPersonScreen() {
           )}
         </View>
 
-        <TextField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="email@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-        />
+        {/* How you met */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">How you met</Text>
+          <TextInput
+            accessibilityLabel="How you met"
+            value={howMet}
+            onChangeText={setHowMet}
+            placeholder="At a conference, through a friend…"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="next"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink }}
+          />
+        </View>
 
-        <TextField
-          label="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="+1 (555) 000-0000"
-          keyboardType="phone-pad"
-          returnKeyType="next"
-        />
-
-        <TextField
-          label="How did you meet?"
-          value={howMet}
-          onChangeText={setHowMet}
-          placeholder="At a conference, through a friend…"
-          returnKeyType="next"
-        />
-
-        {/* Frequency */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">
-            How often should you stay in touch?
+        {/* Keep in touch — frequency dropdown */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+            How often to stay in touch?
           </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {ONBOARDING_FREQ_OPTIONS.map((opt) => (
-              <PillButton
-                key={opt.value}
-                label={opt.label}
-                selected={frequencyDays === opt.value}
-                onPress={() => setFrequencyDays(opt.value)}
-              />
-            ))}
+          <View ref={freqButtonRef}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Choose keep in touch cadence"
+              onPress={handleFreqPress}
+              activeOpacity={0.78}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                height: 44,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                backgroundColor: "white",
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
+                {freqLabel(frequencyDays)}
+              </Text>
+              <Ionicons name={freqDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <TextField
-          label="Location"
-          value={location}
-          onChangeText={setLocation}
-          placeholder="City, country"
-          returnKeyType="next"
-        />
+        {/* Location */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Location</Text>
+          <TextInput
+            accessibilityLabel="Location"
+            value={location}
+            onChangeText={setLocation}
+            placeholder="City, country"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="next"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink }}
+          />
+        </View>
 
-        <TextField
-          label="Notes"
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Anything else to remember…"
-          multiline
-          numberOfLines={3}
-          returnKeyType="default"
-        />
+        {/* Notes */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Notes</Text>
+          <TextInput
+            accessibilityLabel="Notes"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Anything else to remember…"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={3}
+            returnKeyType="default"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink, textAlignVertical: "top", minHeight: 80 }}
+          />
+        </View>
 
         {/* Tags */}
         <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Tags</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Tags</Text>
           <TagPicker
             tags={allTags}
             selectedTagIds={selectedTagIds}
@@ -445,6 +668,59 @@ export default function EditPersonScreen() {
 
         <Button title="Save changes" onPress={handleSave} loading={saving} />
       </View>
+
+      {/* Frequency dropdown modal */}
+      <Modal
+        visible={freqDropdownVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => setFreqDropdownVisible(false)}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => setFreqDropdownVisible(false)}>
+          <Pressable
+            style={{
+              position: "absolute",
+              top: freqDropdownPos.y + 4,
+              left: freqDropdownPos.x,
+              backgroundColor: "white",
+              borderRadius: 12,
+              minWidth: 200,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+              elevation: 8,
+              overflow: "hidden",
+            }}
+          >
+            {ONBOARDING_FREQ_OPTIONS.map((option, index) => (
+              <TouchableOpacity
+                key={option.value}
+                accessibilityRole="button"
+                accessibilityLabel={option.label}
+                onPress={() => {
+                  setFrequencyDays(option.value)
+                  setFreqDropdownVisible(false)
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderBottomWidth: index < ONBOARDING_FREQ_OPTIONS.length - 1 ? 1 : 0,
+                  borderBottomColor: "#F5F4F2",
+                }}
+              >
+                <Text style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 14 }}>
+                  {option.label}
+                </Text>
+                {frequencyDays === option.value ? <Ionicons name="checkmark" size={16} color={colors.forest} /> : null}
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   )
 }

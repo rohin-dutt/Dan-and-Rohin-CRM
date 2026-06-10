@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+import DateTimePicker from "@react-native-community/datetimepicker"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
@@ -15,7 +16,7 @@ import { colors, fonts } from "@/constants/theme"
 import { Divider, IconTile } from "@/components/RootsUI"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { PillButton } from "@/components/PillButton"
-import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
+import { updateStreakAfterAction, todayInputValue } from "@roots/shared"
 
 type QuickAddMode = "note" | "chat"
 
@@ -23,6 +24,25 @@ type PersonOption = {
   id: string
   name: string
   company: string | null
+}
+
+const QUICK_INTERACTION_TYPES = ["Text / Email", "Call", "In Person"] as const
+type QuickInteractionType = (typeof QUICK_INTERACTION_TYPES)[number]
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function formatDateDisplay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
 }
 
 export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -39,8 +59,9 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
   const [personInputFocused, setPersonInputFocused] = useState(false)
 
   // Chat fields
-  const [interactionType, setInteractionType] = useState(INTERACTION_TYPES[0])
-  const [date, setDate] = useState(todayInputValue())
+  const [interactionType, setInteractionType] = useState<QuickInteractionType>("Text / Email")
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [interactionNotes, setInteractionNotes] = useState("")
 
   // Note fields
@@ -52,7 +73,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
 
   const filteredPeople = useMemo(() => {
     const normalized = personSearch.trim().toLowerCase()
-    if (!normalized) return people.slice(0, 5)
+    if (!normalized) return []
     return people
       .filter(
         (p) =>
@@ -70,8 +91,9 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
     setPersonInputFocused(false)
     setFormError(null)
     setSaving(false)
-    setInteractionType(INTERACTION_TYPES[0])
-    setDate(todayInputValue())
+    setInteractionType("Text / Email")
+    setSelectedDate(new Date())
+    setShowDatePicker(false)
     setInteractionNotes("")
     setNoteText("")
   }, [])
@@ -115,10 +137,6 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
       setFormError("Please select a person first")
       return
     }
-    if (!date.trim()) {
-      setFormError("Date is required")
-      return
-    }
     setSaving(true)
     setFormError(null)
     try {
@@ -129,13 +147,14 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
       const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
         p_person_id: selectedPerson.id,
         p_type: interactionType,
-        p_date: date.trim(),
+        p_date: toLocalDateString(selectedDate),
         p_notes: interactionNotes.trim() || null,
         p_follow_up_needed: false,
         p_follow_up_date: null,
       })
       if (rpcError) throw rpcError
       await updateStreakAfterAction(supabase)
+      DeviceEventEmitter.emit("interactionAdded")
       closeForm()
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save")
@@ -160,11 +179,14 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         data: { session },
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
-      const { error: insertError } = await supabase.from("person_notes").insert({
+      const { error: insertError } = await supabase.from("interactions").insert({
         user_id: session.user.id,
         person_id: selectedPerson.id,
-        body: noteText.trim(),
-        note_date: todayInputValue(),
+        type: "note",
+        date: todayInputValue(),
+        notes: noteText.trim(),
+        follow_up_needed: false,
+        follow_up_status: "done",
       })
       if (insertError) throw insertError
       DeviceEventEmitter.emit("noteAdded")
@@ -206,7 +228,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
             />
             <Divider />
             <QuickAddAction
-              icon="calendar-outline"
+              icon="pencil-outline"
               label="Add note"
               description="Save a note about someone"
               color={colors.purple}
@@ -366,7 +388,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                       />
                     </View>
 
-                    {showPersonResults && filteredPeople.length > 0 ? (
+                    {showPersonResults && personSearch.trim() && filteredPeople.length > 0 ? (
                       <View
                         style={{
                           borderRadius: 14,
@@ -419,43 +441,6 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                       >
                         No people match "{personSearch}"
                       </Text>
-                    ) : !loadingPeople && people.length === 0 && !fetchError ? (
-                      <View
-                        style={{
-                          borderRadius: 14,
-                          borderWidth: 1,
-                          borderColor: "#E7E5E4",
-                          backgroundColor: "white",
-                          padding: 16,
-                          marginTop: 4,
-                          marginBottom: 12,
-                        }}
-                      >
-                        <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 14 }}>
-                          No people yet
-                        </Text>
-                        <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 4 }}>
-                          Add someone first, then you can log notes and chats.
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => {
-                            closeForm()
-                            router.push("/people/new")
-                          }}
-                          style={{
-                            marginTop: 12,
-                            minHeight: 40,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: 10,
-                            backgroundColor: colors.forest,
-                          }}
-                        >
-                          <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 13 }}>
-                            Add person
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
                     ) : fetchError ? (
                       <Text
                         style={{
@@ -499,7 +484,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                         marginBottom: 20,
                       }}
                     >
-                      {INTERACTION_TYPES.map((type) => (
+                      {QUICK_INTERACTION_TYPES.map((type) => (
                         <PillButton
                           key={type}
                           label={type}
@@ -519,25 +504,61 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
                     >
                       When?
                     </Text>
-                    <TextInput
-                      value={date}
-                      onChangeText={setDate}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="numbers-and-punctuation"
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Select date"
+                      onPress={() => setShowDatePicker((v) => !v)}
                       style={{
-                        fontFamily: fonts.body,
-                        color: colors.ink,
-                        fontSize: 14,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        height: 44,
                         borderWidth: 1,
-                        borderColor: "#E7E5E4",
+                        borderColor: showDatePicker ? colors.forest : "#E7E5E4",
                         borderRadius: 12,
                         paddingHorizontal: 14,
-                        paddingVertical: 11,
                         backgroundColor: "white",
-                        marginBottom: 20,
+                        marginBottom: showDatePicker ? 0 : 20,
                       }}
-                    />
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
+                      <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14, flex: 1 }}>
+                        {formatDateDisplay(selectedDate)}
+                      </Text>
+                      <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                    </TouchableOpacity>
+
+                    {showDatePicker ? (
+                      <View
+                        style={{
+                          borderWidth: 1,
+                          borderTopWidth: 0,
+                          borderColor: colors.forest,
+                          borderBottomLeftRadius: 12,
+                          borderBottomRightRadius: 12,
+                          backgroundColor: "white",
+                          overflow: "hidden",
+                          marginBottom: 20,
+                        }}
+                      >
+                        <DateTimePicker
+                          value={selectedDate}
+                          mode="date"
+                          display="spinner"
+                          onChange={(_, date) => {
+                            if (date) setSelectedDate(date)
+                          }}
+                          maximumDate={new Date()}
+                        />
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel="Done selecting date"
+                          onPress={() => setShowDatePicker(false)}
+                          style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+                        >
+                          <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
 
                     <Text
                       style={{

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  DeviceEventEmitter,
   FlatList,
   Modal,
   Pressable,
@@ -210,6 +211,11 @@ export default function PeopleScreen() {
       load()
     }, [load]),
   )
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("interactionAdded", load)
+    return () => sub.remove()
+  }, [load])
 
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags])
 
