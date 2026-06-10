@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  ActionSheetIOS,
   FlatList,
+  Modal,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -19,7 +20,7 @@ import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForUser } from "@/lib/important-moments"
 import type { ImportantMoment, Interaction, Person, PersonTag, Tag } from "@/types"
 import { colors, fonts } from "@/constants/theme"
-import { formatDate, getNextDueDays, getRelationshipStatus, getUpcomingMoments, isTouchPoint } from "@roots/shared"
+import { getNextDueDays, getRelationshipStatus, getUpcomingMoments, isTouchPoint } from "@roots/shared"
 
 type SortKey = "last_contacted" | "name" | "most_contacted" | "recently_added"
 type CategoryFilter = "All" | "Friends" | "Family" | "Professional"
@@ -111,6 +112,20 @@ function personImageUrl(person: Person) {
   return maybePerson.photo_url ?? maybePerson.avatar_url ?? maybePerson.image_url ?? null
 }
 
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+function formatLastInteraction(dateStr: string | null | undefined): string {
+  if (!dateStr) return "No interactions yet"
+  const date = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`)
+  const currentYear = new Date().getFullYear()
+  const month = MONTH_SHORT[date.getMonth()]
+  const day = date.getDate()
+  if (date.getFullYear() === currentYear) {
+    return `Last interaction ${month} ${day}`
+  }
+  return `Last interaction ${month} ${day}, ${date.getFullYear()}`
+}
+
 export default function PeopleScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ status?: string | string[]; location?: string | string[]; moments?: string }>()
@@ -130,6 +145,9 @@ export default function PeopleScreen() {
   const [locationFilters, setLocationFilters] = useState<string[]>(parseMultiParam(params.location))
   const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
+  const [sortDropdownVisible, setSortDropdownVisible] = useState(false)
+  const [sortDropdownPos, setSortDropdownPos] = useState({ x: 0, y: 0 })
+  const sortButtonRef = useRef<View>(null)
 
   const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
 
@@ -281,19 +299,15 @@ export default function PeopleScreen() {
   const hasActiveFilter = statusFilters.length > 0 || tagFilters.length > 0 || locationFilters.length > 0 || params.moments === "upcoming"
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last Contacted"
 
-  function openSortSheet() {
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        options: ["Cancel", ...SORT_OPTIONS.map((o) => o.label)],
-        cancelButtonIndex: 0,
-      },
-      (buttonIndex) => {
-        if (buttonIndex > 0) {
-          const option = SORT_OPTIONS[buttonIndex - 1]
-          if (option) setSort(option.key)
-        }
-      },
-    )
+  function handleSortPress() {
+    if (sortDropdownVisible) {
+      setSortDropdownVisible(false)
+      return
+    }
+    sortButtonRef.current?.measure((_, __, ___, height, pageX, pageY) => {
+      setSortDropdownPos({ x: pageX, y: pageY + height })
+      setSortDropdownVisible(true)
+    })
   }
 
   if (loading) return <LoadingState />
@@ -364,17 +378,19 @@ export default function PeopleScreen() {
         </View>
 
         <View className="mt-5 flex-row items-center justify-between">
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Change sort order"
-            onPress={openSortSheet}
-            className="min-h-10 flex-row items-center"
-          >
-            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-base">
-              Sort: {currentSortLabel}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color={colors.ink} />
-          </TouchableOpacity>
+          <View ref={sortButtonRef}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Change sort order"
+              onPress={handleSortPress}
+              className="min-h-10 flex-row items-center"
+            >
+              <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-base">
+                Sort: {currentSortLabel}
+              </Text>
+              <Ionicons name={sortDropdownVisible ? "chevron-up" : "chevron-down"} size={18} color={colors.ink} />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             accessibilityRole="button"
@@ -413,7 +429,6 @@ export default function PeopleScreen() {
             <PersonCard
               person={item}
               tags={tagsByPerson.get(item.id) ?? []}
-              interactionCount={interactionCounts.get(item.id) ?? 0}
               onPress={() => router.push(`/people/${item.id}`)}
             />
           )}
@@ -423,26 +438,19 @@ export default function PeopleScreen() {
       <FilterSheet
         visible={filterSheetVisible}
         statusFilters={statusFilters}
-        tagFilters={tagFilters}
         locationFilters={locationFilters}
         locationSearch={locationSearch}
         people={people}
-        tags={tags}
         onToggleStatus={(filter) =>
           setStatusFilters((current) =>
             current.includes(filter) ? current.filter((item) => item !== filter) : [...current, filter],
           )
         }
-        onToggleTag={(tagId) =>
-          setTagFilters((current) =>
-            current.includes(tagId) ? current.filter((item) => item !== tagId) : [...current, tagId],
-          )
-        }
         onToggleLocation={(location) =>
           setLocationFilters((current) =>
             current.some((item) => normalize(item) === normalize(location))
-              ? current.filter((item) => normalize(item) !== normalize(location))
-              : [...current, location],
+              ? []
+              : [location],
           )
         }
         onLocationSearchChange={setLocationSearch}
@@ -455,6 +463,58 @@ export default function PeopleScreen() {
         }}
         onClose={() => setFilterSheetVisible(false)}
       />
+
+      <Modal
+        visible={sortDropdownVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => setSortDropdownVisible(false)}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => setSortDropdownVisible(false)}>
+          <Pressable
+            style={{
+              position: "absolute",
+              top: sortDropdownPos.y + 4,
+              left: sortDropdownPos.x,
+              backgroundColor: "white",
+              borderRadius: 12,
+              minWidth: 200,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+              elevation: 8,
+              overflow: "hidden",
+            }}
+          >
+            {SORT_OPTIONS.map((option, index) => (
+              <TouchableOpacity
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityLabel={option.label}
+                onPress={() => {
+                  setSort(option.key)
+                  setSortDropdownVisible(false)
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 13,
+                  borderBottomWidth: index < SORT_OPTIONS.length - 1 ? 1 : 0,
+                  borderBottomColor: "#F5F4F2",
+                }}
+              >
+                <Text style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 14 }}>
+                  {option.label}
+                </Text>
+                {sort === option.key ? <Ionicons name="checkmark" size={16} color={colors.forest} /> : null}
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   )
 }
@@ -462,13 +522,10 @@ export default function PeopleScreen() {
 function FilterSheet({
   visible,
   statusFilters,
-  tagFilters,
   locationFilters,
   locationSearch,
   people,
-  tags,
   onToggleStatus,
-  onToggleTag,
   onToggleLocation,
   onLocationSearchChange,
   onClear,
@@ -476,13 +533,10 @@ function FilterSheet({
 }: {
   visible: boolean
   statusFilters: string[]
-  tagFilters: string[]
   locationFilters: string[]
   locationSearch: string
   people: Person[]
-  tags: Tag[]
   onToggleStatus: (filter: string) => void
-  onToggleTag: (tagId: string) => void
   onToggleLocation: (location: string) => void
   onLocationSearchChange: (text: string) => void
   onClear: () => void
@@ -502,158 +556,123 @@ function FilterSheet({
   }, [people])
 
   const filteredLocations = useMemo(() => {
-    if (!locationSearch.trim()) return availableLocations
+    if (!locationSearch.trim()) return []
     const normalized = locationSearch.trim().toLowerCase()
     return availableLocations.filter((loc) => loc.toLowerCase().includes(normalized))
   }, [availableLocations, locationSearch])
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} accessibilityLabel="Dismiss filter sheet">
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 }}
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      accessibilityLabel="Dismiss filter sheet"
+      sheetStyle={{ maxHeight: "52%" }}
+    >
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 }}
+      >
+        <View className="mb-4 items-center">
+          <View className="h-1.5 w-20 rounded-full bg-stone-200" />
+        </View>
+
+        <View className="mb-4 flex-row items-center justify-between">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Clear filters"
+            onPress={onClear}
+          >
+            <Text style={{ fontFamily: fonts.medium, color: colors.error, fontSize: 14 }}>Clear all</Text>
+          </TouchableOpacity>
+          <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 20 }}>Filter</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Apply filters"
+            onPress={onClose}
+          >
+            <Text style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 14 }}>Apply filters</Text>
+          </TouchableOpacity>
+        </View>
+
+        {STATUS_FILTERS.map((option) => (
+          <TouchableOpacity
+            key={option.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: statusFilters.includes(option.key) }}
+            accessibilityLabel={option.label}
+            onPress={() => onToggleStatus(option.key)}
+            className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
+              statusFilters.includes(option.key) ? "border-forest bg-forest" : "border-stone-200 bg-white"
+            }`}
+          >
+            <Text
+              style={{ fontFamily: fonts.medium }}
+              className={`text-sm ${statusFilters.includes(option.key) ? "text-white" : "text-warm-black"}`}
             >
-              <View className="mb-5 items-center">
-                <View className="h-1.5 w-20 rounded-full bg-stone-200" />
-              </View>
-              <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="mb-4 text-xl">
-                Filter
-              </Text>
+              {option.label}
+            </Text>
+            {statusFilters.includes(option.key) ? (
+              <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+            ) : null}
+          </TouchableOpacity>
+        ))}
 
-              {STATUS_FILTERS.map((option) => (
-                <TouchableOpacity
-                  key={option.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: statusFilters.includes(option.key) }}
-                  accessibilityLabel={option.label}
-                  onPress={() => onToggleStatus(option.key)}
-                  className={`mb-2 min-h-11 flex-row items-center justify-between rounded-xl border px-4 ${
-                    statusFilters.includes(option.key) ? "border-forest bg-forest" : "border-stone-200 bg-white"
-                  }`}
-                >
-                  <Text
-                    style={{ fontFamily: fonts.medium }}
-                    className={`text-sm ${statusFilters.includes(option.key) ? "text-white" : "text-warm-black"}`}
-                  >
-                    {option.label}
-                  </Text>
-                  {statusFilters.includes(option.key) ? (
-                    <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                  ) : null}
-                </TouchableOpacity>
-              ))}
+        <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
+          Filter by location
+        </Text>
+        <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
+          <Ionicons name="location-outline" size={16} color="#60646D" />
+          <TextInput
+            value={locationSearch}
+            onChangeText={onLocationSearchChange}
+            placeholder="City, country…"
+            placeholderTextColor="#777A83"
+            className="ml-2 flex-1 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink }}
+          />
+          {locationSearch ? (
+            <TouchableOpacity onPress={() => onLocationSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-              {tags.length > 0 ? (
-                <>
-                  <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
-                    Filter by tag
-                  </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {tags.map((tag) => {
-                      const selected = tagFilters.includes(tag.id)
-                      return (
-                        <TouchableOpacity
-                          key={tag.id}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          accessibilityLabel={`Tag ${tag.name}`}
-                          onPress={() => onToggleTag(tag.id)}
-                          className={`min-h-10 rounded-full border px-3 ${
-                            selected ? "border-forest bg-forest" : "border-stone-200 bg-white"
-                          }`}
-                        >
-                          <Text
-                            style={{ fontFamily: fonts.medium }}
-                            className={`py-2 text-sm ${selected ? "text-white" : "text-warm-black"}`}
-                          >
-                            {tag.name}
-                          </Text>
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-                </>
-              ) : null}
-
-              <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
-                Filter by location
-              </Text>
-              <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
-                <Ionicons name="location-outline" size={16} color="#60646D" />
-                <TextInput
-                  value={locationSearch}
-                  onChangeText={onLocationSearchChange}
-                  placeholder="City, country…"
-                  placeholderTextColor="#777A83"
-                  className="ml-2 flex-1 text-sm"
-                  style={{ fontFamily: fonts.body, color: colors.ink }}
-                />
-                {locationSearch ? (
-                  <TouchableOpacity onPress={() => onLocationSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={16} color={colors.muted} />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {filteredLocations.length > 0 ? (
-                <View className="mt-2 overflow-hidden rounded-xl border border-stone-200 bg-white">
-                  {filteredLocations.map((loc, index) => (
-                    <TouchableOpacity
-                      key={loc}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: locationFilters.some((item) => normalize(item) === normalize(loc)) }}
-                      accessibilityLabel={loc}
-                      onPress={() => onToggleLocation(loc)}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        backgroundColor: locationFilters.some((item) => normalize(item) === normalize(loc)) ? colors.mint : "white",
-                        borderBottomWidth: index < filteredLocations.length - 1 ? 1 : 0,
-                        borderBottomColor: "#F5F5F4",
-                      }}
-                    >
-                      <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }} numberOfLines={1}>
-                        {loc}
-                      </Text>
-                      {locationFilters.some((item) => normalize(item) === normalize(loc)) ? (
-                        <Ionicons name="checkmark" size={16} color={colors.forest} />
-                      ) : null}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : locationSearch.trim() && availableLocations.length > 0 ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-2">
-                  No saved locations match "{locationSearch}"
+        {filteredLocations.length > 0 ? (
+          <View className="mt-2 overflow-hidden rounded-xl border border-stone-200 bg-white">
+            {filteredLocations.map((loc, index) => (
+              <TouchableOpacity
+                key={loc}
+                accessibilityRole="button"
+                accessibilityState={{ selected: locationFilters.some((item) => normalize(item) === normalize(loc)) }}
+                accessibilityLabel={loc}
+                onPress={() => onToggleLocation(loc)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  backgroundColor: locationFilters.some((item) => normalize(item) === normalize(loc)) ? colors.mint : "white",
+                  borderBottomWidth: index < filteredLocations.length - 1 ? 1 : 0,
+                  borderBottomColor: "#F5F5F4",
+                }}
+              >
+                <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }} numberOfLines={1}>
+                  {loc}
                 </Text>
-              ) : null}
-
-              <View className="mt-5 flex-row gap-3">
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear filters"
-                  onPress={onClear}
-                  className="min-h-11 flex-1 items-center justify-center rounded-xl border border-stone-200"
-                >
-                  <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="text-sm">
-                    Clear
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Apply filters"
-                  onPress={onClose}
-                  className="min-h-11 flex-1 items-center justify-center rounded-xl bg-forest"
-                >
-                  <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
-                    Done
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+                {locationFilters.some((item) => normalize(item) === normalize(loc)) ? (
+                  <Ionicons name="checkmark" size={16} color={colors.forest} />
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : locationSearch.trim() ? (
+          <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-2">
+            No saved locations match "{locationSearch}"
+          </Text>
+        ) : null}
+      </ScrollView>
     </BottomSheetModal>
   )
 }
@@ -661,12 +680,10 @@ function FilterSheet({
 function PersonCard({
   person,
   tags,
-  interactionCount,
   onPress,
 }: {
   person: Person
   tags: Tag[]
-  interactionCount: number
   onPress: () => void
 }) {
   const tone = statusTone(person)
@@ -697,17 +714,9 @@ function PersonCard({
                     {[person.relationship_type, person.company].filter(Boolean).join(" · ")}
                   </Text>
                 ) : null}
-                <View className="mt-1 flex-row items-center">
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mr-2 flex-1 text-sm">
-                    Last talked {formatDate(person.last_contacted_at)}
-                  </Text>
-                  <View className="flex-row items-center">
-                    <Ionicons name="chatbubble-outline" size={18} color={colors.ink} />
-                    <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="ml-1 text-sm">
-                      {interactionCount}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mt-1 text-sm">
+                  {formatLastInteraction(person.last_contacted_at)}
+                </Text>
               </View>
               <View className="rounded-xl px-3 py-2" style={{ backgroundColor: tone.bg }}>
                 <Text style={{ fontFamily: fonts.medium, color: tone.text }} className="text-sm">
