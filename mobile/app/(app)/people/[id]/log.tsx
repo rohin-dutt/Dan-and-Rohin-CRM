@@ -1,5 +1,7 @@
 import { useState } from "react"
-import { Switch, Text, TouchableOpacity, View } from "react-native"
+import { DeviceEventEmitter, Switch, Text, TouchableOpacity, View } from "react-native"
+import DateTimePicker from "@react-native-community/datetimepicker"
+import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -7,8 +9,108 @@ import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import { colors } from "@/constants/theme"
-import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
+import { colors, fonts } from "@/constants/theme"
+import { INTERACTION_TYPES, updateStreakAfterAction } from "@roots/shared"
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function formatDateDisplay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+}
+
+function InlineDateField({
+  label,
+  date,
+  placeholder,
+  open,
+  onToggle,
+  onChange,
+  onDone,
+  minimumDate,
+  maximumDate,
+}: {
+  label: string
+  date: Date | null
+  placeholder: string
+  open: boolean
+  onToggle: () => void
+  onChange: (date: Date) => void
+  onDone: () => void
+  minimumDate?: Date
+  maximumDate?: Date
+}) {
+  return (
+    <View className="mb-4">
+      <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 text-sm">
+        {label}
+      </Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`Select ${label.toLowerCase()}`}
+        onPress={onToggle}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          height: 44,
+          borderWidth: 1,
+          borderColor: open ? colors.forest : "#E7E5E4",
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          backgroundColor: "white",
+        }}
+      >
+        <Ionicons name="calendar-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
+        <Text
+          style={{ fontFamily: fonts.body, color: date ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}
+        >
+          {date ? formatDateDisplay(date) : placeholder}
+        </Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+      </TouchableOpacity>
+      {open ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: colors.forest,
+            borderRadius: 12,
+            backgroundColor: "white",
+            overflow: "hidden",
+            marginTop: 6,
+          }}
+        >
+          <DateTimePicker
+            value={date ?? new Date()}
+            mode="date"
+            display="spinner"
+            onChange={(_, picked) => {
+              if (picked) onChange(picked)
+            }}
+            minimumDate={minimumDate}
+            maximumDate={maximumDate}
+          />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`Done selecting ${label.toLowerCase()}`}
+            onPress={onDone}
+            style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+          >
+            <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  )
+}
 
 export default function LogInteractionScreen() {
   const router = useRouter()
@@ -19,18 +121,20 @@ export default function LogInteractionScreen() {
 
   const isNoteMode = action === "note"
   const [interactionType, setInteractionType] = useState(isNoteMode ? "Other" : INTERACTION_TYPES[0])
-  const [date, setDate] = useState(todayInputValue())
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [notes, setNotes] = useState("")
   const [followUpEnabled, setFollowUpEnabled] = useState(false)
-  const [followUpDate, setFollowUpDate] = useState("")
+  const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
+  const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
 
   async function handleSave() {
-    if (!date.trim()) {
-      setError("Date is required")
-      return
-    }
     if (isNoteMode && !notes.trim()) {
       setError("Note text is required")
+      return
+    }
+    if (!isNoteMode && followUpEnabled && !followUpDate) {
+      setError("Follow-up date is required when a follow-up is set")
       return
     }
 
@@ -48,22 +152,24 @@ export default function LogInteractionScreen() {
           user_id: session.user.id,
           person_id: id,
           body: notes.trim(),
-          note_date: date.trim(),
+          note_date: toLocalDateString(selectedDate),
         })
         if (insertError) throw insertError
+        DeviceEventEmitter.emit("noteAdded")
       } else {
         const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
           p_person_id: id,
           p_type: interactionType,
-          p_date: date.trim(),
+          p_date: toLocalDateString(selectedDate),
           p_notes: notes.trim() || null,
           p_follow_up_needed: followUpEnabled,
-          p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
+          p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
         })
 
         if (rpcError) throw rpcError
 
         await updateStreakAfterAction(supabase)
+        DeviceEventEmitter.emit("interactionAdded")
       }
 
       router.back()
@@ -106,13 +212,18 @@ export default function LogInteractionScreen() {
           </View>
         ) : null}
 
-        <TextField
+        <InlineDateField
           label="Date"
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          keyboardType="numbers-and-punctuation"
-          returnKeyType="next"
+          date={selectedDate}
+          placeholder="Select date"
+          open={showDatePicker}
+          onToggle={() => {
+            setShowDatePicker((v) => !v)
+            setShowFollowUpPicker(false)
+          }}
+          onChange={setSelectedDate}
+          onDone={() => setShowDatePicker(false)}
+          maximumDate={new Date()}
         />
 
         <TextField
@@ -143,13 +254,18 @@ export default function LogInteractionScreen() {
           </View>
 
           {followUpEnabled && (
-            <TextField
+            <InlineDateField
               label="Follow-up date"
-              value={followUpDate}
-              onChangeText={setFollowUpDate}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-              returnKeyType="done"
+              date={followUpDate}
+              placeholder="Select follow-up date"
+              open={showFollowUpPicker}
+              onToggle={() => {
+                setShowFollowUpPicker((v) => !v)
+                setShowDatePicker(false)
+              }}
+              onChange={setFollowUpDate}
+              onDone={() => setShowFollowUpPicker(false)}
+              minimumDate={new Date()}
             />
           )}
         </View>

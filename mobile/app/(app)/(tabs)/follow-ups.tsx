@@ -101,10 +101,14 @@ export default function FollowUpsScreen() {
   )
 
   async function markDone(interactionId: string) {
-    await supabase
+    const { error: updateError } = await supabase
       .from("interactions")
       .update({ follow_up_status: "done" })
       .eq("id", interactionId)
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
     load()
   }
 

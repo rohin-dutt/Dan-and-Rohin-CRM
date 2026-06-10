@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react"
 import { Animated, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
-import MapView, { Marker } from "react-native-maps"
+import MapView, { Callout, Marker } from "react-native-maps"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, PersonAvatar, SearchBox, SoftCard } from "@/components/RootsUI"
 import { ErrorBanner } from "@/components/ErrorBanner"
@@ -172,9 +172,8 @@ export default function RootsMapScreen() {
     )
   }, [people, query])
 
+  const allGroups = useMemo(() => buildGroups(people), [people])
   const groups = useMemo(() => buildGroups(filteredPeople), [filteredPeople])
-  const selectedGroup = groups.find((group) => group.key === selectedGroupKey) ?? null
-  const sheetGroups = selectedGroup ? [selectedGroup] : groups
   const animateSheet = useCallback(
     (expanded: boolean) => {
       const nextOffset = expanded ? 0 : SHEET_TRAVEL
@@ -272,6 +271,10 @@ export default function RootsMapScreen() {
         />
         <View className="px-5">
           {error ? <ErrorBanner message={error} /> : null}
+          <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 text-sm">
+            {people.length} {people.length === 1 ? "person" : "people"} across {allGroups.length}{" "}
+            {allGroups.length === 1 ? "location" : "locations"}
+          </Text>
           <SearchBox className="h-11">
             <TextInput
               value={query}
@@ -324,17 +327,17 @@ export default function RootsMapScreen() {
             showsUserLocation={false}
             showsMyLocationButton={false}
             accessibilityLabel="Map of saved Roots locations"
-            onPress={() => setSelectedGroupKey(null)}
+            onPress={(event) => {
+              if ((event.nativeEvent as { action?: string }).action === "marker-press") return
+              setSelectedGroupKey(null)
+            }}
           >
             {groups.map((group) => (
               <Marker
                 key={group.key}
                 coordinate={{ latitude: group.latitude, longitude: group.longitude }}
                 tracksViewChanges={false}
-                onPress={() => {
-                  setSelectedGroupKey(group.key)
-                  animateSheet(true)
-                }}
+                onPress={() => setSelectedGroupKey(group.key)}
               >
                 <View
                   pointerEvents="none"
@@ -345,6 +348,47 @@ export default function RootsMapScreen() {
                     {group.people.length}
                   </Text>
                 </View>
+                <Callout
+                  tooltip
+                  onPress={() => router.push(`/people?location=${encodeURIComponent(group.location)}`)}
+                  accessibilityLabel={`View all people in ${group.location}`}
+                >
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: 14,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      minWidth: 180,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 10,
+                      elevation: 6,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 15 }} numberOfLines={1}>
+                      {group.location}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 2 }}>
+                      {group.people.length} {group.people.length === 1 ? "person" : "people"}
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginTop: 10,
+                        borderRadius: 10,
+                        backgroundColor: colors.forest,
+                        paddingVertical: 8,
+                      }}
+                    >
+                      <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 13 }}>View all</Text>
+                      <Ionicons name="chevron-forward" size={14} color="white" style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                </Callout>
               </Marker>
             ))}
           </MapView>
@@ -371,91 +415,45 @@ export default function RootsMapScreen() {
               <View className="flex-row items-center justify-between">
                 <View>
                   <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
-                    {selectedGroup ? selectedGroup.location : "Locations"}
+                    Locations
                   </Text>
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                     {filteredPeople.length} {filteredPeople.length === 1 ? "person" : "people"} across {groups.length} {groups.length === 1 ? "city" : "cities"}
                   </Text>
                 </View>
-                {selectedGroup ? (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Back to locations"
-                    onPress={() => setSelectedGroupKey(null)}
-                    className="h-9 w-9 items-center justify-center rounded-full bg-stone-100"
-                  >
-                    <Ionicons name="arrow-back" size={18} color={colors.ink} />
-                  </TouchableOpacity>
-                ) : (
-                  <Ionicons name={sheetExpanded ? "chevron-down" : "chevron-up"} size={22} color={colors.muted} />
-                )}
+                <Ionicons name={sheetExpanded ? "chevron-down" : "chevron-up"} size={22} color={colors.muted} />
               </View>
               </TouchableOpacity>
             </View>
             {sheetExpanded ? (
               <ScrollView className="mt-3" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-                {sheetGroups.map((group) =>
-                  selectedGroup ? (
-                    group.people.map((person) => (
-                      <TouchableOpacity
-                        key={person.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Open ${person.name}`}
-                        onPress={() => router.push(`/people/${person.id}`)}
-                        className="flex-row items-center border-b border-stone-100 py-3"
-                      >
-                        <PersonAvatar name={person.name} size={38} imageUrl={person.photo_url ?? person.avatar_url ?? person.image_url ?? null} />
-                        <View className="ml-3 flex-1">
-                          <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-sm" numberOfLines={1}>
-                            {person.name}
-                          </Text>
-                          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-xs" numberOfLines={1}>
-                            {person.company ?? group.location}
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <TouchableOpacity
-                      key={group.key}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Open ${group.location}`}
-                      onPress={() => {
-                        setSelectedGroupKey(group.key)
-                        animateSheet(true)
-                        mapRef.current?.animateToRegion(
-                          {
-                            latitude: group.latitude,
-                            longitude: group.longitude,
-                            latitudeDelta: 3,
-                            longitudeDelta: 3,
-                          },
-                          400,
-                        )
-                      }}
-                      className="flex-row items-center border-b border-stone-100 py-3"
-                    >
-                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-mint">
-                        <Ionicons name="location-outline" size={20} color={colors.forest} />
-                      </View>
-                      <View className="ml-3 flex-1">
-                        <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-sm" numberOfLines={1}>
-                          {group.location}
-                        </Text>
-                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-xs">
-                          {group.people.length} {group.people.length === 1 ? "person" : "people"}
-                        </Text>
-                      </View>
-                      <View className="mr-3 flex-row -space-x-2">
-                        {group.people.slice(0, 4).map((person) => (
-                          <PersonAvatar key={person.id} name={person.name} size={26} imageUrl={person.photo_url ?? person.avatar_url ?? person.image_url ?? null} />
-                        ))}
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-                    </TouchableOpacity>
-                  ),
-                )}
+                {groups.map((group) => (
+                  <TouchableOpacity
+                    key={group.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View all people in ${group.location}`}
+                    onPress={() => router.push(`/people?location=${encodeURIComponent(group.location)}`)}
+                    className="flex-row items-center border-b border-stone-100 py-3"
+                  >
+                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-mint">
+                      <Ionicons name="location-outline" size={20} color={colors.forest} />
+                    </View>
+                    <View className="ml-3 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-sm" numberOfLines={1}>
+                        {group.location}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-xs">
+                        {group.people.length} {group.people.length === 1 ? "person" : "people"}
+                      </Text>
+                    </View>
+                    <View className="mr-3 flex-row -space-x-2">
+                      {group.people.slice(0, 4).map((person) => (
+                        <PersonAvatar key={person.id} name={person.name} size={26} imageUrl={person.photo_url ?? person.avatar_url ?? person.image_url ?? null} />
+                      ))}
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             ) : null}
           </Animated.View>

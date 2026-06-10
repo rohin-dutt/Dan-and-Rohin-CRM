@@ -36,6 +36,12 @@ function formatDateDisplay(date: Date): string {
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
 }
 
+function parseLocalDate(value: string): Date | null {
+  const parts = value.split("-").map(Number)
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null
+  return new Date(parts[0]!, parts[1]! - 1, parts[2])
+}
+
 async function getOrCreateTag(
   userId: string,
   name: string,
@@ -148,6 +154,7 @@ export default function NewPersonScreen() {
   const [longitude, setLongitude] = useState<number | null>(null)
   const [locationSuggestions, setLocationSuggestions] = useState<MapboxFeature[]>([])
   const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
+  const [momentPickerIndex, setMomentPickerIndex] = useState<number | null>(null)
 
   // Freq dropdown
   const freqButtonRef = useRef<View>(null)
@@ -201,6 +208,7 @@ export default function NewPersonScreen() {
   }
 
   function removeImportantMoment(index: number) {
+    setMomentPickerIndex(null)
     setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
   }
 
@@ -223,7 +231,7 @@ export default function NewPersonScreen() {
       .filter((moment) => moment.label || moment.date)
     const invalidMoment = cleanMoments.find((moment) => !moment.label || !/^\d{4}-\d{2}-\d{2}$/.test(moment.date))
     if (invalidMoment) {
-      setError("Important moments need a label and date in YYYY-MM-DD format.")
+      setError("Important moments need both a label and a date.")
       return
     }
 
@@ -681,15 +689,41 @@ export default function NewPersonScreen() {
                         className="mt-2 rounded-xl border border-stone-200 px-3 py-2.5 text-sm"
                         style={{ fontFamily: fonts.body, color: colors.ink }}
                       />
-                      <TextInput
-                        value={moment.date}
-                        onChangeText={(text) => updateImportantMoment(index, { date: text })}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor="#8F96A3"
-                        keyboardType="numbers-and-punctuation"
-                        className="mt-2 rounded-xl border border-stone-200 px-3 py-2.5 text-sm"
-                        style={{ fontFamily: fonts.body, color: colors.ink }}
-                      />
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Select moment date"
+                        onPress={() => setMomentPickerIndex((current) => (current === index ? null : index))}
+                        className="mt-2 flex-row items-center rounded-xl border bg-white px-3 py-2.5"
+                        style={{ borderColor: momentPickerIndex === index ? colors.forest : "#E7E5E4" }}
+                      >
+                        <Ionicons name="calendar-outline" size={16} color={moment.date ? colors.forest : "#8F96A3"} style={{ marginRight: 8 }} />
+                        <Text
+                          style={{ fontFamily: fonts.body, color: moment.date ? colors.ink : "#8F96A3", fontSize: 14, flex: 1 }}
+                        >
+                          {parseLocalDate(moment.date) ? formatDateDisplay(parseLocalDate(moment.date)!) : "Select date"}
+                        </Text>
+                        <Ionicons name={momentPickerIndex === index ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                      </TouchableOpacity>
+                      {momentPickerIndex === index ? (
+                        <View className="mt-2 overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.forest }}>
+                          <DateTimePicker
+                            value={parseLocalDate(moment.date) ?? new Date()}
+                            mode="date"
+                            display="spinner"
+                            onChange={(_, picked) => {
+                              if (picked) updateImportantMoment(index, { date: toLocalDateString(picked) })
+                            }}
+                          />
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Done selecting moment date"
+                            onPress={() => setMomentPickerIndex(null)}
+                            style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+                          >
+                            <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
                       <View className="mt-2 flex-row items-center justify-between">
                         <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="text-sm">
                           Repeat yearly

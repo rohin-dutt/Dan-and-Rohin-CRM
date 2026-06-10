@@ -95,7 +95,7 @@ export default function DashboardScreen() {
 
       const [peopleRes, settingsRes, loadedMoments] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", userId),
-        supabase.from("settings").select("*").eq("user_id", userId).single(),
+        supabase.from("settings").select("*").eq("user_id", userId).maybeSingle(),
         loadImportantMomentsForUser(userId),
       ])
 
@@ -138,8 +138,12 @@ export default function DashboardScreen() {
   )
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener("noteAdded", load)
-    return () => sub.remove()
+    const noteSub = DeviceEventEmitter.addListener("noteAdded", load)
+    const interactionSub = DeviceEventEmitter.addListener("interactionAdded", load)
+    return () => {
+      noteSub.remove()
+      interactionSub.remove()
+    }
   }, [load])
 
   const dashboard = useMemo(() => {
@@ -187,7 +191,7 @@ export default function DashboardScreen() {
     try {
       await Share.share({
         message:
-          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it - check it out at https://useroots.app",
+          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at useroots.app",
       })
     } catch {
       // user dismissed share sheet

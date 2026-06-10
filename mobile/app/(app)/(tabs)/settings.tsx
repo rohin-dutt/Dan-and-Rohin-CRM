@@ -59,8 +59,18 @@ export default function SettingsScreen() {
           .from("settings")
           .select("*")
           .eq("user_id", session.user.id)
-          .single()
-        setSettings(data ?? null)
+          .maybeSingle()
+        if (data) {
+          setSettings(data)
+        } else {
+          const { data: created, error: createError } = await supabase
+            .from("settings")
+            .upsert({ user_id: session.user.id }, { onConflict: "user_id" })
+            .select("*")
+            .single()
+          if (createError) throw createError
+          setSettings(created)
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load settings.")
       } finally {
@@ -451,7 +461,7 @@ export default function SettingsScreen() {
             onPress={() =>
               Share.share({
                 message:
-                  "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it - check it out at https://useroots.app",
+                  "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at useroots.app",
               }).catch(() => null)
             }
           />
@@ -497,19 +507,19 @@ export default function SettingsScreen() {
             icon="help-circle-outline"
             title="Help & Support"
             description="Get help or contact us"
-            onPress={() => Linking.openURL("https://useroots.app/contact")}
+            onPress={() => Linking.openURL("https://useroots.app/contact").catch(() => null)}
           />
           <Divider />
           <SettingsRow
             icon="document-text-outline"
             title="Privacy Policy"
-            onPress={() => Linking.openURL("https://useroots.app/privacy")}
+            onPress={() => Linking.openURL("https://useroots.app/privacy").catch(() => null)}
           />
           <Divider />
           <SettingsRow
             icon="document-text-outline"
             title="Terms of Service"
-            onPress={() => Linking.openURL("https://useroots.app/terms")}
+            onPress={() => Linking.openURL("https://useroots.app/terms").catch(() => null)}
           />
           <View className="mt-3 rounded-xl bg-red-50">
             <SettingsRow

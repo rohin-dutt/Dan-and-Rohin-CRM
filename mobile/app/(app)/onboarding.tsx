@@ -1,20 +1,88 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "expo-router"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
+import DateTimePicker from "@react-native-community/datetimepicker"
+import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
 import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
+import { colors, fonts } from "@/constants/theme"
 import { INTERACTION_TYPES } from "@roots/shared"
 
-function todayString() {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+]
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function formatDateDisplay(date: Date): string {
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+}
+
+function InlineDatePicker({
+  date,
+  placeholder,
+  open,
+  onToggle,
+  onChange,
+  onDone,
+  maximumDate,
+}: {
+  date: Date | null
+  placeholder: string
+  open: boolean
+  onToggle: () => void
+  onChange: (date: Date) => void
+  onDone: () => void
+  maximumDate?: Date
+}) {
+  return (
+    <View>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={placeholder}
+        onPress={onToggle}
+        className="flex-row items-center border rounded-xl px-3 py-2.5 bg-white"
+        style={{ borderColor: open ? colors.forest : "#E5E7EB" }}
+      >
+        <Ionicons name="calendar-outline" size={16} color={date ? colors.forest : "#9CA3AF"} style={{ marginRight: 8 }} />
+        <Text style={{ fontFamily: fonts.body, color: date ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}>
+          {date ? formatDateDisplay(date) : placeholder}
+        </Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+      </TouchableOpacity>
+      {open ? (
+        <View className="mt-2 overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.forest }}>
+          <DateTimePicker
+            value={date ?? new Date()}
+            mode="date"
+            display="spinner"
+            onChange={(_, picked) => {
+              if (picked) onChange(picked)
+            }}
+            maximumDate={maximumDate}
+          />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Done selecting date"
+            onPress={onDone}
+            style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+          >
+            <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  )
 }
 
 export default function OnboardingScreen() {
@@ -33,7 +101,8 @@ export default function OnboardingScreen() {
   const [selectedCategory, setSelectedCategory] = useState("")
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthday, setBirthday] = useState("")
+  const [birthday, setBirthday] = useState<Date | null>(null)
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [relationship, setRelationship] = useState("")
   const [howMet, setHowMet] = useState("")
   const [selectedFreq, setSelectedFreq] = useState(30)
@@ -42,7 +111,8 @@ export default function OnboardingScreen() {
 
   // Step 3 form
   const [interactionType, setInteractionType] = useState("Call")
-  const [interactionDate, setInteractionDate] = useState(todayString())
+  const [interactionDate, setInteractionDate] = useState<Date>(new Date())
+  const [showInteractionDatePicker, setShowInteractionDatePicker] = useState(false)
   const [interactionNotes, setInteractionNotes] = useState("")
   const [step3Saving, setStep3Saving] = useState(false)
   const [step3Error, setStep3Error] = useState<string | null>(null)
@@ -64,7 +134,8 @@ export default function OnboardingScreen() {
     setSelectedCategory("")
     setCompany("")
     setRole("")
-    setBirthday("")
+    setBirthday(null)
+    setShowBirthdayPicker(false)
     setRelationship("")
     setHowMet("")
     setSelectedFreq(30)
@@ -95,7 +166,7 @@ export default function OnboardingScreen() {
         contact_frequency_days: selectedFreq,
         company: isProfessional && company.trim() ? company.trim() : null,
         role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: hasBirthday && birthday ? birthday : null,
+        birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
         relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
       })
       .select()
@@ -147,7 +218,7 @@ export default function OnboardingScreen() {
     const { error } = await supabase.rpc("create_interaction_and_touch_person", {
       p_person_id: savedPersonId,
       p_type: interactionType,
-      p_date: interactionDate,
+      p_date: toLocalDateString(interactionDate),
       p_notes: interactionNotes.trim() || null,
       p_follow_up_needed: false,
       p_follow_up_date: null,
@@ -268,11 +339,13 @@ export default function OnboardingScreen() {
           {showBirthday && (
             <View className="mb-4">
               <Text className="text-sm font-medium text-warm-black mb-1">Birthday</Text>
-              <TextInput
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+              <InlineDatePicker
+                date={birthday}
+                placeholder="Select birthday"
+                open={showBirthdayPicker}
+                onToggle={() => setShowBirthdayPicker((v) => !v)}
+                onChange={setBirthday}
+                onDone={() => setShowBirthdayPicker(false)}
               />
             </View>
           )}
@@ -346,11 +419,14 @@ export default function OnboardingScreen() {
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-warm-black mb-1">When?</Text>
-          <TextInput
-            value={interactionDate}
-            onChangeText={setInteractionDate}
-            placeholder="YYYY-MM-DD"
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+          <InlineDatePicker
+            date={interactionDate}
+            placeholder="Select date"
+            open={showInteractionDatePicker}
+            onToggle={() => setShowInteractionDatePicker((v) => !v)}
+            onChange={setInteractionDate}
+            onDone={() => setShowInteractionDatePicker(false)}
+            maximumDate={new Date()}
           />
         </View>
 

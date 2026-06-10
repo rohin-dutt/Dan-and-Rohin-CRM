@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
+import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 import { colors, fonts } from "@/constants/theme"
 import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
 import type { ImportantMoment, Person, Tag } from "@/types"
@@ -37,6 +38,12 @@ function toLocalDateString(date: Date): string {
 
 function formatDateDisplay(date: Date): string {
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+}
+
+function parseLocalDate(value: string): Date | null {
+  const parts = value.split("-").map(Number)
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null
+  return new Date(parts[0]!, parts[1]! - 1, parts[2])
 }
 
 async function getOrCreateTag(
@@ -77,6 +84,7 @@ export default function EditPersonScreen() {
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [importantMoments, setImportantMoments] = useState<MomentDraft[]>([])
+  const [momentPickerIndex, setMomentPickerIndex] = useState<number | null>(null)
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -89,12 +97,40 @@ export default function EditPersonScreen() {
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(30)
   const [location, setLocation] = useState("")
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<MapboxFeature[]>([])
   const [notes, setNotes] = useState("")
 
   // Freq dropdown
   const freqButtonRef = useRef<View>(null)
   const [freqDropdownVisible, setFreqDropdownVisible] = useState(false)
   const [freqDropdownPos, setFreqDropdownPos] = useState({ x: 0, y: 0 })
+
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleLocationChange(text: string) {
+    setLocation(text)
+    setLatitude(null)
+    setLongitude(null)
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
+    if (!text.trim()) {
+      setLocationSuggestions([])
+      return
+    }
+    geocodeTimerRef.current = setTimeout(() => {
+      void geocodePlace(text).then((results) => {
+        setLocationSuggestions(results.slice(0, 5))
+      })
+    }, 400)
+  }
+
+  function handleLocationSuggestionSelect(feature: MapboxFeature) {
+    setLocation(feature.place_name)
+    setLatitude(feature.center[1])
+    setLongitude(feature.center[0])
+    setLocationSuggestions([])
+  }
 
   useEffect(() => {
     async function load() {
@@ -125,6 +161,8 @@ export default function EditPersonScreen() {
         setHowMet(p.how_met ?? "")
         setFrequencyDays(p.contact_frequency_days ?? 30)
         setLocation(p.location ?? "")
+        setLatitude(p.latitude ?? null)
+        setLongitude(p.longitude ?? null)
         setNotes(p.notes ?? "")
 
         if (p.birthday) {
@@ -169,6 +207,7 @@ export default function EditPersonScreen() {
   }
 
   function removeImportantMoment(index: number) {
+    setMomentPickerIndex(null)
     setImportantMoments((current) => current.filter((_, momentIndex) => momentIndex !== index))
   }
 
@@ -202,7 +241,7 @@ export default function EditPersonScreen() {
       .filter((moment) => moment.label || moment.date)
     const invalidMoment = cleanMoments.find((moment) => !moment.label || !/^\d{4}-\d{2}-\d{2}$/.test(moment.date))
     if (invalidMoment) {
-      setError("Important moments need a label and date in YYYY-MM-DD format.")
+      setError("Important moments need both a label and a date.")
       return
     }
 
@@ -226,6 +265,8 @@ export default function EditPersonScreen() {
           birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
           how_met: howMet.trim() || null,
           location: location.trim() || null,
+          latitude: location.trim() ? latitude : null,
+          longitude: location.trim() ? longitude : null,
           notes: notes.trim() || null,
           contact_frequency_days: frequencyDays,
           relationship_type: category ?? null,
@@ -552,17 +593,41 @@ export default function EditPersonScreen() {
                   style={{ fontFamily: fonts.body, color: colors.ink }}
                   returnKeyType="next"
                 />
-                <TextInput
-                  accessibilityLabel="Moment date"
-                  value={moment.date}
-                  onChangeText={(text) => updateImportantMoment(index, { date: text })}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="numbers-and-punctuation"
-                  className="mb-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                  style={{ fontFamily: fonts.body, color: colors.ink }}
-                  returnKeyType="next"
-                />
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Select moment date"
+                  onPress={() => setMomentPickerIndex((current) => (current === index ? null : index))}
+                  className="mb-2 flex-row items-center rounded-xl border bg-white px-3 py-2.5"
+                  style={{ borderColor: momentPickerIndex === index ? colors.forest : "#E5E7EB" }}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={moment.date ? colors.forest : "#9CA3AF"} style={{ marginRight: 8 }} />
+                  <Text
+                    style={{ fontFamily: fonts.body, color: moment.date ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}
+                  >
+                    {parseLocalDate(moment.date) ? formatDateDisplay(parseLocalDate(moment.date)!) : "Select date"}
+                  </Text>
+                  <Ionicons name={momentPickerIndex === index ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                </TouchableOpacity>
+                {momentPickerIndex === index ? (
+                  <View className="mb-2 overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.forest }}>
+                    <DateTimePicker
+                      value={parseLocalDate(moment.date) ?? new Date()}
+                      mode="date"
+                      display="spinner"
+                      onChange={(_, picked) => {
+                        if (picked) updateImportantMoment(index, { date: toLocalDateString(picked) })
+                      }}
+                    />
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Done selecting moment date"
+                      onPress={() => setMomentPickerIndex(null)}
+                      style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+                    >
+                      <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 <View className="flex-row items-center justify-between">
                   <Text className="text-sm text-warm-black">Repeat yearly</Text>
                   <Switch
@@ -626,16 +691,40 @@ export default function EditPersonScreen() {
         {/* Location */}
         <View className="mb-3">
           <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Location</Text>
-          <TextInput
-            accessibilityLabel="Location"
-            value={location}
-            onChangeText={setLocation}
-            placeholder="City, country"
-            placeholderTextColor="#9CA3AF"
-            returnKeyType="next"
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-            style={{ fontFamily: fonts.body, color: colors.ink }}
-          />
+          <View className="flex-row items-center rounded-xl border border-gray-200 bg-white">
+            <TextInput
+              accessibilityLabel="Location"
+              value={location}
+              onChangeText={handleLocationChange}
+              placeholder="City, country"
+              placeholderTextColor="#9CA3AF"
+              returnKeyType="next"
+              className="flex-1 px-3 py-2.5 text-sm"
+              style={{ fontFamily: fonts.body, color: colors.ink }}
+            />
+            {latitude !== null ? (
+              <View className="pr-3">
+                <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
+              </View>
+            ) : null}
+          </View>
+          {locationSuggestions.length > 0 ? (
+            <View className="mt-1.5 rounded-xl border border-gray-200 bg-white" style={{ zIndex: 20 }}>
+              {locationSuggestions.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={`${suggestion.place_name}-${index}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={suggestion.place_name}
+                  onPress={() => handleLocationSuggestionSelect(suggestion)}
+                  className={`px-4 py-3 ${index < locationSuggestions.length - 1 ? "border-b border-stone-100" : ""}`}
+                >
+                  <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="text-sm">
+                    {suggestion.place_name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {/* Notes */}

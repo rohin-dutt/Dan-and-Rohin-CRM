@@ -117,7 +117,8 @@ const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 function formatLastInteraction(dateStr: string | null | undefined): string {
   if (!dateStr) return "No interactions yet"
-  const date = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`)
+  const [yearPart, monthPart, dayPart] = dateStr.slice(0, 10).split("-").map(Number)
+  const date = new Date(yearPart, monthPart - 1, dayPart)
   const currentYear = new Date().getFullYear()
   const month = MONTH_SHORT[date.getMonth()]
   const day = date.getDate()
@@ -465,7 +466,7 @@ export default function PeopleScreen() {
           setTagFilters([])
           setLocationFilters([])
           setLocationSearch("")
-          if (params.moments === "upcoming") router.replace("/people")
+          if (statusParam || params.location || params.moments === "upcoming") router.replace("/people")
         }}
         onClose={() => setFilterSheetVisible(false)}
       />

@@ -179,14 +179,11 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
         data: { session },
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
-      const { error: insertError } = await supabase.from("interactions").insert({
+      const { error: insertError } = await supabase.from("person_notes").insert({
         user_id: session.user.id,
         person_id: selectedPerson.id,
-        type: "note",
-        date: todayInputValue(),
-        notes: noteText.trim(),
-        follow_up_needed: false,
-        follow_up_status: "done",
+        body: noteText.trim(),
+        note_date: todayInputValue(),
       })
       if (insertError) throw insertError
       DeviceEventEmitter.emit("noteAdded")

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react"
-import { Alert, Text, TouchableOpacity, View } from "react-native"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router"
 import { Screen } from "@/components/Screen"
@@ -301,6 +301,9 @@ export default function PersonDetailScreen() {
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [activeTab, setActiveTab] = useState<ProfileTab>("Timeline")
+  const [menuVisible, setMenuVisible] = useState(false)
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
+  const menuButtonRef = useRef<View>(null)
 
   const load = useCallback(async () => {
     try {
@@ -341,25 +344,31 @@ export default function PersonDetailScreen() {
   )
 
   function showMenu() {
-    Alert.alert(person?.name ?? "Options", undefined, [
-      { text: "Edit", onPress: () => router.push(`/people/${id}/edit`) },
+    if (menuVisible) {
+      setMenuVisible(false)
+      return
+    }
+    menuButtonRef.current?.measure((_, __, ___, height, pageX, pageY) => {
+      setMenuPos({ x: pageX, y: pageY + height })
+      setMenuVisible(true)
+    })
+  }
+
+  function confirmDeletePerson() {
+    Alert.alert("Delete person", `Delete ${person?.name}? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
-        onPress: () =>
-          Alert.alert("Delete person", `Delete ${person?.name}? This cannot be undone.`, [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Delete",
-              style: "destructive",
-              onPress: async () => {
-                await supabase.from("people").delete().eq("id", id)
-                router.back()
-              },
-            },
-          ]),
+        onPress: async () => {
+          const { error: deleteError } = await supabase.from("people").delete().eq("id", id)
+          if (deleteError) {
+            setError(deleteError.message)
+            return
+          }
+          router.back()
+        },
       },
-      { text: "Cancel", style: "cancel" },
     ])
   }
 
@@ -491,14 +500,16 @@ export default function PersonDetailScreen() {
           >
             <Ionicons name="arrow-back" size={26} color={colors.warmBlack} />
           </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Open contact actions"
-            onPress={showMenu}
-            className="h-10 w-10 items-end justify-center"
-          >
-            <Ionicons name="ellipsis-vertical" size={22} color={colors.warmBlack} />
-          </TouchableOpacity>
+          <View ref={menuButtonRef}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open contact actions"
+              onPress={showMenu}
+              className="h-10 w-10 items-end justify-center"
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color={colors.warmBlack} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {error != null && <ErrorBanner message={error} />}
@@ -747,6 +758,69 @@ export default function PersonDetailScreen() {
           </View>
         ) : null}
       </View>
+
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => setMenuVisible(false)}>
+          <Pressable
+            style={{
+              position: "absolute",
+              top: menuPos.y + 4,
+              right: 20,
+              backgroundColor: "white",
+              borderRadius: 12,
+              minWidth: 180,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+              elevation: 8,
+              overflow: "hidden",
+            }}
+          >
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Edit person"
+              onPress={() => {
+                setMenuVisible(false)
+                router.push(`/people/${id}/edit`)
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 13,
+                borderBottomWidth: 1,
+                borderBottomColor: "#F5F4F2",
+              }}
+            >
+              <Ionicons name="create-outline" size={17} color={colors.forest} style={{ marginRight: 10 }} />
+              <Text style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 14 }}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Delete person"
+              onPress={() => {
+                setMenuVisible(false)
+                confirmDeletePerson()
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingVertical: 13,
+              }}
+            >
+              <Ionicons name="trash-outline" size={17} color={colors.error} style={{ marginRight: 10 }} />
+              <Text style={{ fontFamily: fonts.medium, color: colors.error, fontSize: 14 }}>Delete</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   )
 }
