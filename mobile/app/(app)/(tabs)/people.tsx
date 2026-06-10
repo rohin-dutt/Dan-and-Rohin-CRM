@@ -131,9 +131,11 @@ export default function PeopleScreen() {
   const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
 
+  const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
+
   useEffect(() => {
-    setStatusFilters(parseMultiParam(params.status))
-  }, [params.status])
+    setStatusFilters(parseMultiParam(statusParam))
+  }, [statusParam])
 
   useEffect(() => {
     setLocationFilters(parseMultiParam(params.location))
