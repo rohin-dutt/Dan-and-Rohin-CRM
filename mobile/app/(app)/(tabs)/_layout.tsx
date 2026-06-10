@@ -55,7 +55,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="follow-ups"
+          name="add"
           listeners={{
             tabPress: (event) => {
               event.preventDefault()
