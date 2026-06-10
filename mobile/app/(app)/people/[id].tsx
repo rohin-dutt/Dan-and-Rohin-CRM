@@ -374,7 +374,10 @@ export default function PersonDetailScreen() {
   async function snoozeFollowUp(interactionId: string) {
     const snoozeDate = new Date()
     snoozeDate.setDate(snoozeDate.getDate() + 7)
-    const snoozedUntil = snoozeDate.toISOString().split("T")[0]
+    const y = snoozeDate.getFullYear()
+    const mo = String(snoozeDate.getMonth() + 1).padStart(2, "0")
+    const dy = String(snoozeDate.getDate()).padStart(2, "0")
+    const snoozedUntil = `${y}-${mo}-${dy}`
     await supabase
       .from("interactions")
       .update({ follow_up_status: "snoozed", follow_up_snoozed_until: snoozedUntil })

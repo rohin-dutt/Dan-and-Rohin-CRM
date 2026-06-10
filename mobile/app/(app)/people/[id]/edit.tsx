@@ -309,6 +309,10 @@ export default function EditPersonScreen() {
       <View className="px-5 pb-6">
         {error != null && <ErrorBanner message={error} />}
 
+        <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mb-2 mt-1">
+          * Required field
+        </Text>
+
         {/* Name row */}
         <View className="mb-3 flex-row gap-2">
           <View className="flex-1">
@@ -436,7 +440,7 @@ export default function EditPersonScreen() {
         {isFriendOrFamily && (
           <View className="mb-3">
             <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-              Birthday (optional)
+              Birthday
             </Text>
             {birthdayDate ? (
               <View

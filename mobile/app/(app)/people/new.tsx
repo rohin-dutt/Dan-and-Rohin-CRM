@@ -348,8 +348,12 @@ export default function NewPersonScreen() {
           </SoftCard>
         </TouchableOpacity>
 
+        <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mt-2">
+          * Required field
+        </Text>
+
         {/* Main form card */}
-        <SoftCard className="mt-4 p-3">
+        <SoftCard className="mt-2 p-3">
           {/* Name row */}
           <View className="mb-3 flex-row gap-2">
             <View className="flex-1">
@@ -507,7 +511,7 @@ export default function NewPersonScreen() {
           {(category === "Friend" || category === "Family") ? (
             <View className="mb-3">
               <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
-                Birthday (optional)
+                Birthday
               </Text>
               {birthdayDate ? (
                 <View
