@@ -77,6 +77,8 @@ create index if not exists important_moments_person_id_idx
 
 alter table public.important_moments enable row level security;
 
+grant select, insert, update, delete on table public.important_moments to authenticated;
+
 drop policy if exists "Users can read their own important moments" on public.important_moments;
 create policy "Users can read their own important moments"
   on public.important_moments for select

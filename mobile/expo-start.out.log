@@ -1,0 +1,91 @@
+
+> mobile@1.0.0 start
+> expo start --host lan
+
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_API_BASE_URL
+Starting project at C:\Users\danie\Desktop\Coding\personal-crm\mobile
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+iOS .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 97.1% (1680/1705)
+iOS Bundled 4898ms index.ts (1810 modules)
+ WARN  expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Read more at https://docs.expo.dev/develop/development-builds/introduction/.
+ WARN  `expo-notifications` functionality is not fully supported in Expo Go:
+We recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client.
+iOS .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 247ms index.ts (1 module)
+ WARN  expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Read more at https://docs.expo.dev/develop/development-builds/introduction/.
+ WARN  `expo-notifications` functionality is not fully supported in Expo Go:
+We recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client.
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web .\index.ts ▓▓▓▓▓░░░░░░░░░░░ 37.3% (127/321)
+Web .\index.ts ▓▓▓▓▓▓░░░░░░░░░░ 41.2% (440/700)
+Web .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.8% (848/932)
+Web Bundling failed 13530ms index.ts (1184 modules)
+ ERROR  Importing native-only module "react-native/Libraries/Utilities/codegenNativeCommands" on web from: node_modules\react-native-maps\lib\MapMarkerNativeComponent.js
+
+Import stack:
+
+ node_modules\react-native-maps\lib\MapMarkerNativeComponent.js
+ | import "react-native/Libraries/Utilities/codegenNativeCommands"
+           ^ Importing react-native internals is not supported on web.
+
+ node_modules\react-native-maps\lib\MapMarker.js
+ | import "./MapMarkerNativeComponent"
+
+ node_modules\react-native-maps\lib\index.js
+ | import "./MapMarker"
+
+ app\(app)\(tabs)\roots-map.tsx
+ | import "react-native-maps"
+
+ app (require.context)
+
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web .\index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 53.8% (609/830)
+Web .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.0% (1150/1174)
+Web Bundling failed 7459ms index.ts (1186 modules)
+ ERROR  Importing native-only module "react-native/Libraries/Utilities/codegenNativeCommands" on web from: node_modules\react-native-maps\lib\MapMarkerNativeComponent.js
+
+Import stack:
+
+ node_modules\react-native-maps\lib\MapMarkerNativeComponent.js
+ | import "react-native/Libraries/Utilities/codegenNativeCommands"
+           ^ Importing react-native internals is not supported on web.
+
+ node_modules\react-native-maps\lib\MapMarker.js
+ | import "./MapMarkerNativeComponent"
+
+ node_modules\react-native-maps\lib\index.js
+ | import "./MapMarker"
+
+ app\(app)\(tabs)\roots-map.tsx
+ | import "react-native-maps"
+
+ app (require.context)
+
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 3628ms index.ts (1166 modules)
+Web .\index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1166/1166)
+Web Bundled 1460ms index.ts (1164 modules)
+ LOG  [web] Logs will appear in the browser console
+iOS .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 224ms index.ts (1 module)
+Web Bundled 41ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+ WARN  expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Read more at https://docs.expo.dev/develop/development-builds/introduction/.
+ WARN  `expo-notifications` functionality is not fully supported in Expo Go:
+We recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client.
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 33ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 60ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+iOS .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 75ms index.ts (1 module)
+ WARN  expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go with the release of SDK 53. Use a development build instead of Expo Go. Read more at https://docs.expo.dev/develop/development-builds/introduction/.
+ WARN  `expo-notifications` functionality is not fully supported in Expo Go:
+We recommend you instead use a development build to avoid limitations. Learn more: https://expo.fyi/dev-client.

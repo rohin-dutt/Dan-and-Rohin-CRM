@@ -18,11 +18,12 @@ pending until the account exists.
 Proposed bundle ID:
 
 ```text
-com.roots.crm
+com.useroots.app
 ```
 
-Decision: use `com.roots.crm` for now, but allow one final revisit before Apple
-provisioning if a stronger brand or company identifier is chosen.
+Decision: use `com.useroots.app` for the current Expo app config. If this
+changes before Apple provisioning, update `mobile/app.json`, this checklist,
+and App Store Connect together.
 
 ## App Identity
 
@@ -49,8 +50,8 @@ provisioning if a stronger brand or company identifier is chosen.
 - [ ] TestFlight build uploaded.
 - [ ] TestFlight install verified on real iPhone.
 
-June 2, 2026 status: `mobile/eas.json` now defines development, preview, and
-production profiles. `mobile/app.json` sets `com.roots.crm`, `roots://`,
+June 10, 2026 status: `mobile/eas.json` defines development, preview, and
+production profiles. `mobile/app.json` sets `com.useroots.app`, `roots://`,
 version `1.0.0`, and build number `2026060201`. EAS project linking, Apple
 Developer enrollment, provisioning, upload, and TestFlight install remain
 manual external blockers.
@@ -144,7 +145,8 @@ Push Notifications:
   - Implemented from mobile Settings before token registration. Real iPhone QA
     still required.
 - [x] User can disable reminder notifications.
-  - Mobile Settings exposes follow-up and birthday push preference toggles.
+  - Mobile Settings exposes one push notification toggle backed by follow-up,
+    birthday, and important-moment push preference columns.
 - [x] Notification payloads avoid private notes/details.
   - No sender is active yet. Token registration and delivery logging store only
     privacy-safe metadata.

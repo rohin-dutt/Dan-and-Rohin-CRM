@@ -2,11 +2,11 @@ import { useCallback, useMemo, useRef, useState } from "react"
 import { Animated, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
-import MapView, { Callout, Marker } from "react-native-maps"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, PersonAvatar, SearchBox, SoftCard } from "@/components/RootsUI"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
+import RootsMapSurface, { type RootsMapRegion, type RootsMapSurfaceHandle } from "@/components/RootsMapSurface"
 import { supabase } from "@/lib/supabase"
 import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 import { colors, fonts } from "@/constants/theme"
@@ -30,13 +30,6 @@ type LocationGroup = {
   longitude: number
   location: string
   people: MapPerson[]
-}
-
-type MapRegion = {
-  latitude: number
-  longitude: number
-  latitudeDelta: number
-  longitudeDelta: number
 }
 
 const SHEET_EXPANDED_HEIGHT = 390
@@ -77,7 +70,7 @@ function buildGroups(people: MapPerson[]): LocationGroup[] {
   return [...groups.values()].sort((a, b) => b.people.length - a.people.length)
 }
 
-function computeFitRegion(groups: LocationGroup[]): MapRegion | null {
+function computeFitRegion(groups: LocationGroup[]): RootsMapRegion | null {
   if (groups.length === 0) return null
   if (groups.length === 1) {
     return {
@@ -103,7 +96,7 @@ function computeFitRegion(groups: LocationGroup[]): MapRegion | null {
   }
 }
 
-function getDefaultRegion(): MapRegion {
+function getDefaultRegion(): RootsMapRegion {
   return {
     latitude: 20,
     longitude: 0,
@@ -114,7 +107,7 @@ function getDefaultRegion(): MapRegion {
 
 export default function RootsMapScreen() {
   const router = useRouter()
-  const mapRef = useRef<MapView>(null)
+  const mapRef = useRef<RootsMapSurfaceHandle>(null)
   const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sheetTranslateY = useRef(new Animated.Value(SHEET_TRAVEL)).current
   const sheetCurrentOffsetRef = useRef(SHEET_TRAVEL)
@@ -126,7 +119,7 @@ export default function RootsMapScreen() {
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
   const [sheetExpanded, setSheetExpanded] = useState(false)
   const [geocodeSuggestions, setGeocodeSuggestions] = useState<MapboxFeature[]>([])
-  const [mapInitialRegion, setMapInitialRegion] = useState<MapRegion>(getDefaultRegion())
+  const [mapInitialRegion, setMapInitialRegion] = useState<RootsMapRegion>(getDefaultRegion())
 
   const load = useCallback(async () => {
     try {
@@ -320,78 +313,15 @@ export default function RootsMapScreen() {
 
       {groups.length > 0 ? (
         <View className="flex-1">
-          <MapView
+          <RootsMapSurface
             ref={mapRef}
-            style={{ flex: 1 }}
             initialRegion={mapInitialRegion}
-            showsUserLocation={false}
-            showsMyLocationButton={false}
-            accessibilityLabel="Map of saved Roots locations"
-            onPress={(event) => {
-              if ((event.nativeEvent as { action?: string }).action === "marker-press") return
-              setSelectedGroupKey(null)
-            }}
-          >
-            {groups.map((group) => (
-              <Marker
-                key={group.key}
-                coordinate={{ latitude: group.latitude, longitude: group.longitude }}
-                tracksViewChanges={false}
-                onPress={() => setSelectedGroupKey(group.key)}
-              >
-                <View
-                  pointerEvents="none"
-                  className="h-10 w-10 items-center justify-center rounded-full border-[3px] border-white shadow-lg"
-                  style={{ backgroundColor: selectedGroupKey === group.key ? colors.amber : colors.forest }}
-                >
-                  <Text style={{ fontFamily: fonts.bold }} className="text-sm text-white">
-                    {group.people.length}
-                  </Text>
-                </View>
-                <Callout
-                  tooltip
-                  onPress={() => router.push(`/people?location=${encodeURIComponent(group.location)}`)}
-                  accessibilityLabel={`View all people in ${group.location}`}
-                >
-                  <View
-                    style={{
-                      backgroundColor: "white",
-                      borderRadius: 14,
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      minWidth: 180,
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 10,
-                      elevation: 6,
-                    }}
-                  >
-                    <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 15 }} numberOfLines={1}>
-                      {group.location}
-                    </Text>
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 2 }}>
-                      {group.people.length} {group.people.length === 1 ? "person" : "people"}
-                    </Text>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginTop: 10,
-                        borderRadius: 10,
-                        backgroundColor: colors.forest,
-                        paddingVertical: 8,
-                      }}
-                    >
-                      <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 13 }}>View all</Text>
-                      <Ionicons name="chevron-forward" size={14} color="white" style={{ marginLeft: 4 }} />
-                    </View>
-                  </View>
-                </Callout>
-              </Marker>
-            ))}
-          </MapView>
+            groups={groups}
+            selectedGroupKey={selectedGroupKey}
+            onSelectGroup={setSelectedGroupKey}
+            onClearSelection={() => setSelectedGroupKey(null)}
+            onOpenLocation={(location) => router.push(`/people?location=${encodeURIComponent(location)}`)}
+          />
 
           <Animated.View
             className="absolute bottom-0 left-0 right-0 rounded-t-[28px] border border-stone-200 bg-white px-5 pt-2 shadow-xl"

@@ -196,7 +196,7 @@ bodies, or raw contact payloads.
 
 ## Migration Notes
 
-- Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, settings, push tokens, and notification deliveries.
+- Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, settings, push tokens, person notes, important moments, and notification deliveries.
 - The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration, person-tag ownership hardening migration, and restored user-owned cascade constraints applied.
 - The local migration `20260514171147_reconcile_target_schema_drift.sql` reconciles older target-project drift in nullability, defaults, `people.last_contacted_at`, check constraints, and tag-name uniqueness. Apply it to the linked project only as an intentional database release step after reviewing existing data.
 - The local migration `20260516170000_mobile_notification_readiness.sql` adds mobile push token storage, push notification settings fields, and privacy-safe notification delivery logging/idempotency records for the Roots iOS app.

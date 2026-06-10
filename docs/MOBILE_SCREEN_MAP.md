@@ -284,13 +284,13 @@ Actions:
 - edit person
 - delete person
 - log interaction
-- edit interaction
-- delete interaction
+- edit interaction (planned; no dedicated mobile route yet)
+- delete interaction (planned; no dedicated mobile UI yet)
 - edit note
 - delete note
 - mark follow-up done
 - snooze follow-up
-- reopen follow-up
+- reopen follow-up (planned; not currently exposed in mobile)
 
 States:
 
@@ -369,7 +369,9 @@ States:
 
 ### Edit Interaction
 
-Same fields as Log Interaction.
+Planned screen. Current mobile app can create touch-point interactions and
+display recent timeline entries, but does not expose a dedicated edit
+interaction route yet.
 
 Additional actions:
 
@@ -467,8 +469,7 @@ Actions:
 
 - choose file
 - validate
-- review summary
-- import
+- import/update
 
 States:
 

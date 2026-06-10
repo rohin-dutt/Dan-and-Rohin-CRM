@@ -66,12 +66,13 @@ ref. Have you run supabase link?`.
       import/update JSON, and restore/replace JSON should be spot-checked in
       the authenticated app against the linked project after CLI/browser access
       is available.
-- [ ] Restore/import is validated before writes, but the client-side restore
-      sequence is still not one database transaction.
-  - The import parser now rejects malformed nested records and invalid
+- [x] Restore/import is validated before writes and now runs through a single
+      trusted server/RPC boundary.
+  - The import parser rejects malformed nested records and invalid
     cross-references before any write begins.
-  - A future database RPC or server route should make restore/replace fully
-    atomic if restore becomes a high-risk or high-volume workflow.
+  - Web and mobile restore/import both call `/api/import/restore`, which wraps
+    the `restore_crm_snapshot(payload jsonb, replace_existing boolean)` RPC.
+    Keep future destructive restore work on this server/RPC path.
 - [x] Milestone 4 build type regression fixed.
   - Failure: `npm.cmd run build` failed after dashboard extraction because
     `app/(app)/dashboard/_components/dashboard-sections.tsx` lost the inline

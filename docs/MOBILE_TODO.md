@@ -14,8 +14,9 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
   - Decision: the account will be created; owner remains pending until the
     account exists.
 - [x] Confirm App Store bundle ID direction.
-  - Decision: use `com.roots.crm` for now; still allow a final revisit before
-    Apple provisioning if a stronger brand/company identifier is chosen.
+  - Decision: use `com.useroots.app` in `mobile/app.json`. If this changes
+    before Apple provisioning, update the app config, App Store readiness
+    checklist, and App Store Connect together.
 - [x] Confirm production Supabase project strategy for mobile.
   - Decision: use one Supabase project for early mobile development,
     TestFlight, and production for now; revisit separate dev/prod projects
@@ -90,23 +91,25 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
     first. Keep Supabase Edge Functions out of Phase 1 unless a concrete need
     appears.
 - [x] Design push token schema.
-  - Planned table: `push_tokens`, user-owned with token uniqueness, lifecycle
-    status, app install metadata, environment, timestamps, and RLS.
+  - Implemented table: `push_tokens`, user-owned with token uniqueness,
+    lifecycle status, app install metadata, environment, timestamps, and RLS.
 - [x] Design notification preference schema.
-  - Plan: extend `settings` with push follow-up, birthday, timezone, and quiet
-    hours fields instead of adding a second one-row preference table.
+  - Implemented on `settings`: push follow-up, birthday, important-moment,
+    timezone, and quiet-hours fields instead of adding a second one-row
+    preference table.
 - [x] Design notification delivery log or idempotency schema.
-  - Planned table: `notification_deliveries`, server-written, privacy-safe,
-    with a unique idempotency key and no private message body storage.
+  - Implemented table: `notification_deliveries`, server-written,
+    privacy-safe, with a unique idempotency key and no private message body
+    storage.
 - [x] Design account deletion server flow for mobile.
-  - Plan: bearer-auth route validates user, requires explicit confirmation,
-    clears or expires push tokens, deletes the Supabase auth user with a
-    service-role server client, then relies on cascading user-owned data
-    deletes.
+  - Implemented route: bearer-auth `/api/account/delete` validates the user,
+    requires explicit confirmation, clears or expires push tokens, deletes the
+    Supabase auth user with a service-role server client, then relies on
+    cascading user-owned data deletes.
 - [x] Design atomic restore/replace RPC or trusted server route.
-  - Plan: add a single `restore_crm_snapshot(payload jsonb,
-    replace_existing boolean)` RPC and move destructive restore through one
-    transaction before mobile launch.
+  - Implemented: `restore_crm_snapshot(payload jsonb,
+    replace_existing boolean)` runs destructive restore/import in one
+    transaction through `/api/import/restore`.
 - [x] Design note storage separately from logged touch points.
   - Notes now use a dedicated user-owned `person_notes` table. Logged
     `interactions` remain real touch points for last-contacted, follow-ups,
@@ -246,10 +249,17 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Tag display.
 - [ ] Tag assignment.
 - [ ] Edit interaction.
+  - Current mobile surface can create touch-point interactions and display the
+    most recent timeline entries; dedicated edit interaction UI remains open.
 - [ ] Delete interaction.
+  - Dedicated delete interaction UI remains open.
 - [ ] Follow-up done, reopen, and snooze.
+  - Person detail supports marking open follow-ups done and snoozing for 7
+    days. Reopen remains open.
 - [ ] Settings account tab.
-- [ ] Settings notification preferences.
+- [x] Settings notification preferences.
+  - Mobile Settings exposes a combined push notification preference toggle
+    backed by follow-up, birthday, and important-moment push columns.
 - [ ] Settings tag management.
 - [ ] Unsaved-change handling for edit/create flows.
 
@@ -291,8 +301,8 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
     app install id, app version, build number, environment, provider, platform,
     status, and last-seen timestamp.
 - [x] Add notification preferences to Settings.
-  - Mobile Settings now exposes follow-up and birthday push preferences backed
-    by the `settings` push columns.
+  - Mobile Settings now exposes one push notification preference toggle backed
+    by follow-up, birthday, and important-moment push columns.
 - [ ] Build trusted sender for due follow-ups, birthdays, and important
       moments.
   - Schema now supports `notification_deliveries.kind = 'important_moment'`
@@ -329,9 +339,18 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 ## Phase 11: Data Management And Account Deletion
 
-- [ ] Build export flow.
-- [ ] Build import/update flow.
-- [ ] Build restore/replace flow.
+- [x] Build export flow.
+  - Mobile Settings calls the trusted `/api/export` route and opens the native
+    share sheet with the generated JSON payload. Physical-device file/share QA
+    remains required.
+- [x] Build import/update flow.
+  - Mobile Settings uses the native document picker, reads a JSON file, and
+    calls `/api/import/restore` with `replace_existing: false`. Physical-device
+    file-picker QA remains required.
+- [x] Build restore/replace flow.
+  - Mobile Settings confirms the destructive action, uses the native document
+    picker, and calls `/api/import/restore` with `replace_existing: true`.
+    Physical-device file-picker QA remains required.
 - [x] Make restore/replace atomic through RPC or trusted route.
   - Added `restore_crm_snapshot(payload jsonb, replace_existing boolean)` and
     a trusted Next.js route wrapper at `/api/import/restore`.
