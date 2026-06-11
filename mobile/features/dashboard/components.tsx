@@ -30,7 +30,7 @@ export function MetricCard({
       accessibilityLabel={label}
       className="flex-1"
     >
-      <SoftCard className="flex-1 justify-center px-3 py-3">
+      <SoftCard className="px-3 py-3">
         <View className="flex-row items-center justify-center">
           <View
             className="mr-2 h-8 w-8 items-center justify-center rounded-full"
@@ -41,9 +41,6 @@ export function MetricCard({
           <Text
             style={{ fontFamily: fonts.bold, color: colors.forest }}
             className="text-2xl leading-7"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
           >
             {value}
           </Text>

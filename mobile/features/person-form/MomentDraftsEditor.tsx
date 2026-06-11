@@ -102,6 +102,7 @@ export function MomentDraftsEditor({
                   onChange={(_, picked) => {
                     if (picked) onChange(updateMomentDraft(moments, index, { date: toLocalDateString(picked) }))
                   }}
+                  minimumDate={new Date(new Date().getFullYear() - 100, 0, 1)}
                 />
                 <TouchableOpacity
                   accessibilityRole="button"

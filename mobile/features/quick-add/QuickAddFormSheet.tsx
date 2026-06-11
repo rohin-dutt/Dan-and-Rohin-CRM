@@ -499,6 +499,7 @@ export function QuickAddFormSheet({
                   onChange={(_, date) => {
                     if (date) setSelectedDate(date)
                   }}
+                  minimumDate={new Date(new Date().getFullYear() - 100, 0, 1)}
                   maximumDate={new Date()}
                 />
                 <TouchableOpacity

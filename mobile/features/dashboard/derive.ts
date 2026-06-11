@@ -1,4 +1,5 @@
 import {
+  categorizePeople,
   getMostContacted,
   getNextDueDays,
   getOnTimeRate,
@@ -8,10 +9,15 @@ import {
 } from "@roots/shared"
 import type { ImportantMoment, Person } from "@/types"
 
-// Interaction columns the dashboard needs for its stats.
-export type DashboardInteraction = Pick<Interaction, "person_id" | "type" | "is_touch_point">
+// Interaction columns the dashboard needs — includes follow-up fields so
+// categorizePeople can bucket people correctly (not just cadence-based).
+export type DashboardInteraction = Pick<
+  Interaction,
+  "person_id" | "type" | "is_touch_point" | "follow_up_needed" | "follow_up_date" | "follow_up_status"
+>
 
-export const DASHBOARD_INTERACTION_COLUMNS = "person_id, type, is_touch_point"
+export const DASHBOARD_INTERACTION_COLUMNS =
+  "person_id, type, is_touch_point, follow_up_needed, follow_up_date, follow_up_status"
 
 export type DashboardModel = {
   overdueList: Person[]
@@ -33,20 +39,19 @@ export function buildDashboardModel(input: {
 }): DashboardModel {
   const { people, interactions, importantMoments } = input
 
-  const overdueList = people.filter((person) => {
-    const days = getNextDueDays(person)
-    return days != null && days <= 0
-  })
-  const dueThisWeekList = people.filter((person) => {
-    const days = getNextDueDays(person)
-    return days != null && days >= 1 && days <= 7
-  })
-  const comingUpList = people.filter((person) => {
-    const days = getNextDueDays(person)
-    return days != null && days >= 8
-  })
+  // categorizePeople accounts for explicit follow-ups (follow_up_needed +
+  // follow_up_date) in addition to cadence, so people with an open follow-up
+  // appear in the right bucket even if they have no cadence set.
+  const sections = categorizePeople(
+    people,
+    new Date(),
+    interactions as unknown as Interaction[],
+  )
+
+  const overdueList = sections.overdue
+  const dueThisWeekList = sections.dueThisWeek
+  const comingUpList = sections.comingUp
   const followUpList = [...overdueList, ...dueThisWeekList]
-    .sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0))
 
   return {
     overdueList,

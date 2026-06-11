@@ -121,6 +121,7 @@ export function BirthdayField({
               onChange={(_, picked) => {
                 if (picked) setDraftDate(picked)
               }}
+              minimumDate={new Date(1900, 0, 1)}
               maximumDate={new Date()}
             />
             <View
