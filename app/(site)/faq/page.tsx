@@ -5,24 +5,48 @@ export const metadata = { title: "FAQ — Roots" };
 
 const faqs = [
   {
+    q: "What is Roots?",
+    a: "Roots is an app that helps you stay close to the people who matter most to you. Think of it as a gentle reminder system for your real relationships — the friends you mean to call, the family you keep meaning to visit, the people who shaped who you are.",
+  },
+  {
+    q: "How does it work?",
+    a: "Add the people you want to stay close to, set how often you'd like to reach out, and log your interactions when you connect. Roots tracks when you last talked and reminds you when it's been too long. That's the whole idea.",
+  },
+  {
+    q: "How is this different from just using my contacts app?",
+    a: "Your contacts app stores information. Roots helps you act on it. It tells you who you haven't talked to in a while, surfaces upcoming birthdays and important moments, and gives you a nudge when a relationship needs attention. It's less about storing contacts and more about maintaining the ones that matter.",
+  },
+  {
+    q: "Can I import my existing contacts?",
+    a: "Yes. When you add someone new you can pull their name, phone, and email directly from your phone's contacts so you're not starting from scratch.",
+  },
+  {
+    q: "Is Roots available on Android?",
+    a: "Not yet — Roots is currently iOS only. Android is on the roadmap.",
+  },
+  {
     q: "Is Roots free?",
-    a: "Yes, Roots is free to use. Create an account and get started in under a minute.",
+    a: "Yes, Roots is free to download and use.",
   },
   {
-    q: "Who can see my data?",
-    a: "Only you. Your contacts, notes, and interactions are private to your account. We do not sell or share your data.",
+    q: "Is my data private?",
+    a: "Yes. Your relationship data is private to you. We do not sell it, share it with third parties, or use it for advertising purposes.",
   },
   {
-    q: "Can I export my data?",
-    a: "Yes. From the Settings page you can export everything as a JSON file and re-import it at any time.",
+    q: "Will you sell my data?",
+    a: "No. We do not sell, share, or monetize your personal data in any form. Your relationship data exists solely to power your experience in Roots.",
   },
   {
-    q: "What are follow-ups?",
-    a: "Follow-ups are reminders attached to a person. Set a due date and a note, and Roots will surface them on your dashboard when it's time to act.",
+    q: "How do I get started?",
+    a: "Download Roots, add a few people who matter to you, and set how often you want to stay in touch. Roots will take it from there.",
   },
   {
-    q: "Is there a mobile app?",
-    a: "Roots is a progressive web app. Add it to your home screen from your browser for a native-like experience on iOS and Android.",
+    q: "What happens if I delete my account?",
+    a: "All of your data is permanently and irreversibly deleted from our systems. We do not retain copies after deletion.",
+  },
+  {
+    q: "What if I want to delete my account?",
+    a: "You can delete your account and all associated data directly from the Settings screen in the app at any time.",
   },
 ];
 

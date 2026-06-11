@@ -13,7 +13,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Last updated: May 2026
+          Last updated: June 2026
         </p>
         <div className="mt-8 max-w-prose space-y-8 text-sm leading-7 text-muted-foreground">
           <section>
@@ -26,8 +26,7 @@ export default function TermsPage() {
           <section>
             <h2 className="font-medium text-foreground">The service</h2>
             <p className="mt-2">
-              Roots is a personal relationship management tool that helps you
-              track contacts, log interactions, and receive reminders. We
+              Roots is an app that helps you stay close to the people who matter most. It surfaces who you haven't talked to in a while, reminds you of important moments, and helps you follow through on the connections that matter. We
               reserve the right to modify or discontinue the service at any
               time with reasonable notice.
             </p>

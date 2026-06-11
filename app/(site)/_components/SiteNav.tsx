@@ -29,18 +29,11 @@ export function SiteNav() {
         >
           Contact
         </Link>
-        <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
         <Link
-          href="/auth/login"
-          className="rounded-md px-3 py-2 text-foreground transition hover:bg-muted"
-        >
-          Sign in
-        </Link>
-        <Link
-          href="/auth/signup"
+          href="#"
           className="rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground transition hover:bg-primary/80"
         >
-          Sign up
+          Download
         </Link>
       </nav>
     </header>

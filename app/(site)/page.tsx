@@ -28,21 +28,14 @@ export default function Home() {
             Stay close to the people<br className="hidden sm:block" /> who matter most.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-            Roots helps you remember context, follow up on time, and reach out
-            before relationships go quiet.
+            Life gets busy. Roots makes sure the people who matter don't slip away.
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <div className="mt-8 flex justify-center">
             <Link
-              href="/auth/signup"
+              href="#"
               className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80"
             >
-              Start for free
-            </Link>
-            <Link
-              href="/auth/login"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-primary bg-background px-6 text-sm font-medium text-primary transition hover:bg-primary/10"
-            >
-              Sign in
+              Download on the App Store
             </Link>
           </div>
         </section>
