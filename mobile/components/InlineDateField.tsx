@@ -1,4 +1,4 @@
-import { Platform, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Text, TouchableOpacity, View } from "react-native"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
@@ -28,15 +28,6 @@ export function InlineDateField({
   maximumDate?: Date
 }) {
   const accessibilityName = (label ?? placeholder).toLowerCase()
-  const inputDateValue = date ? date.toISOString().slice(0, 10) : ""
-
-  function handleWebDateChange(value: string) {
-    if (!value) return
-    const [year, month, day] = value.split("-").map(Number)
-    if (!year || !month || !day) return
-    onChange(new Date(year, month - 1, day))
-  }
-
   return (
     <View className={label ? "mb-4" : undefined}>
       {label ? (
@@ -81,26 +72,16 @@ export function InlineDateField({
             marginTop: 6,
           }}
         >
-          {Platform.OS === "web" ? (
-            <TextInput
-              accessibilityLabel={`Choose ${accessibilityName}`}
-              value={inputDateValue}
-              onChangeText={handleWebDateChange}
-              placeholder="YYYY-MM-DD"
-              className="px-4 py-3 text-base text-warm-black"
-            />
-          ) : (
-            <DateTimePicker
-              value={date ?? new Date()}
-              mode="date"
-              display="spinner"
-              onChange={(_, picked) => {
-                if (picked) onChange(picked)
-              }}
-              minimumDate={minimumDate}
-              maximumDate={maximumDate}
-            />
-          )}
+          <DateTimePicker
+            value={date ?? new Date()}
+            mode="date"
+            display="spinner"
+            onChange={(_, picked) => {
+              if (picked) onChange(picked)
+            }}
+            minimumDate={minimumDate}
+            maximumDate={maximumDate}
+          />
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={`Done selecting ${accessibilityName}`}

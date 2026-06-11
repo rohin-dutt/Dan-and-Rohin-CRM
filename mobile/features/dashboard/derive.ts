@@ -1,6 +1,4 @@
 import {
-  categorizePeople,
-  getFollowUpQueue,
   getMostContacted,
   getNextDueDays,
   getOnTimeRate,
@@ -10,69 +8,52 @@ import {
 } from "@roots/shared"
 import type { ImportantMoment, Person } from "@/types"
 
-// Interaction columns the dashboard needs for stats and explicit follow-up queues.
-export type DashboardInteraction = Pick<
-  Interaction,
-  | "id"
-  | "person_id"
-  | "type"
-  | "date"
-  | "notes"
-  | "is_touch_point"
-  | "follow_up_needed"
-  | "follow_up_date"
-  | "follow_up_status"
-  | "follow_up_snoozed_until"
-  | "created_at"
-  | "updated_at"
->
+// Interaction columns the dashboard needs for its stats.
+export type DashboardInteraction = Pick<Interaction, "person_id" | "type" | "is_touch_point">
 
-export const DASHBOARD_INTERACTION_COLUMNS =
-  "id, person_id, type, date, notes, is_touch_point, follow_up_needed, follow_up_date, follow_up_status, follow_up_snoozed_until, created_at, updated_at"
+export const DASHBOARD_INTERACTION_COLUMNS = "person_id, type, is_touch_point"
 
 export type DashboardModel = {
-  cadenceOverdueList: Person[]
-  cadenceDueThisWeekList: Person[]
+  overdueList: Person[]
+  dueThisWeekList: Person[]
   comingUpList: Person[]
-  cadenceCheckIns: Person[]
-  cadenceCheckInExtraCount: number
-  explicitFollowUps: Array<{ interaction: DashboardInteraction; person: Person }>
-  explicitFollowUpExtraCount: number
+  followUps: Person[]
+  followUpExtraCount: number
   upcomingMoments: UpcomingMomentItem[]
   onTimeRate: number | null
   mostContacted: Person | null
 }
 
-// Pure derivation of the dashboard sections from loaded rows. Cadence
-// check-ins and explicit follow-ups stay separate so completed/snoozed
-// follow-ups do not make cadence cards look like urgent follow-up tasks.
+// Pure derivation of the dashboard sections from loaded rows; isolated so a
+// future server-side summary can replace it without touching the screen.
 export function buildDashboardModel(input: {
   people: Person[]
   interactions: DashboardInteraction[]
   importantMoments: ImportantMoment[]
 }): DashboardModel {
   const { people, interactions, importantMoments } = input
-  const peopleById = new Map(people.map((person) => [person.id, person]))
-  const sections = categorizePeople(people, new Date())
 
-  const followUpQueue = getFollowUpQueue(interactions, new Date())
-  const explicitFollowUpList = [...followUpQueue.overdue, ...followUpQueue.due_today, ...followUpQueue.due]
-    .map((interaction) => {
-      const person = peopleById.get(interaction.person_id)
-      return person ? { interaction, person } : null
-    })
-    .filter((item): item is { interaction: DashboardInteraction; person: Person } => item != null)
-
-  const cadenceCheckInList = [...sections.overdue, ...sections.dueThisWeek]
+  const overdueList = people.filter((person) => {
+    const days = getNextDueDays(person)
+    return days != null && days <= 0
+  })
+  const dueThisWeekList = people.filter((person) => {
+    const days = getNextDueDays(person)
+    return days != null && days >= 1 && days <= 7
+  })
+  const comingUpList = people.filter((person) => {
+    const days = getNextDueDays(person)
+    return days != null && days >= 8
+  })
+  const followUpList = [...overdueList, ...dueThisWeekList]
+    .sort((a, b) => (getNextDueDays(a) ?? 0) - (getNextDueDays(b) ?? 0))
 
   return {
-    cadenceOverdueList: sections.overdue,
-    cadenceDueThisWeekList: sections.dueThisWeek,
-    comingUpList: sections.comingUp,
-    cadenceCheckIns: cadenceCheckInList.slice(0, 3),
-    cadenceCheckInExtraCount: Math.max(0, cadenceCheckInList.length - 3),
-    explicitFollowUps: explicitFollowUpList.slice(0, 3),
-    explicitFollowUpExtraCount: Math.max(0, explicitFollowUpList.length - 3),
+    overdueList,
+    dueThisWeekList,
+    comingUpList,
+    followUps: followUpList.slice(0, 3),
+    followUpExtraCount: Math.max(0, followUpList.length - 3),
     upcomingMoments: getUpcomingMoments(people, importantMoments, new Date(), 14),
     onTimeRate: getOnTimeRate(people),
     mostContacted: getMostContacted(people, interactions),

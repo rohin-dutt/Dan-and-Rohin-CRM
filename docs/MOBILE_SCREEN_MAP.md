@@ -244,6 +244,7 @@ Sections:
 
 - account
 - notifications
+- tags
 - data
 - support/legal
 
@@ -251,6 +252,7 @@ Actions:
 
 - logout
 - update notification preferences
+- manage tags
 - export data
 - import/update
 - restore/replace

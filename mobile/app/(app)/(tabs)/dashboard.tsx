@@ -174,14 +174,14 @@ export default function DashboardScreen() {
           <View className="mt-5 flex-row gap-3 px-5">
             <MetricCard
               icon="alert-circle"
-              value={dashboard.cadenceOverdueList.length}
-              label="Cadence Overdue"
+              value={dashboard.overdueList.length}
+              label="Overdue"
               onPress={() => router.push("/people?status=overdue")}
             />
             <MetricCard
               icon="time"
-              value={dashboard.cadenceDueThisWeekList.length}
-              label="Cadence Due"
+              value={dashboard.dueThisWeekList.length}
+              label="Due This Week"
               tone="amber"
               onPress={() => router.push("/people?status=due_this_week")}
             />
@@ -196,64 +196,16 @@ export default function DashboardScreen() {
 
           <SoftCard className="mx-5 mt-5 p-5">
             <SectionTitle
-              title="Open follow-ups"
-              actionLabel="View all"
-              onAction={() => router.push("/people")}
-            />
-            {dashboard.explicitFollowUps.length === 0 ? (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                Explicit follow-ups from logged interactions will appear here.
-              </Text>
-            ) : (
-              dashboard.explicitFollowUps.map(({ interaction, person }, index) => (
-                <View key={interaction.id}>
-                  {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open ${person.name}`}
-                    onPress={() => router.push(`/people/${person.id}`)}
-                    activeOpacity={0.76}
-                    className="flex-row items-center"
-                  >
-                    <View className="mr-3 items-center">
-                      <StatusDot status="amber" />
-                    </View>
-                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
-                    <View className="ml-4 flex-1">
-                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
-                        {person.name}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
-                        {interaction.type}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                        {interaction.follow_up_date ? `Due ${interaction.follow_up_date}` : "No due date"}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
-            {dashboard.explicitFollowUpExtraCount > 0 ? (
-              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="mt-4 text-sm">
-                {dashboard.explicitFollowUpExtraCount} more
-              </Text>
-            ) : null}
-          </SoftCard>
-
-          <SoftCard className="mx-5 mt-5 p-5">
-            <SectionTitle
-              title="Cadence check-ins"
+              title="People to follow up with"
               actionLabel="View all"
               onAction={() => router.push("/people?status=overdue&status=due_this_week")}
             />
-            {dashboard.cadenceCheckIns.length === 0 ? (
+            {dashboard.followUps.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                No cadence check-ins need attention right now.
+                No follow-ups need attention right now.
               </Text>
             ) : (
-              dashboard.cadenceCheckIns.map((person, index) => (
+              dashboard.followUps.map((person, index) => (
                 <View key={person.id}>
                   {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
                   <TouchableOpacity
@@ -285,15 +237,15 @@ export default function DashboardScreen() {
                 </View>
               ))
             )}
-            {dashboard.cadenceCheckInExtraCount > 0 ? (
+            {dashboard.followUpExtraCount > 0 ? (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`${dashboard.cadenceCheckInExtraCount} more cadence check-ins`}
+                accessibilityLabel={`${dashboard.followUpExtraCount} more follow-ups`}
                 onPress={() => router.push("/people?status=overdue&status=due_this_week")}
                 className="mt-4"
               >
                 <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-                  {dashboard.cadenceCheckInExtraCount} more
+                  {dashboard.followUpExtraCount} more
                 </Text>
               </TouchableOpacity>
             ) : null}

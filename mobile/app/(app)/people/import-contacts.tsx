@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import * as Contacts from "expo-contacts"
 import { useRouter } from "expo-router"
-import { safeBack } from "@/lib/navigation"
 import { Ionicons } from "@expo/vector-icons"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
@@ -21,8 +20,6 @@ type PermissionState = "unknown" | "denied" | "limited" | "granted"
 type ImportResponse = {
   ok: boolean
   imported: number
-  updated: number
-  skipped: number
   errors: string[]
 }
 
@@ -164,17 +161,16 @@ export default function ImportContactsScreen() {
         `${duplicateSelections} selected contact${duplicateSelections === 1 ? "" : "s"} may already exist. Roots will create new people for this import.`,
         [
           { text: "Review", style: "cancel" },
-          { text: "Update existing", onPress: () => void submitImport("update") },
-          { text: "Create new anyway", style: "destructive", onPress: () => void submitImport("create_anyway") },
+          { text: "Import", style: "destructive", onPress: () => void submitImport() },
         ],
       )
       return
     }
 
-    await submitImport("create")
+    await submitImport()
   }
 
-  async function submitImport(duplicateAction: "create" | "create_anyway" | "update" | "skip") {
+  async function submitImport() {
     setSaving(true)
     setError(null)
     setResult(null)
@@ -183,19 +179,12 @@ export default function ImportContactsScreen() {
     try {
       const response = await callTrustedApi("/api/import/contacts", {
         body: {
-          contacts: selectedCandidates.map((candidate) =>
-            toContactImportPayload(candidate, candidate.duplicatePersonId ? duplicateAction : "create"),
-          ),
+          contacts: selectedCandidates.map(toContactImportPayload),
         },
       }) as ImportResponse
 
       const failures = response.errors.length
-      const parts = [
-        `${response.imported} created`,
-        `${response.updated ?? 0} updated`,
-        `${response.skipped ?? 0} skipped`,
-      ]
-      setResult(`${parts.join(", ")}${failures ? ` with ${failures} warning${failures === 1 ? "" : "s"}` : ""}.`)
+      setResult(`Imported ${response.imported} contact${response.imported === 1 ? "" : "s"}${failures ? ` with ${failures} warning${failures === 1 ? "" : "s"}` : ""}.`)
       if (failures === 0) {
         setCandidates((current) => current.filter((candidate) => !submittedIds.has(candidate.id)))
         setSelectedIds(new Set())
@@ -218,7 +207,7 @@ export default function ImportContactsScreen() {
     <Screen scrollable={false}>
       <View className="px-5 pt-4 pb-3 bg-cream">
         <View className="flex-row items-center justify-between mb-3">
-          <TouchableOpacity onPress={() => safeBack(router, "/people/new")} className="py-2 pr-3">
+          <TouchableOpacity onPress={() => router.back()} className="py-2 pr-3">
             <Text className="text-sage text-sm font-semibold">Cancel</Text>
           </TouchableOpacity>
           <Text className="text-base font-semibold text-warm-black">Import contacts</Text>
