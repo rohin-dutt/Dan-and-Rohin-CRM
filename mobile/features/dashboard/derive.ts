@@ -8,7 +8,7 @@ import {
   type Interaction,
   type UpcomingMomentItem,
 } from "@roots/shared"
-import type { ImportantMoment, Person, PersonNote } from "@/types"
+import type { ImportantMoment, Person } from "@/types"
 
 // Interaction columns the dashboard needs for stats and explicit follow-up queues.
 export type DashboardInteraction = Pick<
@@ -39,7 +39,6 @@ export type DashboardModel = {
   explicitFollowUps: Array<{ interaction: DashboardInteraction; person: Person }>
   explicitFollowUpExtraCount: number
   upcomingMoments: UpcomingMomentItem[]
-  recentNotes: Array<{ note: PersonNote; person: Person | null }>
   onTimeRate: number | null
   mostContacted: Person | null
 }
@@ -50,10 +49,9 @@ export type DashboardModel = {
 export function buildDashboardModel(input: {
   people: Person[]
   interactions: DashboardInteraction[]
-  personNotes: PersonNote[]
   importantMoments: ImportantMoment[]
 }): DashboardModel {
-  const { people, interactions, personNotes, importantMoments } = input
+  const { people, interactions, importantMoments } = input
   const peopleById = new Map(people.map((person) => [person.id, person]))
   const sections = categorizePeople(people, new Date())
 
@@ -66,18 +64,6 @@ export function buildDashboardModel(input: {
     .filter((item): item is { interaction: DashboardInteraction; person: Person } => item != null)
 
   const cadenceCheckInList = [...sections.overdue, ...sections.dueThisWeek]
-  const recentNotes = [...personNotes]
-    .sort((a, b) => {
-      const aDate = a.note_date ?? a.created_at.slice(0, 10)
-      const bDate = b.note_date ?? b.created_at.slice(0, 10)
-      if (bDate !== aDate) return bDate.localeCompare(aDate)
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
-    .slice(0, 3)
-    .map((note) => ({
-      note,
-      person: people.find((person) => person.id === note.person_id) ?? null,
-    }))
 
   return {
     cadenceOverdueList: sections.overdue,
@@ -88,7 +74,6 @@ export function buildDashboardModel(input: {
     explicitFollowUps: explicitFollowUpList.slice(0, 3),
     explicitFollowUpExtraCount: Math.max(0, explicitFollowUpList.length - 3),
     upcomingMoments: getUpcomingMoments(people, importantMoments, new Date(), 14),
-    recentNotes,
     onTimeRate: getOnTimeRate(people),
     mostContacted: getMostContacted(people, interactions),
   }

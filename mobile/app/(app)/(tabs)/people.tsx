@@ -220,7 +220,7 @@ export default function PeopleScreen() {
           >
             <Ionicons name="filter-outline" size={17} color={hasActiveFilter ? "#FFFFFF" : colors.ink} />
             <Text style={{ fontFamily: fonts.medium }} className={`ml-2 text-sm ${hasActiveFilter ? "text-white" : "text-warm-black"}`}>
-              {hasActiveFilter ? "Filtered" : "More"}
+              Filters
             </Text>
           </TouchableOpacity>
         </View>
@@ -251,7 +251,7 @@ export default function PeopleScreen() {
               style={{ fontFamily: fonts.body, color: hasActiveFilter ? colors.forest : colors.ink }}
               className="ml-2 text-base"
             >
-              {hasActiveFilter ? "Filtered" : "Filters"}
+              Filters
             </Text>
           </TouchableOpacity>
         </View>

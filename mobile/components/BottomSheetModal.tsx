@@ -101,7 +101,7 @@ export function BottomSheetModal({
           sheetStyle,
         ]}
       >
-        <View>{children}</View>
+        {children}
       </Animated.View>
     </View>
   )
