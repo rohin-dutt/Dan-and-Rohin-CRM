@@ -142,6 +142,10 @@ that maps only name, first email, and first phone. It flags likely duplicates
 and uploads only selected contacts through the trusted contacts import API.
 Update-existing behavior and real-device permission QA remain open.
 
+June 11, 2026 status: duplicate review now supports create, update existing,
+and skip semantics through the trusted contacts import route. Real-device
+Contacts permission QA remains open.
+
 Push Notifications:
 
 - [ ] Purpose shown before system prompt.

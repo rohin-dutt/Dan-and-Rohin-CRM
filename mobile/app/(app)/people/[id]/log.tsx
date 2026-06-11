@@ -8,6 +8,7 @@ import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { InlineDateField } from "@/components/InlineDateField"
 import { supabase } from "@/lib/supabase"
+import { safeBack } from "@/lib/navigation"
 import { colors } from "@/constants/theme"
 import { INTERACTION_TYPES, toLocalDateString, updateStreakAfterAction } from "@roots/shared"
 
@@ -72,9 +73,9 @@ export default function LogInteractionScreen() {
         DeviceEventEmitter.emit("interactionAdded")
       }
 
-      router.back()
+      safeBack(router, `/people/${id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to log interaction")
+      setError(e instanceof Error ? e.message : isNoteMode ? "Failed to save note" : "Failed to log interaction")
     } finally {
       setSaving(false)
     }
@@ -84,7 +85,7 @@ export default function LogInteractionScreen() {
     <Screen>
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
-        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
+        <TouchableOpacity onPress={() => safeBack(router, `/people/${id}`)} className="py-1 pr-3">
           <Text className="text-sage text-sm font-semibold">Cancel</Text>
         </TouchableOpacity>
         <Text className="text-base font-semibold text-warm-black">

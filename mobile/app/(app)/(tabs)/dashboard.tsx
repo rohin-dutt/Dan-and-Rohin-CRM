@@ -8,11 +8,10 @@ import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForUser } from "@/lib/important-moments"
-import { loadPersonNotesForPeople } from "@/lib/person-notes"
 import { personImageUrl } from "@/lib/person-display"
 import { firstNameFromMetadata } from "@/lib/user-metadata"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
-import type { ImportantMoment, Person, PersonNote, Settings } from "@/types"
+import type { ImportantMoment, Person, Settings } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
 import {
@@ -35,7 +34,6 @@ export default function DashboardScreen() {
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
-  const [personNotes, setPersonNotes] = useState<PersonNote[]>([])
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [firstName, setFirstName] = useState("there")
@@ -65,19 +63,14 @@ export default function DashboardScreen() {
 
       if (loadedPeople.length > 0) {
         const personIds = loadedPeople.map((person) => person.id)
-        const [{ data: loadedInteractions, error: interactionsError }, loadedNotes] = await Promise.all([
-          supabase
-            .from("interactions")
-            .select(DASHBOARD_INTERACTION_COLUMNS)
-            .in("person_id", personIds),
-          loadPersonNotesForPeople(personIds),
-        ])
+        const { data: loadedInteractions, error: interactionsError } = await supabase
+          .from("interactions")
+          .select(DASHBOARD_INTERACTION_COLUMNS)
+          .in("person_id", personIds)
         if (interactionsError) throw interactionsError
         setInteractions(loadedInteractions ?? [])
-        setPersonNotes(loadedNotes)
       } else {
         setInteractions([])
-        setPersonNotes([])
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard.")
@@ -103,8 +96,8 @@ export default function DashboardScreen() {
   }, [load])
 
   const dashboard = useMemo(
-    () => buildDashboardModel({ people, interactions, personNotes, importantMoments }),
-    [importantMoments, interactions, people, personNotes],
+    () => buildDashboardModel({ people, interactions, importantMoments }),
+    [importantMoments, interactions, people],
   )
 
   const inviteFriend = useCallback(async () => {
@@ -181,14 +174,14 @@ export default function DashboardScreen() {
           <View className="mt-5 flex-row gap-3 px-5">
             <MetricCard
               icon="alert-circle"
-              value={dashboard.overdueList.length}
-              label="Overdue"
+              value={dashboard.cadenceOverdueList.length}
+              label="Cadence Overdue"
               onPress={() => router.push("/people?status=overdue")}
             />
             <MetricCard
               icon="time"
-              value={dashboard.dueThisWeekList.length}
-              label="Due This Week"
+              value={dashboard.cadenceDueThisWeekList.length}
+              label="Cadence Due"
               tone="amber"
               onPress={() => router.push("/people?status=due_this_week")}
             />
@@ -203,16 +196,64 @@ export default function DashboardScreen() {
 
           <SoftCard className="mx-5 mt-5 p-5">
             <SectionTitle
-              title="People to follow up with"
+              title="Open follow-ups"
+              actionLabel="View all"
+              onAction={() => router.push("/people")}
+            />
+            {dashboard.explicitFollowUps.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                Explicit follow-ups from logged interactions will appear here.
+              </Text>
+            ) : (
+              dashboard.explicitFollowUps.map(({ interaction, person }, index) => (
+                <View key={interaction.id}>
+                  {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${person.name}`}
+                    onPress={() => router.push(`/people/${person.id}`)}
+                    activeOpacity={0.76}
+                    className="flex-row items-center"
+                  >
+                    <View className="mr-3 items-center">
+                      <StatusDot status="amber" />
+                    </View>
+                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
+                    <View className="ml-4 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                        {person.name}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
+                        {interaction.type}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                        {interaction.follow_up_date ? `Due ${interaction.follow_up_date}` : "No due date"}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            {dashboard.explicitFollowUpExtraCount > 0 ? (
+              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="mt-4 text-sm">
+                {dashboard.explicitFollowUpExtraCount} more
+              </Text>
+            ) : null}
+          </SoftCard>
+
+          <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle
+              title="Cadence check-ins"
               actionLabel="View all"
               onAction={() => router.push("/people?status=overdue&status=due_this_week")}
             />
-            {dashboard.followUps.length === 0 ? (
+            {dashboard.cadenceCheckIns.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                No follow-ups need attention right now.
+                No cadence check-ins need attention right now.
               </Text>
             ) : (
-              dashboard.followUps.map((person, index) => (
+              dashboard.cadenceCheckIns.map((person, index) => (
                 <View key={person.id}>
                   {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
                   <TouchableOpacity
@@ -244,15 +285,15 @@ export default function DashboardScreen() {
                 </View>
               ))
             )}
-            {dashboard.followUpExtraCount > 0 ? (
+            {dashboard.cadenceCheckInExtraCount > 0 ? (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`${dashboard.followUpExtraCount} more follow-ups`}
+                accessibilityLabel={`${dashboard.cadenceCheckInExtraCount} more cadence check-ins`}
                 onPress={() => router.push("/people?status=overdue&status=due_this_week")}
                 className="mt-4"
               >
                 <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-                  {dashboard.followUpExtraCount} more
+                  {dashboard.cadenceCheckInExtraCount} more
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -300,38 +341,6 @@ export default function DashboardScreen() {
                 </Text>
               </TouchableOpacity>
             ) : null}
-          </SoftCard>
-
-          <SoftCard className="mx-5 mt-5 p-4">
-            <SectionTitle title="Recent notes" />
-            {dashboard.recentNotes.length === 0 ? (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                Notes you log will appear here.
-              </Text>
-            ) : (
-              dashboard.recentNotes.map(({ note, person }, index) => (
-                <View key={note.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
-                  <TouchableOpacity
-                    onPress={() => person && router.push(`/people/${person.id}`)}
-                    activeOpacity={0.76}
-                    className="flex-row"
-                  >
-                    <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
-                    <View className="ml-3 flex-1">
-                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
-                        {person ? `Note with ${person.name}` : "Recent note"}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
-                        {note.body}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                        {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(note.note_date ? `${note.note_date}T12:00:00` : note.created_at))}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-5">

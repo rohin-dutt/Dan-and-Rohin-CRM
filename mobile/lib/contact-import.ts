@@ -8,12 +8,15 @@ export type ImportCandidate = {
   phone: string | null
   displayPhone: string | null
   duplicateReason: string | null
+  duplicatePersonId: string | null
 }
 
 export type ContactImportPayload = {
   name: string
   email?: string
   tel?: string
+  existing_person_id?: string
+  duplicate_action?: "create" | "create_anyway" | "update" | "skip"
 }
 
 function normalize(value: string | null | undefined) {
@@ -53,7 +56,7 @@ function formatPhoneForDisplay(entry: Contacts.PhoneNumber | null): string | nul
   return raw
 }
 
-function getDuplicateReason(candidate: ContactImportPayload, people: Person[]) {
+function getDuplicateMatch(candidate: ContactImportPayload, people: Person[]) {
   const candidateName = normalize(candidate.name)
   const candidateEmail = normalize(candidate.email)
   const candidatePhone = normalizePhone(candidate.tel)
@@ -65,9 +68,12 @@ function getDuplicateReason(candidate: ContactImportPayload, people: Person[]) {
   })
 
   if (!match) return null
-  if (candidateEmail && normalize(match.email) === candidateEmail) return "Email matches an existing person"
-  if (candidatePhone && normalizePhone(match.phone) === candidatePhone) return "Phone matches an existing person"
-  return "Name matches an existing person"
+  const reason = candidateEmail && normalize(match.email) === candidateEmail
+    ? "Email matches an existing person"
+    : candidatePhone && normalizePhone(match.phone) === candidatePhone
+      ? "Phone matches an existing person"
+      : "Name matches an existing person"
+  return { personId: match.id, reason }
 }
 
 export function mapDeviceContact(contact: Contacts.ExistingContact, people: Person[]): ImportCandidate | null {
@@ -81,20 +87,28 @@ export function mapDeviceContact(contact: Contacts.ExistingContact, people: Pers
     tel: firstPhone(contact.phoneNumbers) ?? undefined,
   }
 
+  const duplicate = getDuplicateMatch(payload, people)
+
   return {
     id: contact.id,
     name: payload.name,
     email: payload.email ?? null,
     phone: payload.tel ?? null,
     displayPhone: formatPhoneForDisplay(phoneEntry),
-    duplicateReason: getDuplicateReason(payload, people),
+    duplicateReason: duplicate?.reason ?? null,
+    duplicatePersonId: duplicate?.personId ?? null,
   }
 }
 
-export function toContactImportPayload(candidate: ImportCandidate): ContactImportPayload {
+export function toContactImportPayload(
+  candidate: ImportCandidate,
+  duplicateAction: ContactImportPayload["duplicate_action"] = candidate.duplicatePersonId ? "skip" : "create",
+): ContactImportPayload {
   return {
     name: candidate.name,
     email: candidate.email ?? undefined,
     tel: candidate.phone ?? undefined,
+    existing_person_id: candidate.duplicatePersonId ?? undefined,
+    duplicate_action: duplicateAction,
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Text, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Button } from "@/components/Button"
@@ -12,8 +12,28 @@ export default function UpdatePasswordScreen() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [hasRecoverySession, setHasRecoverySession] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (cancelled) return
+        setHasRecoverySession(Boolean(session))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setHasRecoverySession(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleUpdate() {
     setError(null)
@@ -41,6 +61,20 @@ export default function UpdatePasswordScreen() {
     setPassword("")
     setConfirmPassword("")
     setSaved(true)
+  }
+
+  if (!hasRecoverySession) {
+    return (
+      <Screen>
+        <View className="flex-1 justify-center px-6 py-12">
+          <Text className="text-3xl font-bold text-warm-black mb-2">Reset link expired</Text>
+          <Text className="text-base text-gray-500 mb-8">
+            This password reset link is invalid or expired. Request a new link to continue.
+          </Text>
+          <Button title="Return to sign in" onPress={() => router.replace("/(auth)/login")} />
+        </View>
+      </Screen>
+    )
   }
 
   return (

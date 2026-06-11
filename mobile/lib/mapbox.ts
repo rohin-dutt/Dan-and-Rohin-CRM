@@ -1,5 +1,7 @@
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? ""
 
+export const geocodingAvailable = Boolean(MAPBOX_TOKEN)
+
 export type MapboxFeature = {
   place_name: string
   center: [number, number]

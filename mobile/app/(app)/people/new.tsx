@@ -8,6 +8,7 @@ import { IconTile, SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
+import { safeBack } from "@/lib/navigation"
 import { colors, fonts } from "@/constants/theme"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
@@ -41,6 +42,8 @@ export default function NewPersonScreen() {
 
   async function handleSave() {
     if (saving) return
+    setError(null)
+    setCategoryError(null)
     if (!firstName.trim()) {
       setError("First name is required")
       return
@@ -89,7 +92,7 @@ export default function NewPersonScreen() {
         moments: cleanMoments,
       })
 
-      router.back()
+      safeBack(router, "/people")
     } catch (e) {
       if (e instanceof PersonRelationsError) {
         // The person row was created; only tag/moment assignment failed.
@@ -98,7 +101,7 @@ export default function NewPersonScreen() {
           "Partly saved",
           `${cleanName} was added, but some details could not be saved: ${e.message}`,
         )
-        router.back()
+        safeBack(router, "/people")
       } else {
         setError(e instanceof Error ? e.message : "Failed to save person")
       }
@@ -115,7 +118,7 @@ export default function NewPersonScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Cancel adding person"
-            onPress={() => router.back()}
+            onPress={() => safeBack(router, "/people")}
             className="min-h-11 justify-center pr-4"
           >
             <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-lg">
@@ -297,6 +300,11 @@ export default function NewPersonScreen() {
               suggestions={locationField.suggestions}
               onSelect={locationField.selectSuggestion}
             />
+            {!locationField.geocodingAvailable ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1.5 text-xs">
+                Location suggestions are disabled until EXPO_PUBLIC_MAPBOX_TOKEN is configured.
+              </Text>
+            ) : null}
           </View>
 
           {/* How you met */}

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from "react-native"
+import { Alert, Modal, Pressable, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Screen } from "@/components/Screen"
@@ -7,12 +7,13 @@ import { PersonAvatar } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { personImageUrl } from "@/lib/person-display"
+import { safeBack } from "@/lib/navigation"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getNextDueDays } from "@roots/shared"
 import { StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
 import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person-detail/tabs"
-import { formatNextAction } from "@/features/person-detail/helpers"
+import { formatCadenceAction } from "@/features/person-detail/helpers"
 import { usePersonDetail } from "@/features/person-detail/use-person-detail"
 import type { PersonNote } from "@/types"
 
@@ -22,6 +23,9 @@ export default function PersonDetailScreen() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("Timeline")
   const [menuVisible, setMenuVisible] = useState(false)
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
+  const [editingNote, setEditingNote] = useState<PersonNote | null>(null)
+  const [editingNoteBody, setEditingNoteBody] = useState("")
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null)
   const menuButtonRef = useRef<View>(null)
 
   const {
@@ -60,39 +64,36 @@ export default function PersonDetailScreen() {
         style: "destructive",
         onPress: async () => {
           const deleted = await deletePerson()
-          if (deleted) router.back()
+          if (deleted) safeBack(router, "/people")
         },
       },
     ])
   }
 
   function promptEditNote(note: PersonNote) {
-    Alert.prompt(
-      "Edit note",
-      undefined,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Save",
-          onPress: (value: string | undefined) => {
-            if (value != null) void updatePersonNote(note.id, value)
-          },
-        },
-      ],
-      "plain-text",
-      note.body,
-    )
+    setEditingNote(note)
+    setEditingNoteBody(note.body)
   }
 
   function confirmDeleteNote(noteId: string) {
-    Alert.alert("Delete note", "Delete this note?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => void deletePersonNote(noteId),
-      },
-    ])
+    setDeletingNoteId(noteId)
+  }
+
+  async function saveEditedNote() {
+    if (!editingNote) return
+    const body = editingNoteBody.trim()
+    if (!body) return
+    const noteId = editingNote.id
+    setEditingNote(null)
+    setEditingNoteBody("")
+    await updatePersonNote(noteId, body)
+  }
+
+  async function deleteSelectedNote() {
+    if (!deletingNoteId) return
+    const noteId = deletingNoteId
+    setDeletingNoteId(null)
+    await deletePersonNote(noteId)
   }
 
   if (loading) return <LoadingState />
@@ -116,7 +117,7 @@ export default function PersonDetailScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => router.back()}
+            onPress={() => safeBack(router, "/people")}
             className="h-10 w-10 items-start justify-center"
           >
             <Ionicons name="arrow-back" size={26} color={colors.warmBlack} />
@@ -164,7 +165,7 @@ export default function PersonDetailScreen() {
 
         <StatStrip
           lastTalked={formatDaysAgo(person.last_contacted_at)}
-          nextAction={formatNextAction(nextDueDays)}
+          nextAction={formatCadenceAction(nextDueDays)}
           interactionsCount={touchPointInteractions.length}
           openFollowUpsCount={openFollowUps.length}
         />
@@ -270,6 +271,87 @@ export default function PersonDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {editingNote != null ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditingNote(null)}
+        >
+          <View className="flex-1 justify-center bg-black/35 px-5">
+            <View className="rounded-2xl bg-white p-5">
+              <Text style={{ fontFamily: fonts.heading, color: colors.forest }} className="text-2xl">
+                Edit note
+              </Text>
+              <TextInput
+                accessibilityLabel="Note body"
+                value={editingNoteBody}
+                onChangeText={setEditingNoteBody}
+                multiline
+                className="mt-4 min-h-32 rounded-xl border border-stone-200 px-4 py-3 text-base text-warm-black"
+                textAlignVertical="top"
+              />
+              <View className="mt-5 flex-row gap-3">
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel edit note"
+                  onPress={() => setEditingNote(null)}
+                  className="flex-1 items-center rounded-xl border border-stone-200 py-3"
+                >
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.muted }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Save edited note"
+                  onPress={() => void saveEditedNote()}
+                  className="flex-1 items-center rounded-xl bg-forest py-3"
+                >
+                  <Text style={{ fontFamily: fonts.semibold, color: "white" }}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
+      {deletingNoteId != null ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDeletingNoteId(null)}
+        >
+          <View className="flex-1 justify-center bg-black/35 px-5">
+            <View className="rounded-2xl bg-white p-5">
+              <Text style={{ fontFamily: fonts.heading, color: colors.forest }} className="text-2xl">
+                Delete note?
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base">
+                This note will be permanently removed.
+              </Text>
+              <View className="mt-5 flex-row gap-3">
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel delete note"
+                  onPress={() => setDeletingNoteId(null)}
+                  className="flex-1 items-center rounded-xl border border-stone-200 py-3"
+                >
+                  <Text style={{ fontFamily: fonts.semibold, color: colors.muted }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Confirm delete note"
+                  onPress={() => void deleteSelectedNote()}
+                  className="flex-1 items-center rounded-xl bg-red-700 py-3"
+                >
+                  <Text style={{ fontFamily: fonts.semibold, color: "white" }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </Screen>
   )
 }

@@ -6,6 +6,8 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  StyleSheet,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native"
@@ -79,12 +81,13 @@ export function BottomSheetModal({
   ).current
 
   const content = (
-    <Pressable
-      style={{ flex: 1, justifyContent: "flex-end", backgroundColor: `rgba(0,0,0,${backdropOpacity})` }}
-      onPress={dismiss}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
+    <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: `rgba(0,0,0,${backdropOpacity})` }}>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={dismiss}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+      />
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -98,9 +101,9 @@ export function BottomSheetModal({
           sheetStyle,
         ]}
       >
-        <Pressable onPress={() => null}>{children}</Pressable>
+        {children}
       </Animated.View>
-    </Pressable>
+    </View>
   )
 
   return (
