@@ -48,6 +48,16 @@ export function parseMultiParam(value: string | string[] | undefined): string[] 
     .filter(Boolean)
 }
 
+// Location values can contain commas ("Paris, France"), so they are kept
+// whole and only split on the explicit "||" separator used between values.
+export function parseLocationParam(value: string | string[] | undefined): string[] {
+  const raw = Array.isArray(value) ? value.join("||") : value ?? ""
+  return raw
+    .split("||")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 export function matchesSearch(person: Person, rawQuery: string) {
   const query = rawQuery.trim().toLowerCase()
   if (!query) return true

@@ -32,8 +32,11 @@ type LocationGroup = {
   people: MapPerson[]
 }
 
-const SHEET_EXPANDED_HEIGHT = 390
-const SHEET_COLLAPSED_HEIGHT = 116
+// The floating tab bar overlays the bottom ~100px of the screen, so the
+// collapsed peek must be tall enough that the "Locations" header and the
+// people/locations subtext are fully visible above it.
+const SHEET_EXPANDED_HEIGHT = 460
+const SHEET_COLLAPSED_HEIGHT = 208
 const SHEET_TRAVEL = SHEET_EXPANDED_HEIGHT - SHEET_COLLAPSED_HEIGHT
 
 function clampSheetOffset(value: number) {
@@ -165,7 +168,6 @@ export default function RootsMapScreen() {
     )
   }, [people, query])
 
-  const allGroups = useMemo(() => buildGroups(people), [people])
   const groups = useMemo(() => buildGroups(filteredPeople), [filteredPeople])
   const animateSheet = useCallback(
     (expanded: boolean) => {
@@ -264,10 +266,6 @@ export default function RootsMapScreen() {
         />
         <View className="px-5">
           {error ? <ErrorBanner message={error} /> : null}
-          <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 text-sm">
-            {people.length} {people.length === 1 ? "person" : "people"} across {allGroups.length}{" "}
-            {allGroups.length === 1 ? "location" : "locations"}
-          </Text>
           <SearchBox className="h-11">
             <TextInput
               value={query}
@@ -348,7 +346,7 @@ export default function RootsMapScreen() {
                     Locations
                   </Text>
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                    {filteredPeople.length} {filteredPeople.length === 1 ? "person" : "people"} across {groups.length} {groups.length === 1 ? "city" : "cities"}
+                    {filteredPeople.length} {filteredPeople.length === 1 ? "person" : "people"} across {groups.length} {groups.length === 1 ? "location" : "locations"}
                   </Text>
                 </View>
                 <Ionicons name={sheetExpanded ? "chevron-down" : "chevron-up"} size={22} color={colors.muted} />

@@ -3,10 +3,10 @@ import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
-import { Button } from "@/components/Button"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
@@ -21,6 +21,7 @@ import {
   type ImportantMomentDraft,
 } from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
+import { CompactTextField } from "@/features/person-form/CompactTextField"
 import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
@@ -34,6 +35,7 @@ export default function EditPersonScreen() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
@@ -45,9 +47,10 @@ export default function EditPersonScreen() {
   const [role, setRole] = useState("")
   const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
   const [email, setEmail] = useState("")
-  const [howMet, setHowMet] = useState("")
-  const [frequencyDays, setFrequencyDays] = useState(30)
+  const [phone, setPhone] = useState("")
   const [notes, setNotes] = useState("")
+  const [howMet, setHowMet] = useState("")
+  const [frequencyDays, setFrequencyDays] = useState(90)
 
   const freqMenu = useAnchoredMenu()
   const locationField = useLocationAutocomplete()
@@ -81,8 +84,9 @@ export default function EditPersonScreen() {
         setCompany(p.company ?? "")
         setRole(p.role ?? "")
         setEmail(p.email ?? "")
+        setPhone(p.phone ?? "")
         setHowMet(p.how_met ?? "")
-        setFrequencyDays(p.contact_frequency_days ?? 30)
+        setFrequencyDays(p.contact_frequency_days ?? 90)
         resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
         setNotes(p.notes ?? "")
 
@@ -111,9 +115,6 @@ export default function EditPersonScreen() {
     load()
   }, [id, resetLocation])
 
-  const isProfessional = category === "Professional"
-  const isFriendOrFamily = category === "Friend" || category === "Family"
-
   async function handleSave() {
     if (saving) return
     if (!firstName.trim()) {
@@ -125,7 +126,7 @@ export default function EditPersonScreen() {
       return
     }
     if (!category) {
-      setCategoryError("Choose Friend, Family, or Professional.")
+      setCategoryError("Please select a relationship type.")
       return
     }
     const cleanName = `${firstName.trim()} ${lastName.trim()}`
@@ -152,6 +153,8 @@ export default function EditPersonScreen() {
         person: {
           name: cleanName,
           email: email.trim() || null,
+          phone: phone.trim() || null,
+          notes: notes.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
           birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
@@ -159,7 +162,6 @@ export default function EditPersonScreen() {
           location: trimmedLocation || null,
           latitude: trimmedLocation ? locationField.latitude : null,
           longitude: trimmedLocation ? locationField.longitude : null,
-          notes: notes.trim() || null,
           contact_frequency_days: frequencyDays,
           relationship_type: category ?? null,
         },
@@ -203,256 +205,309 @@ export default function EditPersonScreen() {
 
   return (
     <Screen>
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-3 pb-2">
-        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-base">Cancel</Text>
-        </TouchableOpacity>
-        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">Edit person</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <View className="px-5 pt-3 pb-6">
+        {/* Header */}
+        <View className="flex-row items-center justify-between">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Cancel editing person"
+            onPress={() => router.back()}
+            className="min-h-11 justify-center pr-4"
+          >
+            <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-lg">
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-xl">
+            Edit Person
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Save person"
+            onPress={handleSave}
+            disabled={saving}
+            className="min-h-11 justify-center pl-4"
+          >
+            <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-lg">
+              {saving ? "Saving" : "Save"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      <View className="px-5 pb-6">
         {error != null && <ErrorBanner message={error} />}
 
-        <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mb-2 mt-1">
+        <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mt-2">
           * Required field
         </Text>
 
-        {/* Name row */}
-        <View className="mb-3 flex-row gap-2">
-          <View className="flex-1">
-            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-              First name <Text style={{ color: "#B91C1C" }}>*</Text>
-            </Text>
-            <TextInput
-              accessibilityLabel="First name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="First name"
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="words"
-              returnKeyType="next"
-              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
-              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
-            />
-          </View>
-          <View className="flex-1">
-            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-              Last name <Text style={{ color: "#B91C1C" }}>*</Text>
-            </Text>
-            <TextInput
-              accessibilityLabel="Last name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Last name"
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="words"
-              returnKeyType="next"
-              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
-              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
-            />
-          </View>
-        </View>
-
-        {/* Relationship type */}
-        <View className="mb-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-            Relationship type <Text style={{ color: "#B91C1C" }}>*</Text>
-          </Text>
-          <View className="flex-row gap-2">
-            {RELATIONSHIP_CATEGORIES.map((cat) => {
-              const selected = category === cat.label
-              return (
-                <TouchableOpacity
-                  key={cat.label}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Relationship type ${cat.label}`}
-                  onPress={() => {
-                    setCategory(cat.label)
-                    setCategoryError(null)
-                  }}
-                  className="min-h-[42px] flex-1 items-center justify-center rounded-xl border px-2 py-2"
-                  style={{
-                    backgroundColor: selected ? colors.forest : "white",
-                    borderColor: selected ? colors.forest : "#E5E7EB",
-                  }}
-                >
-                  <Text
-                    style={{ fontFamily: fonts.medium, color: selected ? "white" : colors.ink }}
-                    className="text-sm"
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.78}
-                  >
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-          {categoryError ? <Text className="mt-1 text-xs text-red-500">{categoryError}</Text> : null}
-        </View>
-
-        {/* Conditional: Professional fields */}
-        {isProfessional && (
-          <>
-            <View className="mb-3">
-              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Email</Text>
+        {/* Main form card */}
+        <SoftCard className="mt-2 p-3">
+          {/* Name row */}
+          <View className="mb-3 flex-row gap-2">
+            <View className="flex-1">
+              <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+                First name <Text style={{ color: "#B91C1C" }}>*</Text>
+              </Text>
               <TextInput
-                accessibilityLabel="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="email@example.com"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
+                accessibilityLabel="First name"
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Alex"
+                placeholderTextColor="#8F96A3"
+                autoCapitalize="words"
                 returnKeyType="next"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                style={{ fontFamily: fonts.body, color: colors.ink }}
+                className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
+                style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
               />
             </View>
-            <View className="mb-3">
-              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Company</Text>
+            <View className="flex-1">
+              <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+                Last name <Text style={{ color: "#B91C1C" }}>*</Text>
+              </Text>
               <TextInput
-                accessibilityLabel="Company"
+                accessibilityLabel="Last name"
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Taylor"
+                placeholderTextColor="#8F96A3"
+                autoCapitalize="words"
+                returnKeyType="next"
+                className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
+                style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
+          </View>
+
+          {/* Relationship type */}
+          <View className="mb-3">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+              Relationship type <Text style={{ color: "#B91C1C" }}>*</Text>
+            </Text>
+            <View className="flex-row overflow-hidden rounded-xl border border-stone-200">
+              {RELATIONSHIP_CATEGORIES.map((cat, index) => {
+                const selected = category === cat.label
+                return (
+                  <TouchableOpacity
+                    key={cat.label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Relationship type ${cat.label}`}
+                    onPress={() => {
+                      setCategory(cat.label)
+                      setCategoryError(null)
+                    }}
+                    className={`min-h-[50px] flex-1 flex-row items-center justify-center px-1 ${index > 0 ? "border-l border-stone-200" : ""}`}
+                    style={{ backgroundColor: selected ? colors.forest : "white" }}
+                  >
+                    <Ionicons name={cat.icon} size={18} color={selected ? "white" : colors.muted} />
+                    <Text
+                      style={{ fontFamily: fonts.medium, color: selected ? "white" : colors.ink }}
+                      className="ml-1.5 text-sm"
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.78}
+                    >
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+            {categoryError ? <Text className="mt-1.5 text-xs text-red-500">{categoryError}</Text> : null}
+          </View>
+
+          {/* Keep in touch — frequency dropdown */}
+          <View className="mb-3">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+              Keep in touch
+            </Text>
+            <View ref={freqMenu.anchorRef}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Choose keep in touch cadence"
+                onPress={freqMenu.toggle}
+                activeOpacity={0.78}
+                className="flex-row items-center rounded-xl border border-stone-200 bg-white"
+                style={{ height: 44 }}
+              >
+                <View className="items-center justify-center border-r border-stone-200" style={{ width: 44, height: 44 }}>
+                  <Ionicons name="calendar-outline" size={20} color={colors.forest} />
+                </View>
+                <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="flex-1 px-3 text-sm">
+                  {frequencyLabel(frequencyDays)}
+                </Text>
+                <Ionicons name={freqMenu.visible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+                <View className="w-3" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Location */}
+          <View className="mb-3">
+            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+              Location
+            </Text>
+            <View className="flex-row items-center rounded-xl border border-stone-200 bg-white" style={{ height: 44 }}>
+              <View className="items-center justify-center border-r border-stone-200" style={{ width: 44, height: 44 }}>
+                <Ionicons name="location-outline" size={20} color={colors.forest} />
+              </View>
+              <TextInput
+                accessibilityLabel="Location"
+                value={locationField.location}
+                onChangeText={locationField.handleLocationChange}
+                placeholder="City, country"
+                placeholderTextColor="#8F96A3"
+                className="flex-1 px-3 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink, height: 44 }}
+                returnKeyType="next"
+              />
+              {locationField.latitude !== null ? (
+                <View className="pr-3">
+                  <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
+                </View>
+              ) : null}
+            </View>
+            <LocationSuggestionsList
+              suggestions={locationField.suggestions}
+              onSelect={locationField.selectSuggestion}
+            />
+          </View>
+
+          {/* How you met (or Relationship for Family) */}
+          <CompactTextField
+            label={category === "Family" ? "Relationship" : "How you met"}
+            icon="people-outline"
+            value={howMet}
+            onChangeText={setHowMet}
+            placeholder={category === "Family" ? "Parent, sibling, partner..." : "At a conference, through a friend..."}
+          />
+
+          {/* Phone */}
+          <CompactTextField
+            label="Phone"
+            icon="call-outline"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+1 555 123 4567"
+            keyboardType="phone-pad"
+          />
+
+          {/* Notes */}
+          <CompactTextField
+            label="Notes"
+            icon="document-text-outline"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Anything else to remember..."
+            multiline
+          />
+
+          {/* Conditional: Birthday for Friend/Family */}
+          {(category === "Friend" || category === "Family") ? (
+            <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+          ) : null}
+
+          {/* Conditional: Email + Company for Professional */}
+          {category === "Professional" ? (
+            <>
+              <CompactTextField
+                label="Email"
+                icon="mail-outline"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="alex@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <CompactTextField
+                label="Company"
+                icon="business-outline"
                 value={company}
                 onChangeText={setCompany}
                 placeholder="Company name"
-                placeholderTextColor="#9CA3AF"
-                returnKeyType="next"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                style={{ fontFamily: fonts.body, color: colors.ink }}
               />
+            </>
+          ) : null}
+        </SoftCard>
+
+        {/* Show more details */}
+        <SoftCard className="mt-4">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ expanded: detailsExpanded }}
+            accessibilityLabel={detailsExpanded ? "Hide more details" : "Show more details"}
+            onPress={() => setDetailsExpanded((value) => !value)}
+            activeOpacity={0.78}
+            className="flex-row items-center p-3"
+          >
+            <View className="flex-1">
+              <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-base">
+                {detailsExpanded ? "Hide more details" : "Show more details"}
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-xs leading-4">
+                Role, important dates, and more
+              </Text>
             </View>
-            <View className="mb-3">
-              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Role</Text>
-              <TextInput
-                accessibilityLabel="Role"
+            <Ionicons name={detailsExpanded ? "chevron-up" : "chevron-down"} size={22} color={colors.muted} />
+          </TouchableOpacity>
+
+          {detailsExpanded ? (
+            <View className="border-t border-stone-100 p-3">
+              {(category === "Friend" || category === "Family") ? (
+                <CompactTextField
+                  label="Company"
+                  icon="business-outline"
+                  value={company}
+                  onChangeText={setCompany}
+                  placeholder="Company name"
+                />
+              ) : null}
+
+              <CompactTextField
+                label="Role"
+                icon="briefcase-outline"
                 value={role}
                 onChangeText={setRole}
                 placeholder="Job title"
-                placeholderTextColor="#9CA3AF"
-                returnKeyType="next"
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-                style={{ fontFamily: fonts.body, color: colors.ink }}
               />
-            </View>
-          </>
-        )}
 
-        {/* Conditional: Birthday for Friend/Family */}
-        {isFriendOrFamily && <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />}
+              {(category === "Friend" || category === "Family") ? (
+                <CompactTextField
+                  label="Email"
+                  icon="mail-outline"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="alex@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              ) : null}
 
-        {/* Important moments */}
-        <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
+              {category === "Professional" ? (
+                <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+              ) : null}
 
-        {/* How you met */}
-        <View className="mb-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">How you met</Text>
-          <TextInput
-            accessibilityLabel="How you met"
-            value={howMet}
-            onChangeText={setHowMet}
-            placeholder="At a conference, through a friend…"
-            placeholderTextColor="#9CA3AF"
-            returnKeyType="next"
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-            style={{ fontFamily: fonts.body, color: colors.ink }}
-          />
-        </View>
+              <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
 
-        {/* Keep in touch — frequency dropdown */}
-        <View className="mb-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
-            How often to stay in touch?
-          </Text>
-          <View ref={freqMenu.anchorRef}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Choose keep in touch cadence"
-              onPress={freqMenu.toggle}
-              activeOpacity={0.78}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                height: 44,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                backgroundColor: "white",
-                paddingHorizontal: 12,
-              }}
-            >
-              <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
-                {frequencyLabel(frequencyDays)}
-              </Text>
-              <Ionicons name={freqMenu.visible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Location */}
-        <View className="mb-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Location</Text>
-          <View className="flex-row items-center rounded-xl border border-gray-200 bg-white">
-            <TextInput
-              accessibilityLabel="Location"
-              value={locationField.location}
-              onChangeText={locationField.handleLocationChange}
-              placeholder="City, country"
-              placeholderTextColor="#9CA3AF"
-              returnKeyType="next"
-              className="flex-1 px-3 py-2.5 text-sm"
-              style={{ fontFamily: fonts.body, color: colors.ink }}
-            />
-            {locationField.latitude !== null ? (
-              <View className="pr-3">
-                <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
+              {/* Tags */}
+              <View className="mb-1">
+                <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
+                  Tags
+                </Text>
+                <TagPicker
+                  tags={allTags}
+                  selectedTagIds={selectedTagIds}
+                  onToggle={(tagId) =>
+                    setSelectedTagIds((prev) =>
+                      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
+                    )
+                  }
+                  onCreateTag={handleCreateTag}
+                />
               </View>
-            ) : null}
-          </View>
-          <LocationSuggestionsList
-            suggestions={locationField.suggestions}
-            onSelect={locationField.selectSuggestion}
-          />
-        </View>
-
-        {/* Notes */}
-        <View className="mb-3">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Notes</Text>
-          <TextInput
-            accessibilityLabel="Notes"
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Anything else to remember…"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={3}
-            returnKeyType="default"
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-            style={{ fontFamily: fonts.body, color: colors.ink, textAlignVertical: "top", minHeight: 80 }}
-          />
-        </View>
-
-        {/* Tags */}
-        <View className="mb-4">
-          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Tags</Text>
-          <TagPicker
-            tags={allTags}
-            selectedTagIds={selectedTagIds}
-            onToggle={(tagId) =>
-              setSelectedTagIds((prev) =>
-                prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
-              )
-            }
-            onCreateTag={handleCreateTag}
-          />
-        </View>
-
-        <Button title="Save changes" onPress={handleSave} loading={saving} />
+            </View>
+          ) : null}
+        </SoftCard>
       </View>
 
       <AnchoredMenu

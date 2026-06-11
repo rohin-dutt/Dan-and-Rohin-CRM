@@ -32,6 +32,8 @@ export default function NewPersonScreen() {
   const [role, setRole] = useState("")
   const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [notes, setNotes] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(90)
   const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
@@ -75,6 +77,8 @@ export default function NewPersonScreen() {
         person: {
           name: cleanName,
           email: email.trim() || null,
+          phone: phone.trim() || null,
+          notes: notes.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
           birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
@@ -299,13 +303,33 @@ export default function NewPersonScreen() {
             />
           </View>
 
-          {/* How you met */}
+          {/* How you met (or Relationship for Family) */}
           <CompactTextField
-            label="How you met"
+            label={category === "Family" ? "Relationship" : "How you met"}
             icon="people-outline"
             value={howMet}
             onChangeText={setHowMet}
-            placeholder="At a conference, through a friend..."
+            placeholder={category === "Family" ? "Parent, sibling, partner..." : "At a conference, through a friend..."}
+          />
+
+          {/* Phone */}
+          <CompactTextField
+            label="Phone"
+            icon="call-outline"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+1 555 123 4567"
+            keyboardType="phone-pad"
+          />
+
+          {/* Notes */}
+          <CompactTextField
+            label="Notes"
+            icon="document-text-outline"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Anything else to remember..."
+            multiline
           />
 
           {/* Conditional: Birthday for Friend/Family */}
@@ -359,6 +383,16 @@ export default function NewPersonScreen() {
 
           {detailsExpanded ? (
             <View className="border-t border-stone-100 p-3">
+              {(category === "Friend" || category === "Family") ? (
+                <CompactTextField
+                  label="Company"
+                  icon="business-outline"
+                  value={company}
+                  onChangeText={setCompany}
+                  placeholder="Company name"
+                />
+              ) : null}
+
               <CompactTextField
                 label="Role"
                 icon="briefcase-outline"
@@ -367,11 +401,23 @@ export default function NewPersonScreen() {
                 placeholder="Job title"
               />
 
-              <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
+              {(category === "Friend" || category === "Family") ? (
+                <CompactTextField
+                  label="Email"
+                  icon="mail-outline"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="alex@example.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              ) : null}
 
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-xs leading-4">
-                Tags are created from the selected relationship type when this person is saved.
-              </Text>
+              {category === "Professional" ? (
+                <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+              ) : null}
+
+              <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
             </View>
           ) : null}
         </SoftCard>

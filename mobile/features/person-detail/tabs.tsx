@@ -1,213 +1,312 @@
-import { Text, TouchableOpacity, View } from "react-native"
+import { useState } from "react"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 import { Button } from "@/components/Button"
-import { Divider, IconTile, SoftCard } from "@/components/RootsUI"
+import { IconTile, SoftCard } from "@/components/RootsUI"
 import { formatDate } from "@roots/shared"
 import { formatCompactDate, formatTimelineDate } from "@/lib/format-dates"
 import { formatFrequency } from "@/constants/frequencies"
 import { DetailEmptyState, InfoList, SectionCard, TagPill, type InfoRow } from "./components"
 import { interactionIcon } from "./helpers"
-import type { Interaction, ImportantMoment, Person, PersonNote, Tag } from "@/types"
+import type { Interaction, Person, PersonNote, Tag } from "@/types"
 
-export function TimelineTab({
-  interactions,
-  onViewAll,
-  onLogInteraction,
-  onAddNote,
-}: {
-  interactions: Interaction[]
-  onViewAll: () => void
-  onLogInteraction: () => void
-  onAddNote: () => void
-}) {
+export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (interactions.length === 0) {
+    return (
+      <View className="mt-6">
+        <DetailEmptyState title="No interactions yet" body="Log a call, text, or meeting to start this contact's timeline." />
+      </View>
+    )
+  }
+
+  const visible = expanded ? interactions : interactions.slice(0, 3)
+  const extraCount = interactions.length - 3
+
   return (
     <View className="mt-6">
-      {interactions.length > 0 ? (
-        <View>
-          {interactions.slice(0, 6).map((interaction, index) => (
-            <View key={interaction.id} className="flex-row">
-              <View className="items-center">
-                <IconTile icon={interactionIcon(interaction.type)} size={44} />
-                {index < Math.min(interactions.length, 6) - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
-              </View>
-              <View className="ml-4 flex-1 pb-6">
-                <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
-                  {formatTimelineDate(interaction.date)}  ·  {interaction.type}
-                </Text>
-                {interaction.notes ? (
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
-                    {interaction.notes}
-                  </Text>
-                ) : (
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                    No notes for this interaction.
-                  </Text>
-                )}
-              </View>
-            </View>
-          ))}
-          <Divider />
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="View all interactions"
-            onPress={onViewAll}
-            className="py-4"
-          >
-            <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-base">
-              View all interactions
+      {visible.map((interaction, index) => (
+        <View key={interaction.id} className="flex-row">
+          <View className="items-center">
+            <IconTile icon={interactionIcon(interaction.type)} size={44} />
+            {index < visible.length - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
+          </View>
+          <View className="ml-4 flex-1 pb-6">
+            <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+              {formatTimelineDate(interaction.date)}  ·  {interaction.type}
             </Text>
-          </TouchableOpacity>
+            {interaction.notes ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
+                {interaction.notes}
+              </Text>
+            ) : (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                No notes for this interaction.
+              </Text>
+            )}
+          </View>
         </View>
-      ) : (
-        <DetailEmptyState title="No interactions yet" body="Log a call, text, or meeting to start this contact's timeline." />
-      )}
-
-      <View className="mt-5 flex-row gap-3">
-        <View className="flex-1">
-          <Button title="Log Interaction" onPress={onLogInteraction} />
-        </View>
-        <View className="flex-1">
-          <Button title="Add Note" onPress={onAddNote} variant="secondary" />
-        </View>
-      </View>
+      ))}
+      {!expanded && extraCount > 0 ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${extraCount} more interactions`}
+          onPress={() => setExpanded(true)}
+          className="py-2"
+        >
+          <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+            {extraCount} more
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   )
 }
 
-export function AboutTab({
-  person,
-  tags,
-  importantMoments,
-  onEdit,
-}: {
-  person: Person
-  tags: Tag[]
-  importantMoments: ImportantMoment[]
-  onEdit: () => void
-}) {
+export function AboutTab({ person, tags }: { person: Person; tags: Tag[] }) {
+  const overview = person.notes?.trim()
+
   const contactRows: InfoRow[] = []
-  if (person.email) contactRows.push({ icon: "mail-outline", label: "Email", value: person.email, actionIcon: "mail-outline" })
-  if (person.phone) contactRows.push({ icon: "call-outline", label: "Phone", value: person.phone, actionIcon: "chatbubble-outline" })
-  if (person.location) contactRows.push({ icon: "location-outline", label: "Location", value: person.location, actionIcon: "map-outline" })
+  if (person.phone) contactRows.push({ icon: "call-outline", label: "Phone", value: person.phone })
+  if (person.location) contactRows.push({ icon: "location-outline", label: "Location", value: person.location })
 
   const personalRows: InfoRow[] = []
-  if (person.birthday) personalRows.push({ icon: "calendar-outline", label: "Birthday", value: formatCompactDate(person.birthday), actionIcon: "chevron-forward", tone: "purple" })
-  importantMoments.forEach((moment) => {
+  if (person.birthday) {
+    personalRows.push({ icon: "calendar-outline", label: "Birthday", value: formatCompactDate(person.birthday), tone: "purple" })
+  }
+  if (person.how_met) {
     personalRows.push({
-      icon: "sparkles-outline",
-      label: moment.label,
-      value: `${formatCompactDate(moment.date)}${moment.recurs_yearly ? " - yearly" : ""}`,
-      actionIcon: "chevron-forward",
-      tone: "green",
+      icon: "people-outline",
+      label: person.relationship_type === "Family" ? "Relationship" : "How we met",
+      value: person.how_met,
+      tone: "amber",
     })
-  })
-  if (person.how_met) personalRows.push({ icon: "people-outline", label: "How we met", value: person.how_met, actionIcon: "chevron-forward", tone: "amber" })
-  if (person.relationship_type) personalRows.push({ icon: "heart-outline", label: "Relationship type", value: person.relationship_type, actionIcon: "chevron-forward", tone: "red" })
-  personalRows.push({ icon: "time-outline", label: "Contact frequency", value: formatFrequency(person.contact_frequency_days), actionIcon: "chevron-forward", tone: "amber" })
+  }
+  if (person.relationship_type) {
+    personalRows.push({ icon: "heart-outline", label: "Relationship type", value: person.relationship_type, tone: "red" })
+  }
+  if (person.contact_frequency_days) {
+    personalRows.push({ icon: "time-outline", label: "Contact frequency", value: formatFrequency(person.contact_frequency_days), tone: "green" })
+  }
+
+  const work = [person.role, person.company].filter(Boolean).join(" at ")
+  const hasAdditionalInfo = Boolean(work) || tags.length > 0
+  const hasAnything = Boolean(overview) || contactRows.length > 0 || personalRows.length > 0 || hasAdditionalInfo
+
+  if (!hasAnything) {
+    return (
+      <View className="mt-5">
+        <DetailEmptyState title="Nothing here yet" body="Details you add about this person will appear here." />
+      </View>
+    )
+  }
 
   return (
     <View className="mt-5">
-      <SectionCard icon="person-outline" title="Overview" onEdit={onEdit}>
-        <Text style={{ fontFamily: fonts.body, color: colors.warmBlack }} className="text-base leading-6">
-          {person.notes?.trim() || "No overview notes added yet."}
-        </Text>
-      </SectionCard>
-
-      <SectionCard icon="call-outline" title="Contact information" onEdit={onEdit}>
-        <InfoList rows={contactRows} />
-      </SectionCard>
-
-      <SectionCard icon="calendar-outline" title="Personal details" onEdit={onEdit}>
-        <InfoList rows={personalRows} />
-      </SectionCard>
-
-      <SectionCard icon="pricetag-outline" title="Additional info" onEdit={onEdit}>
-        {person.company || person.role ? (
-          <View className="mb-3">
-            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
-              Work
-            </Text>
-            <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
-              {[person.role, person.company].filter(Boolean).join(" at ")}
-            </Text>
-          </View>
-        ) : null}
-        {tags.length > 0 ? (
-          <View>
-            <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
-              Tags
-            </Text>
-            <View className="mt-2 flex-row flex-wrap gap-2">
-              {tags.map((tag) => (
-                <TagPill key={tag.id} tag={tag} />
-              ))}
-            </View>
-          </View>
-        ) : (
-          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-            No tags or extra work details added yet.
+      {overview ? (
+        <SectionCard icon="person-outline" title="Overview">
+          <Text style={{ fontFamily: fonts.body, color: colors.warmBlack }} className="text-base leading-6">
+            {overview}
           </Text>
-        )}
-      </SectionCard>
+        </SectionCard>
+      ) : null}
+
+      {contactRows.length > 0 ? (
+        <SectionCard icon="call-outline" title="Contact information">
+          <InfoList rows={contactRows} />
+        </SectionCard>
+      ) : null}
+
+      {personalRows.length > 0 ? (
+        <SectionCard icon="calendar-outline" title="Personal details">
+          <InfoList rows={personalRows} />
+        </SectionCard>
+      ) : null}
+
+      {hasAdditionalInfo ? (
+        <SectionCard icon="pricetag-outline" title="Additional info">
+          {work ? (
+            <View className={tags.length > 0 ? "mb-3" : ""}>
+              <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
+                Work
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                {work}
+              </Text>
+            </View>
+          ) : null}
+          {tags.length > 0 ? (
+            <View>
+              <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
+                Tags
+              </Text>
+              <View className="mt-2 flex-row flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <TagPill key={tag.id} tag={tag} />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </SectionCard>
+      ) : null}
     </View>
   )
 }
 
 export function NotesTab({
   notes,
-  onEditNote,
+  onUpdateNote,
   onDeleteNote,
   onAddNote,
 }: {
   notes: PersonNote[]
-  onEditNote: (note: PersonNote) => void
+  onUpdateNote: (noteId: string, body: string) => Promise<void>
   onDeleteNote: (noteId: string) => void
   onAddNote: () => void
 }) {
+  const [menuNoteId, setMenuNoteId] = useState<string | null>(null)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [draftBody, setDraftBody] = useState("")
+  const [savingNote, setSavingNote] = useState(false)
+
+  const sortedNotes = [...notes].sort((a, b) =>
+    String(b.note_date ?? b.created_at).localeCompare(String(a.note_date ?? a.created_at)),
+  )
+
+  function startEditing(note: PersonNote) {
+    setMenuNoteId(null)
+    setEditingNoteId(note.id)
+    setDraftBody(note.body)
+  }
+
+  async function saveEdit(noteId: string) {
+    if (savingNote || !draftBody.trim()) return
+    setSavingNote(true)
+    try {
+      await onUpdateNote(noteId, draftBody)
+      setEditingNoteId(null)
+      setDraftBody("")
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
   return (
     <View className="mt-6">
       <Text style={{ fontFamily: fonts.heading, color: colors.forest }} className="mb-4 text-[24px] leading-7">
         Notes ({notes.length})
       </Text>
-      {notes.length > 0 ? (
+      {sortedNotes.length > 0 ? (
         <View className="gap-4">
-          {notes.map((note) => (
-            <SoftCard key={note.id} className="p-4">
-              <View className="flex-row items-center">
-                <IconTile icon="document-text-outline" size={58} />
-                <View className="ml-4 flex-1">
-                  <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+          {sortedNotes.map((note) => {
+            const isEditing = editingNoteId === note.id
+            const menuOpen = menuNoteId === note.id
+            return (
+              <SoftCard key={note.id} className="p-4">
+                <View className="flex-row items-start justify-between">
+                  <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="flex-1 text-base">
                     {formatTimelineDate(note.note_date ?? note.created_at)}
                   </Text>
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6" numberOfLines={3}>
-                    {note.body}
-                  </Text>
+                  {!isEditing ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Note options"
+                      onPress={() => setMenuNoteId(menuOpen ? null : note.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      className="ml-3"
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
-              </View>
-              <View className="mt-4 flex-row gap-2">
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit note"
-                  onPress={() => onEditNote(note)}
-                  className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
-                >
-                  <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-                    Edit
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete note"
-                  onPress={() => onDeleteNote(note.id)}
-                  className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
-                >
-                  <Text style={{ fontFamily: fonts.semibold, color: "#B91C1C" }} className="text-sm">
-                    Delete
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </SoftCard>
-          ))}
+
+                {isEditing ? (
+                  <>
+                    <TextInput
+                      accessibilityLabel="Edit note text"
+                      value={draftBody}
+                      onChangeText={setDraftBody}
+                      multiline
+                      autoFocus
+                      className="mt-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-base"
+                      style={{
+                        fontFamily: fonts.body,
+                        color: colors.ink,
+                        minHeight: 90,
+                        textAlignVertical: "top",
+                        lineHeight: 22,
+                      }}
+                    />
+                    <View className="mt-3 flex-row gap-2">
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel editing note"
+                        disabled={savingNote}
+                        onPress={() => {
+                          setEditingNoteId(null)
+                          setDraftBody("")
+                        }}
+                        className="flex-1 items-center rounded-xl border border-stone-200 bg-white py-3"
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: colors.muted }} className="text-sm">
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Save note"
+                        disabled={savingNote || !draftBody.trim()}
+                        onPress={() => void saveEdit(note.id)}
+                        className={`flex-1 items-center rounded-xl py-3 ${savingNote || !draftBody.trim() ? "opacity-50" : ""}`}
+                        style={{ backgroundColor: colors.forest }}
+                      >
+                        <Text style={{ fontFamily: fonts.semibold, color: "white" }} className="text-sm">
+                          {savingNote ? "Saving" : "Save"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
+                      {note.body}
+                    </Text>
+                    {menuOpen ? (
+                      <View className="mt-4 flex-row gap-2">
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel="Edit note"
+                          onPress={() => startEditing(note)}
+                          className="flex-1 flex-row items-center justify-center rounded-xl border border-stone-200 bg-white py-3"
+                        >
+                          <Ionicons name="create-outline" size={16} color={colors.forest} style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+                            Edit
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel="Delete note"
+                          onPress={() => {
+                            setMenuNoteId(null)
+                            onDeleteNote(note.id)
+                          }}
+                          className="flex-1 flex-row items-center justify-center rounded-xl border border-stone-200 bg-white py-3"
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#B91C1C" style={{ marginRight: 6 }} />
+                          <Text style={{ fontFamily: fonts.semibold, color: "#B91C1C" }} className="text-sm">
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </SoftCard>
+            )
+          })}
         </View>
       ) : (
         <DetailEmptyState title="No notes yet" body="Notes you save about this person will appear here." />
@@ -221,15 +320,19 @@ export function NotesTab({
 
 export function FollowUpsTab({
   followUps,
+  completedFollowUps,
   updating,
-  onSnooze,
-  onDone,
+  onDelete,
+  onComplete,
 }: {
   followUps: Interaction[]
+  completedFollowUps: Interaction[]
   updating: boolean
-  onSnooze: (interactionId: string) => void
-  onDone: (interactionId: string) => void
+  onDelete: (interactionId: string) => void
+  onComplete: (interactionId: string) => void
 }) {
+  const [completedExpanded, setCompletedExpanded] = useState(false)
+
   return (
     <View className="mt-6">
       {followUps.length > 0 ? (
@@ -255,25 +358,25 @@ export function FollowUpsTab({
               <View className="mt-4 flex-row gap-2">
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel={`Snooze ${fu.type} follow-up for 7 days`}
+                  accessibilityLabel={`Delete ${fu.type} follow-up`}
                   disabled={updating}
-                  onPress={() => onSnooze(fu.id)}
+                  onPress={() => onDelete(fu.id)}
                   className={`flex-1 items-center rounded-xl border border-stone-200 bg-white py-3 ${updating ? "opacity-50" : ""}`}
                 >
-                  <Text style={{ fontFamily: fonts.semibold, color: colors.muted }} className="text-sm">
-                    Snooze 7d
+                  <Text style={{ fontFamily: fonts.semibold, color: "#B91C1C" }} className="text-sm">
+                    Delete
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel={`Mark ${fu.type} follow-up done`}
+                  accessibilityLabel={`Mark ${fu.type} follow-up as complete`}
                   disabled={updating}
-                  onPress={() => onDone(fu.id)}
+                  onPress={() => onComplete(fu.id)}
                   className={`flex-1 items-center rounded-xl py-3 ${updating ? "opacity-50" : ""}`}
                   style={{ backgroundColor: colors.forest }}
                 >
                   <Text style={{ fontFamily: fonts.semibold, color: "white" }} className="text-sm">
-                    Done
+                    Mark as Complete
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -283,6 +386,48 @@ export function FollowUpsTab({
       ) : (
         <DetailEmptyState title="No open follow-ups" body="Open follow-ups from logged interactions will appear here." />
       )}
+
+      {completedFollowUps.length > 0 ? (
+        <View className="mt-5">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ expanded: completedExpanded }}
+            accessibilityLabel={completedExpanded ? "Collapse completed follow-ups" : "Expand completed follow-ups"}
+            onPress={() => setCompletedExpanded((value) => !value)}
+            className="flex-row items-center justify-between py-2"
+          >
+            <Text style={{ fontFamily: fonts.semibold, color: colors.muted }} className="text-sm">
+              Completed ({completedFollowUps.length})
+            </Text>
+            <Ionicons name={completedExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+          </TouchableOpacity>
+
+          {completedExpanded ? (
+            <View className="mt-2 gap-3">
+              {completedFollowUps.map((fu) => (
+                <SoftCard key={fu.id} className="p-4 opacity-70">
+                  <View className="flex-row items-start">
+                    <IconTile icon="checkmark-circle-outline" size={42} background={colors.mint} color={colors.forest} />
+                    <View className="ml-3 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+                        {fu.type}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                        {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"}
+                      </Text>
+                      {fu.notes ? (
+                        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
+                          {fu.notes}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                </SoftCard>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   )
 }
