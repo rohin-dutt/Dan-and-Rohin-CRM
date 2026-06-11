@@ -18,14 +18,6 @@ export function formatNextAction(days: number | null): string {
   return `Due in ${days}d`
 }
 
-export function formatCadenceAction(days: number | null): string {
-  if (days == null) return "No cadence"
-  if (days < 0) return `Cadence ${Math.abs(days)}d overdue`
-  if (days === 0) return "Cadence due today"
-  if (days === 1) return "Cadence due tomorrow"
-  return `Cadence in ${days}d`
-}
-
 export function interactionIcon(type: string): keyof typeof Ionicons.glyphMap {
   const normalized = type.trim().toLowerCase()
   if (normalized.includes("call") || normalized.includes("phone")) return "call-outline"

@@ -81,8 +81,6 @@ export type Settings = {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
-  onboarding_completed: boolean;
-  onboarding_completed_at: string | null;
   current_streak: number;
   last_streak_date: string | null;
   created_at: string;

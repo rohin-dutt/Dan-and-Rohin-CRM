@@ -8,7 +8,6 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
 import { InlineDateField } from "@/components/InlineDateField"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
-import { markOnboardingCompleted } from "@/lib/onboarding"
 import { RELATIONSHIP_CATEGORIES } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS } from "@/constants/frequencies"
 import { INTERACTION_TYPES, toLocalDateString } from "@roots/shared"
@@ -33,7 +32,7 @@ export default function OnboardingScreen() {
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [relationship, setRelationship] = useState("")
   const [howMet, setHowMet] = useState("")
-  const [selectedFreq, setSelectedFreq] = useState(90)
+  const [selectedFreq, setSelectedFreq] = useState(30)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -66,7 +65,7 @@ export default function OnboardingScreen() {
     setShowBirthdayPicker(false)
     setRelationship("")
     setHowMet("")
-    setSelectedFreq(90)
+    setSelectedFreq(30)
     setFormError(null)
   }
 
@@ -74,14 +73,6 @@ export default function OnboardingScreen() {
     const trimmedFirst = firstName.trim()
     if (!trimmedFirst) {
       setFormError("First name is required.")
-      return
-    }
-    if (!lastName.trim()) {
-      setFormError("Last name is required.")
-      return
-    }
-    if (!selectedCategory) {
-      setFormError("Please select a relationship type.")
       return
     }
     if (!userId || saving) return
@@ -104,7 +95,7 @@ export default function OnboardingScreen() {
           company: isProfessional && company.trim() ? company.trim() : null,
           role: isProfessional && role.trim() ? role.trim() : null,
           birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
-          relationship_type: selectedCategory,
+          relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
         },
         categoryLabel: selectedCategory || null,
       })
@@ -148,23 +139,7 @@ export default function OnboardingScreen() {
       return
     }
 
-    if (userId) {
-      await markOnboardingCompleted(userId)
-    }
     router.replace("/(app)/(tabs)/dashboard")
-  }
-
-  async function completeWithoutInteraction() {
-    if (!userId || !savedPersonId) return
-    setStep3Saving(true)
-    setStep3Error(null)
-    try {
-      await markOnboardingCompleted(userId)
-      router.replace("/(app)/(tabs)/dashboard")
-    } catch (e) {
-      setStep3Error(e instanceof Error ? e.message : "Failed to finish onboarding.")
-      setStep3Saving(false)
-    }
   }
 
   if (loading) return null
@@ -226,9 +201,7 @@ export default function OnboardingScreen() {
               />
             </View>
             <View className="flex-1">
-              <Text className="text-sm font-medium text-warm-black mb-1">
-                Last name <Text className="text-red-500">*</Text>
-              </Text>
+              <Text className="text-sm font-medium text-warm-black mb-1">Last name</Text>
               <TextInput
                 value={lastName}
                 onChangeText={setLastName}
@@ -238,9 +211,7 @@ export default function OnboardingScreen() {
             </View>
           </View>
 
-          <Text className="text-sm font-medium text-warm-black mb-2">
-            Relationship type <Text className="text-red-500">*</Text>
-          </Text>
+          <Text className="text-sm font-medium text-warm-black mb-2">Relationship type</Text>
           <View className="flex-row flex-wrap gap-2 mb-4">
             {RELATIONSHIP_CATEGORIES.map(({ label }) => (
               <PillButton
@@ -386,11 +357,10 @@ export default function OnboardingScreen() {
         />
 
         <TouchableOpacity
-          onPress={completeWithoutInteraction}
-          disabled={step3Saving}
+          onPress={() => router.replace("/(app)/(tabs)/dashboard")}
           className="mt-4 items-center"
         >
-          <Text className="text-sm text-gray-400">Finish without logging a chat</Text>
+          <Text className="text-sm text-gray-400">Skip — I'll add this later →</Text>
         </TouchableOpacity>
       </View>
     </Screen>

@@ -2,7 +2,7 @@ import { Text, TouchableOpacity, View } from "react-native"
 import { colors, fonts } from "@/constants/theme"
 import { Button } from "@/components/Button"
 import { Divider, IconTile, SoftCard } from "@/components/RootsUI"
-import { formatDate, getFollowUpState } from "@roots/shared"
+import { formatDate } from "@roots/shared"
 import { formatCompactDate, formatTimelineDate } from "@/lib/format-dates"
 import { formatFrequency } from "@/constants/frequencies"
 import { DetailEmptyState, InfoList, SectionCard, TagPill, type InfoRow } from "./components"
@@ -234,33 +234,17 @@ export function FollowUpsTab({
     <View className="mt-6">
       {followUps.length > 0 ? (
         <View className="gap-3">
-          {followUps.map((fu) => {
-            const state = getFollowUpState(fu)
-            const isSnoozed = state === "snoozed"
-            const dueLabel = fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"
-            return (
+          {followUps.map((fu) => (
             <SoftCard key={fu.id} className="p-4">
               <View className="flex-row items-start">
-                <IconTile
-                  icon={isSnoozed ? "pause-circle-outline" : "flag-outline"}
-                  size={42}
-                  background={isSnoozed ? "#F0EAFB" : "#FFF3DE"}
-                  color={isSnoozed ? colors.purple : colors.amber}
-                />
+                <IconTile icon="flag-outline" size={42} background="#FFF3DE" color={colors.amber} />
                 <View className="ml-3 flex-1">
                   <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
                     {fu.type}
                   </Text>
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                    {isSnoozed && fu.follow_up_snoozed_until
-                      ? `Snoozed until ${formatDate(fu.follow_up_snoozed_until)}`
-                      : dueLabel}
+                    {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"}
                   </Text>
-                  {isSnoozed ? (
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-xs">
-                      Original due date: {dueLabel}
-                    </Text>
-                  ) : null}
                   {fu.notes ? (
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
                       {fu.notes}
@@ -294,7 +278,7 @@ export function FollowUpsTab({
                 </TouchableOpacity>
               </View>
             </SoftCard>
-          )})}
+          ))}
         </View>
       ) : (
         <DetailEmptyState title="No open follow-ups" body="Open follow-ups from logged interactions will appear here." />

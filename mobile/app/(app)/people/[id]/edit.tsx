@@ -11,7 +11,6 @@ import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import { updatePersonWithRelations } from "@/lib/people-data"
-import { safeBack } from "@/lib/navigation"
 import { colors, fonts } from "@/constants/theme"
 import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
@@ -169,7 +168,7 @@ export default function EditPersonScreen() {
         moments: cleanMoments,
       })
 
-      safeBack(router, `/people/${id}`)
+      router.back()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save changes")
     } finally {
@@ -206,7 +205,7 @@ export default function EditPersonScreen() {
     <Screen>
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 pt-3 pb-2">
-        <TouchableOpacity onPress={() => safeBack(router, `/people/${id}`)} className="py-1 pr-3">
+        <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
           <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-base">Cancel</Text>
         </TouchableOpacity>
         <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">Edit person</Text>
@@ -415,15 +414,10 @@ export default function EditPersonScreen() {
               </View>
             ) : null}
           </View>
-        <LocationSuggestionsList
-          suggestions={locationField.suggestions}
-          onSelect={locationField.selectSuggestion}
-        />
-        {!locationField.geocodingAvailable ? (
-          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1.5 text-xs">
-            Location suggestions are disabled until EXPO_PUBLIC_MAPBOX_TOKEN is configured.
-          </Text>
-        ) : null}
+          <LocationSuggestionsList
+            suggestions={locationField.suggestions}
+            onSelect={locationField.selectSuggestion}
+          />
         </View>
 
         {/* Notes */}

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { geocodePlace, geocodingAvailable, type MapboxFeature } from "@/lib/mapbox"
+import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 
 // Debounced location text input with Mapbox suggestions. Editing the text
 // clears any previously selected coordinates until a suggestion is chosen.
@@ -15,7 +15,7 @@ export function useLocationAutocomplete() {
     setLatitude(null)
     setLongitude(null)
     if (timerRef.current) clearTimeout(timerRef.current)
-    if (!text.trim() || !geocodingAvailable) {
+    if (!text.trim()) {
       setSuggestions([])
       return
     }
@@ -46,7 +46,6 @@ export function useLocationAutocomplete() {
     latitude,
     longitude,
     suggestions,
-    geocodingAvailable,
     handleLocationChange,
     selectSuggestion,
     resetLocation,

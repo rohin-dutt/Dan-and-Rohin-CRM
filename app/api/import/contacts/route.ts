@@ -5,20 +5,6 @@ interface IncomingContact {
   name?: string;
   email?: string | string[];
   tel?: string | string[];
-  duplicate_action?: "create" | "create_anyway" | "update" | "skip";
-  existing_person_id?: string;
-}
-
-function firstValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function normalize(value: string | null | undefined) {
-  return value?.trim().toLowerCase() ?? "";
-}
-
-function normalizePhone(value: string | null | undefined) {
-  return value?.replace(/\D/g, "") ?? "";
 }
 
 export async function POST(request: Request) {
@@ -37,70 +23,20 @@ export async function POST(request: Request) {
   const contacts = Array.isArray(body.contacts) ? body.contacts : [];
 
   let imported = 0;
-  let updated = 0;
-  let skipped = 0;
   const errors: string[] = [];
 
   for (const contact of contacts) {
     if (!contact.name?.trim()) continue;
 
-    const email = firstValue(contact.email)?.trim() || null;
-    const phone = firstValue(contact.tel)?.trim() || null;
-    const name = contact.name.trim();
-    const action = contact.duplicate_action ?? "create";
-    const existingPeopleRes = await auth.supabase
-      .from("people")
-      .select("id, name, email, phone")
-      .eq("user_id", auth.user.id);
-
-    if (existingPeopleRes.error) {
-      errors.push(`Failed to check "${name}" for duplicates: ${existingPeopleRes.error.message}`);
-      continue;
-    }
-
-    const existingPeople = existingPeopleRes.data ?? [];
-    const match = existingPeople.find((person) => {
-      if (contact.existing_person_id && person.id === contact.existing_person_id) return true;
-      if (email && normalize(person.email) === normalize(email)) return true;
-      if (phone && normalizePhone(person.phone) === normalizePhone(phone)) return true;
-      return normalize(person.name) === normalize(name);
-    });
-
-    if (match && action === "skip") {
-      skipped++;
-      continue;
-    }
-
-    if (match && action === "update") {
-      const { error } = await auth.supabase
-        .from("people")
-        .update({
-          name,
-          email: email ?? match.email ?? null,
-          phone: phone ?? match.phone ?? null,
-        })
-        .eq("user_id", auth.user.id)
-        .eq("id", match.id);
-
-      if (error) {
-        errors.push(`Failed to update "${name}": ${error.message}`);
-      } else {
-        updated++;
-      }
-      continue;
-    }
-
-    if (match && action === "create") {
-      skipped++;
-      continue;
-    }
+    const email = Array.isArray(contact.email) ? contact.email[0] : contact.email;
+    const phone = Array.isArray(contact.tel) ? contact.tel[0] : contact.tel;
 
     const { error } = await auth.supabase.from("people").insert({
-      name,
-      email,
-      phone,
+      name: contact.name.trim(),
+      email: email ?? null,
+      phone: phone ?? null,
       user_id: auth.user.id,
-      contact_frequency_days: 90,
+      contact_frequency_days: 30,
     });
 
     if (error) {
@@ -110,5 +46,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return Response.json({ ok: true, imported, updated, skipped, errors });
+  return Response.json({ ok: true, imported, errors });
 }
