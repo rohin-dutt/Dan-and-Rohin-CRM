@@ -1,48 +1,30 @@
 import { useEffect, useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
-import { TextField } from "@/components/TextField"
-import { PillButton } from "@/components/PillButton"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
-import { colors } from "@/constants/theme"
-import { ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
+import { loadImportantMomentsForPerson } from "@/lib/important-moments"
+import { updatePersonWithRelations } from "@/lib/people-data"
+import { colors, fonts } from "@/constants/theme"
+import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
+import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
+import {
+  normalizeMomentDrafts,
+  parseLocalDateString,
+  toLocalDateString,
+  type ImportantMomentDraft,
+} from "@roots/shared"
+import { BirthdayField } from "@/features/person-form/BirthdayField"
+import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
+import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
+import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
 import type { Person, Tag } from "@/types"
-
-const CATEGORIES = [
-  { label: "Friend", tagName: "Friend", tagColor: "#16A34A" },
-  { label: "Family", tagName: "Family", tagColor: "#2563EB" },
-  { label: "Professional", tagName: "Professional", tagColor: "#D97706" },
-] as const
-
-type CategoryLabel = (typeof CATEGORIES)[number]["label"]
-
-async function getOrCreateTag(
-  userId: string,
-  name: string,
-  color: string,
-): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from("tags")
-    .select("id")
-    .eq("user_id", userId)
-    .ilike("name", name)
-    .maybeSingle()
-
-  if (existing) return existing.id
-
-  const { data: created } = await supabase
-    .from("tags")
-    .insert({ user_id: userId, name, color })
-    .select("id")
-    .single()
-
-  return created?.id ?? null
-}
 
 export default function EditPersonScreen() {
   const router = useRouter()
@@ -54,18 +36,22 @@ export default function EditPersonScreen() {
   const [categoryError, setCategoryError] = useState<string | null>(null)
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
 
-  const [name, setName] = useState("")
-  const [category, setCategory] = useState<CategoryLabel | null>(null)
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [category, setCategory] = useState<RelationshipCategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthday, setBirthday] = useState("")
+  const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(30)
-  const [location, setLocation] = useState("")
   const [notes, setNotes] = useState("")
+
+  const freqMenu = useAnchoredMenu()
+  const locationField = useLocationAutocomplete()
+  const { resetLocation } = locationField
 
   useEffect(() => {
     async function load() {
@@ -75,31 +61,47 @@ export default function EditPersonScreen() {
         } = await supabase.auth.getSession()
         if (!session) return
 
-        const [personRes, tagsRes, personTagsRes] = await Promise.all([
+        const [personRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
           supabase.from("people").select("*").eq("id", id).single(),
           supabase.from("tags").select("*").eq("user_id", session.user.id),
           supabase.from("person_tags").select("tag_id").eq("person_id", id),
+          loadImportantMomentsForPerson(id),
         ])
 
         if (personRes.error) throw personRes.error
+        if (tagsRes.error) throw tagsRes.error
+        if (personTagsRes.error) throw personTagsRes.error
         const p: Person = personRes.data
 
-        setName(p.name)
+        // Split name into first/last
+        const nameParts = p.name.trim().split(/\s+/)
+        setFirstName(nameParts[0] ?? "")
+        setLastName(nameParts.slice(1).join(" "))
+
         setCompany(p.company ?? "")
         setRole(p.role ?? "")
-        setBirthday(p.birthday ?? "")
         setEmail(p.email ?? "")
-        setPhone(p.phone ?? "")
         setHowMet(p.how_met ?? "")
         setFrequencyDays(p.contact_frequency_days ?? 30)
-        setLocation(p.location ?? "")
+        resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
         setNotes(p.notes ?? "")
 
-        const cat = CATEGORIES.find((c) => c.label === p.relationship_type)
+        if (p.birthday) {
+          setBirthdayDate(parseLocalDateString(p.birthday))
+        }
+
+        const cat = findRelationshipCategory(p.relationship_type)
         if (cat) setCategory(cat.label)
 
         setAllTags(tagsRes.data ?? [])
         setSelectedTagIds((personTagsRes.data ?? []).map((pt) => pt.tag_id))
+        setImportantMoments(
+          loadedMoments.map((moment) => ({
+            label: moment.label,
+            date: moment.date,
+            recurs_yearly: moment.recurs_yearly,
+          })),
+        )
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load person")
       } finally {
@@ -107,18 +109,29 @@ export default function EditPersonScreen() {
       }
     }
     load()
-  }, [id])
+  }, [id, resetLocation])
 
   const isProfessional = category === "Professional"
   const isFriendOrFamily = category === "Friend" || category === "Family"
 
   async function handleSave() {
-    if (!name.trim()) {
-      setError("Name is required")
+    if (saving) return
+    if (!firstName.trim()) {
+      setError("First name is required")
+      return
+    }
+    if (!lastName.trim()) {
+      setError("Last name is required")
       return
     }
     if (!category) {
       setCategoryError("Choose Friend, Family, or Professional.")
+      return
+    }
+    const cleanName = `${firstName.trim()} ${lastName.trim()}`
+    const { moments: cleanMoments, valid } = normalizeMomentDrafts(importantMoments)
+    if (!valid) {
+      setError("Important moments need both a label and a date.")
       return
     }
 
@@ -132,44 +145,28 @@ export default function EditPersonScreen() {
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
 
-      const { error: updateErr } = await supabase
-        .from("people")
-        .update({
-          name: name.trim(),
+      const trimmedLocation = locationField.location.trim()
+      await updatePersonWithRelations({
+        userId: session.user.id,
+        personId: id,
+        person: {
+          name: cleanName,
           email: email.trim() || null,
-          phone: phone.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
-          birthday: birthday.trim() || null,
+          birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
           how_met: howMet.trim() || null,
-          location: location.trim() || null,
+          location: trimmedLocation || null,
+          latitude: trimmedLocation ? locationField.latitude : null,
+          longitude: trimmedLocation ? locationField.longitude : null,
           notes: notes.trim() || null,
           contact_frequency_days: frequencyDays,
           relationship_type: category ?? null,
-        })
-        .eq("id", id)
-
-      if (updateErr) throw updateErr
-
-      // If a category tag is selected, ensure it's in the selectedTagIds
-      let finalTagIds = [...selectedTagIds]
-      if (category) {
-        const cat = CATEGORIES.find((c) => c.label === category)
-        if (cat) {
-          const tagId = await getOrCreateTag(session.user.id, cat.tagName, cat.tagColor)
-          if (tagId && !finalTagIds.includes(tagId)) {
-            finalTagIds = [...finalTagIds, tagId]
-          }
-        }
-      }
-
-      // Replace all person_tags
-      await supabase.from("person_tags").delete().eq("person_id", id)
-      if (finalTagIds.length > 0) {
-        await supabase.from("person_tags").insert(
-          finalTagIds.map((tagId) => ({ person_id: id, tag_id: tagId })),
-        )
-      }
+        },
+        categoryLabel: category,
+        tagIds: selectedTagIds,
+        moments: cleanMoments,
+      })
 
       router.back()
     } catch (e) {
@@ -185,11 +182,16 @@ export default function EditPersonScreen() {
     } = await supabase.auth.getSession()
     if (!session) return
 
-    const { data } = await supabase
+    const { data, error: createError } = await supabase
       .from("tags")
       .insert({ user_id: session.user.id, name: tagName, color: colors.sage })
       .select("*")
       .single()
+
+    if (createError) {
+      setError(createError.message)
+      return
+    }
 
     if (data) {
       setAllTags((prev) => [...prev, data])
@@ -202,140 +204,242 @@ export default function EditPersonScreen() {
   return (
     <Screen>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+      <View className="flex-row items-center justify-between px-5 pt-3 pb-2">
         <TouchableOpacity onPress={() => router.back()} className="py-1 pr-3">
-          <Text className="text-sage text-sm font-semibold">Cancel</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-base">Cancel</Text>
         </TouchableOpacity>
-        <Text className="text-base font-semibold text-warm-black">Edit person</Text>
+        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">Edit person</Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <View className="px-5 pb-8">
+      <View className="px-5 pb-6">
         {error != null && <ErrorBanner message={error} />}
 
-        <TextField
-          label="Name *"
-          value={name}
-          onChangeText={setName}
-          placeholder="Full name"
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
+        <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mb-2 mt-1">
+          * Required field
+        </Text>
 
-        {/* Category */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Relationship type *</Text>
-          <View className="flex-row gap-2">
-            {CATEGORIES.map((cat) => (
-              <PillButton
-                key={cat.label}
-                label={cat.label}
-                selected={category === cat.label}
-                onPress={() => {
-                  setCategory(cat.label)
-                  setCategoryError(null)
-                }}
-              />
-            ))}
+        {/* Name row */}
+        <View className="mb-3 flex-row gap-2">
+          <View className="flex-1">
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+              First name <Text style={{ color: "#B91C1C" }}>*</Text>
+            </Text>
+            <TextInput
+              accessibilityLabel="First name"
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First name"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              returnKeyType="next"
+              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
+              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+            />
           </View>
-          {categoryError && <Text className="text-xs text-red-500 mt-2">{categoryError}</Text>}
+          <View className="flex-1">
+            <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+              Last name <Text style={{ color: "#B91C1C" }}>*</Text>
+            </Text>
+            <TextInput
+              accessibilityLabel="Last name"
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last name"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="words"
+              returnKeyType="next"
+              className="rounded-xl border border-gray-200 bg-white px-3 text-sm"
+              style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+            />
+          </View>
         </View>
 
+        {/* Relationship type */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+            Relationship type <Text style={{ color: "#B91C1C" }}>*</Text>
+          </Text>
+          <View className="flex-row gap-2">
+            {RELATIONSHIP_CATEGORIES.map((cat) => {
+              const selected = category === cat.label
+              return (
+                <TouchableOpacity
+                  key={cat.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Relationship type ${cat.label}`}
+                  onPress={() => {
+                    setCategory(cat.label)
+                    setCategoryError(null)
+                  }}
+                  className="min-h-[42px] flex-1 items-center justify-center rounded-xl border px-2 py-2"
+                  style={{
+                    backgroundColor: selected ? colors.forest : "white",
+                    borderColor: selected ? colors.forest : "#E5E7EB",
+                  }}
+                >
+                  <Text
+                    style={{ fontFamily: fonts.medium, color: selected ? "white" : colors.ink }}
+                    className="text-sm"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+          {categoryError ? <Text className="mt-1 text-xs text-red-500">{categoryError}</Text> : null}
+        </View>
+
+        {/* Conditional: Professional fields */}
         {isProfessional && (
           <>
-            <TextField
-              label="Company"
-              value={company}
-              onChangeText={setCompany}
-              placeholder="Company name"
-              returnKeyType="next"
-            />
-            <TextField
-              label="Role"
-              value={role}
-              onChangeText={setRole}
-              placeholder="Job title"
-              returnKeyType="next"
-            />
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Email</Text>
+              <TextInput
+                accessibilityLabel="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="email@example.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Company</Text>
+              <TextInput
+                accessibilityLabel="Company"
+                value={company}
+                onChangeText={setCompany}
+                placeholder="Company name"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
+            <View className="mb-3">
+              <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Role</Text>
+              <TextInput
+                accessibilityLabel="Role"
+                value={role}
+                onChangeText={setRole}
+                placeholder="Job title"
+                placeholderTextColor="#9CA3AF"
+                returnKeyType="next"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+                style={{ fontFamily: fonts.body, color: colors.ink }}
+              />
+            </View>
           </>
         )}
 
-        {isFriendOrFamily && (
-          <TextField
-            label="Birthday"
-            value={birthday}
-            onChangeText={setBirthday}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
+        {/* Conditional: Birthday for Friend/Family */}
+        {isFriendOrFamily && <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />}
+
+        {/* Important moments */}
+        <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
+
+        {/* How you met */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">How you met</Text>
+          <TextInput
+            accessibilityLabel="How you met"
+            value={howMet}
+            onChangeText={setHowMet}
+            placeholder="At a conference, through a friend…"
+            placeholderTextColor="#9CA3AF"
             returnKeyType="next"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink }}
           />
-        )}
+        </View>
 
-        <TextField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="email@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-        />
-
-        <TextField
-          label="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="+1 (555) 000-0000"
-          keyboardType="phone-pad"
-          returnKeyType="next"
-        />
-
-        <TextField
-          label="How did you meet?"
-          value={howMet}
-          onChangeText={setHowMet}
-          placeholder="At a conference, through a friend…"
-          returnKeyType="next"
-        />
-
-        {/* Frequency */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">
-            How often should you stay in touch?
+        {/* Keep in touch — frequency dropdown */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">
+            How often to stay in touch?
           </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {ONBOARDING_FREQ_OPTIONS.map((opt) => (
-              <PillButton
-                key={opt.value}
-                label={opt.label}
-                selected={frequencyDays === opt.value}
-                onPress={() => setFrequencyDays(opt.value)}
-              />
-            ))}
+          <View ref={freqMenu.anchorRef}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Choose keep in touch cadence"
+              onPress={freqMenu.toggle}
+              activeOpacity={0.78}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                height: 44,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                backgroundColor: "white",
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
+                {frequencyLabel(frequencyDays)}
+              </Text>
+              <Ionicons name={freqMenu.visible ? "chevron-up" : "chevron-down"} size={18} color={colors.muted} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <TextField
-          label="Location"
-          value={location}
-          onChangeText={setLocation}
-          placeholder="City, country"
-          returnKeyType="next"
-        />
+        {/* Location */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Location</Text>
+          <View className="flex-row items-center rounded-xl border border-gray-200 bg-white">
+            <TextInput
+              accessibilityLabel="Location"
+              value={locationField.location}
+              onChangeText={locationField.handleLocationChange}
+              placeholder="City, country"
+              placeholderTextColor="#9CA3AF"
+              returnKeyType="next"
+              className="flex-1 px-3 py-2.5 text-sm"
+              style={{ fontFamily: fonts.body, color: colors.ink }}
+            />
+            {locationField.latitude !== null ? (
+              <View className="pr-3">
+                <Ionicons name="checkmark-circle" size={18} color={colors.forest} />
+              </View>
+            ) : null}
+          </View>
+          <LocationSuggestionsList
+            suggestions={locationField.suggestions}
+            onSelect={locationField.selectSuggestion}
+          />
+        </View>
 
-        <TextField
-          label="Notes"
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Anything else to remember…"
-          multiline
-          numberOfLines={3}
-          returnKeyType="default"
-        />
+        {/* Notes */}
+        <View className="mb-3">
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Notes</Text>
+          <TextInput
+            accessibilityLabel="Notes"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Anything else to remember…"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={3}
+            returnKeyType="default"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            style={{ fontFamily: fonts.body, color: colors.ink, textAlignVertical: "top", minHeight: 80 }}
+          />
+        </View>
 
         {/* Tags */}
         <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Tags</Text>
+          <Text style={{ fontFamily: fonts.medium, color: colors.warmBlack }} className="mb-1 text-sm">Tags</Text>
           <TagPicker
             tags={allTags}
             selectedTagIds={selectedTagIds}
@@ -350,6 +454,15 @@ export default function EditPersonScreen() {
 
         <Button title="Save changes" onPress={handleSave} loading={saving} />
       </View>
+
+      <AnchoredMenu
+        visible={freqMenu.visible}
+        position={freqMenu.position}
+        options={CONTACT_FREQUENCY_OPTIONS.map((option) => ({ key: option.value, label: option.label }))}
+        selectedKey={frequencyDays}
+        onSelect={setFrequencyDays}
+        onClose={freqMenu.close}
+      />
     </Screen>
   )
 }

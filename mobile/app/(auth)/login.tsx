@@ -16,6 +16,14 @@ export default function LoginScreen() {
 
   async function handleSignIn() {
     setError(null)
+    if (!email.trim()) {
+      setError("Email is required")
+      return
+    }
+    if (!password) {
+      setError("Password is required")
+      return
+    }
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)

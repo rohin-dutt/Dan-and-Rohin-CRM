@@ -35,20 +35,21 @@ Use Expo Router's file-based routing under `mobile/app`. Expo Router is built
 on React Navigation, so React Navigation concepts and options can still be used
 where needed.
 
-Current repo baseline before Expo scaffolding:
+Current repo baseline:
 
 - The web app is still the root Next.js app under `app/`, already using route
   groups for `(site)`, `(auth)`, and `(app)`.
-- Current trusted route handlers are limited to `app/api/export`,
-  `app/api/import/contacts`, and `app/api/account/delete`.
+- Current trusted route handlers include `app/api/export`,
+  `app/api/import/contacts`, `app/api/import/restore`,
+  `app/api/mobile/push-token`, and `app/api/account/delete`.
 - Browser Supabase access is centralized in `lib/supabase.ts`; route handlers
-  currently create cookie-backed server clients inline.
+  use `lib/trusted-api-auth.ts` where bearer-token mobile auth and cookie auth
+  need to share the same endpoint.
 - Existing migrations and RLS live under `supabase/migrations`.
-- Portable CRM logic currently starts in `lib/crm-rules.js`,
-  `lib/date-utils.ts`, and `app/(app)/settings/_lib/import-validation.ts`;
-  these are candidates for `packages/shared`.
-- `mobile/` and `packages/shared/` do not exist yet. Do not move the web app
-  into `apps/web` as part of Phase 1.
+- Portable CRM logic currently lives in `packages/shared`, `lib/date-utils.ts`,
+  and `app/(app)/settings/_lib/import-validation.ts`.
+- `mobile/` and `packages/shared/` exist. Do not move the web app into
+  `apps/web` unless the master plan changes.
 
 ## Shared Package Boundaries
 
@@ -242,19 +243,20 @@ server-side account deletion path.
 
 ### Atomic Restore/Replace
 
-The current web restore/replace flow performs multiple client-side writes.
-Mobile v1 must not reuse that behavior for destructive restore. Implement a
-single database RPC or trusted route backed by a database transaction before
-mobile launch.
+Web and mobile restore/import now share the trusted `/api/import/restore`
+route. That route validates uploaded JSON in TypeScript, then calls the
+`restore_crm_snapshot(payload jsonb, replace_existing boolean)` RPC so
+destructive restore runs inside one database transaction.
 
-Preferred Phase 1 approach:
+Required restore boundary:
 
-- Add a `restore_crm_snapshot(payload jsonb, replace_existing boolean)` RPC as
+- Keep `restore_crm_snapshot(payload jsonb, replace_existing boolean)` as
   `security invoker`.
 - Validate the uploaded JSON in TypeScript before calling the RPC.
 - Inside the RPC, derive the user from `auth.uid()`, optionally delete the
   user's existing people and tags when `replace_existing = true`, then insert
-  or upsert tags, people, interactions, and person tags in dependency order.
+  or upsert tags, people, touch-point interactions, person notes, and person
+  tags in dependency order.
 - Force every imported owner field to `auth.uid()` and reject person/tag
   relationships that are not present in the same payload or already owned by
   the user.
@@ -302,7 +304,7 @@ Secondary stack screens:
 - Onboarding.
 - Person detail.
 - Add/edit person.
-- Log/edit interaction.
+- Log interaction. Dedicated edit interaction UI remains planned.
 - Contacts import review.
 - Export/import/restore.
 - Account deletion.
@@ -341,7 +343,8 @@ Cache:
 - people
 - tags
 - person_tags
-- interactions
+- interactions, limited to real touch points
+- person_notes
 - settings
 
 The app should derive dashboard and follow-up views from cached data when
@@ -397,6 +400,7 @@ Push notifications should support:
 - due follow-up reminders
 - overdue follow-up reminders
 - birthday reminders
+- important-moment reminders
 - deep links into person detail and relevant People filters
 
 Push token storage should be per user/device. Tokens should be cleaned up when
@@ -419,6 +423,24 @@ Push backend decision: scheduled push sending starts in the existing
 Next.js/Vercel backend. Use a protected route plus a trusted scheduler, such as
 Vercel Cron, when scheduled delivery is implemented.
 
+Important moments use the user-owned `important_moments` table. Mobile can
+create, edit, delete, and display those rows now. The schema also supports
+privacy-safe `notification_deliveries.kind = 'important_moment'`, but actual
+scheduled delivery still requires the trusted sender/cron job to include that
+kind.
+
+## Notes And Touch Points
+
+Mobile stores note-only records in the user-owned `person_notes` table. Notes
+are not interactions, do not call `create_interaction_and_touch_person`, and do
+not update `people.last_contacted_at`.
+
+`interactions` is reserved for logged calls, texts, meetings, chats, emails,
+coffee, and similar relationship touch points. Dashboard stats, People sort,
+Last talked, follow-up queues, streaks, and interaction counters must use only
+touch-point interactions. Person detail timelines show touch points; the Notes
+tab shows `person_notes`.
+
 ## Data Management
 
 Mobile must support:
@@ -428,8 +450,16 @@ Mobile must support:
 - restore/replace
 - account deletion
 
-Restore/replace should be atomic before mobile launch. Prefer a database RPC or
-trusted server route so partial restores cannot leave mixed user data.
+Exports and restore/import payloads include `person_notes` separately from
+`interactions`. Restore/import keeps backward compatibility by converting
+legacy `type = "Note"` or `is_touch_point = false` interaction payload rows
+into `person_notes`.
+
+Restore/replace is atomic through the trusted `/api/import/restore` route,
+which validates the payload and calls the `restore_crm_snapshot(payload jsonb,
+replace_existing boolean)` database RPC. Continue routing destructive restore
+through that server/RPC boundary so partial restores cannot leave mixed user
+data.
 
 Account deletion must run server-side because it requires privileged auth-user
 deletion. It must also clear or expire push tokens and local cache, then route
@@ -466,8 +496,9 @@ Manual real-device QA is required for:
 - reduced motion
 - TestFlight install/update
 
-Mobile E2E decision: use Maestro for the first mobile E2E path. Use the repo's
-existing Node tests for `packages/shared`.
+Mobile E2E decision: use Maestro for the first native mobile E2E path, but no
+Maestro suite is checked in yet. Current checked-in E2E coverage is Playwright
+for the web/backend surface, plus Node tests for `packages/shared`.
 
 ## Environment
 

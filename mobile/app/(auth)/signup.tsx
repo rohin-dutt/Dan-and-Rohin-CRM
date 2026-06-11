@@ -23,12 +23,24 @@ export default function SignupScreen() {
       setError("First name is required")
       return
     }
+    if (!email.trim()) {
+      setError("Email is required")
+      return
+    }
+    if (!password) {
+      setError("Password is required")
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { first_name: firstName, last_name: lastName },
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+        },
       },
     })
     setLoading(false)

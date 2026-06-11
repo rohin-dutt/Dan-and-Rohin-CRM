@@ -1,8 +1,9 @@
-import type { Interaction, Person, PersonTag, Tag } from "@/types/index";
+import type { Interaction, Person, PersonNote, PersonTag, Tag } from "@/types/index";
 
 export type ExportPayload = {
   people: Person[];
   interactions: Interaction[];
+  person_notes: PersonNote[];
   tags: Tag[];
   person_tags: PersonTag[];
 };
@@ -16,16 +17,19 @@ export function parsePersonalCrmExport(text: string): ExportPayload {
   const peopleInput = requireArray(parsed, "people");
   const tagsInput = requireArray(parsed, "tags");
   const interactionsInput = requireArray(parsed, "interactions");
+  const personNotesInput = optionalArray(parsed, "person_notes");
   const personTagsInput = requireArray(parsed, "person_tags");
 
   peopleInput.forEach(validatePerson);
   tagsInput.forEach(validateTag);
   interactionsInput.forEach(validateInteraction);
+  personNotesInput.forEach(validatePersonNote);
   personTagsInput.forEach(validatePersonTag);
 
   const people = peopleInput as Person[];
   const tags = tagsInput as Tag[];
   const interactions = interactionsInput as Interaction[];
+  const personNotes = personNotesInput as PersonNote[];
   const personTags = personTagsInput as PersonTag[];
 
   const personIds = new Set(people.map((person) => person.id));
@@ -34,6 +38,12 @@ export function parsePersonalCrmExport(text: string): ExportPayload {
   for (const interaction of interactions) {
     if (!personIds.has(interaction.person_id)) {
       throw new Error("Import contains an interaction for an unknown person.");
+    }
+  }
+
+  for (const note of personNotes) {
+    if (!personIds.has(note.person_id)) {
+      throw new Error("Import contains a note for an unknown person.");
     }
   }
 
@@ -47,6 +57,7 @@ export function parsePersonalCrmExport(text: string): ExportPayload {
     people,
     tags,
     interactions,
+    person_notes: personNotes,
     person_tags: personTags,
   };
 }
@@ -58,6 +69,18 @@ function requireArray(
   const value = payload[key];
   if (!Array.isArray(value)) {
     throw new Error("This file does not look like a Personal CRM export.");
+  }
+  return value;
+}
+
+function optionalArray(
+  payload: Record<string, unknown>,
+  key: keyof ExportPayload
+): unknown[] {
+  const value = payload[key];
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`${key} must be an array.`);
   }
   return value;
 }
@@ -109,6 +132,7 @@ function validateInteraction(
   optionalString(value, "notes", label);
   optionalString(value, "follow_up_date", label);
   optionalString(value, "follow_up_snoozed_until", label);
+  optionalBoolean(value, "is_touch_point", label);
 
   if (
     value.follow_up_status !== "open" &&
@@ -117,6 +141,21 @@ function validateInteraction(
   ) {
     throw new Error(`${label}.follow_up_status is invalid.`);
   }
+}
+
+function validatePersonNote(
+  value: unknown,
+  index: number
+): asserts value is PersonNote {
+  const label = `person_notes[${index}]`;
+  assertRecord(value, label);
+  requireString(value, "id", label);
+  requireString(value, "user_id", label);
+  requireString(value, "person_id", label);
+  requireNonEmptyString(value, "body", label);
+  requireString(value, "created_at", label);
+  requireString(value, "updated_at", label);
+  optionalString(value, "note_date", label);
 }
 
 function validatePersonTag(
@@ -170,6 +209,20 @@ function requireBoolean(
 ) {
   if (typeof record[key] !== "boolean") {
     throw new Error(`${label}.${key} must be a boolean.`);
+  }
+}
+
+function optionalBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  label: string
+) {
+  if (
+    record[key] !== undefined &&
+    record[key] !== null &&
+    typeof record[key] !== "boolean"
+  ) {
+    throw new Error(`${label}.${key} must be a boolean or null.`);
   }
 }
 

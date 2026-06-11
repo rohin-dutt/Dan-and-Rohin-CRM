@@ -1,5 +1,6 @@
 import { SiteNav } from "../_components/SiteNav";
 import { SiteFooter } from "../_components/SiteFooter";
+import { ContactForm } from "./ContactForm";
 
 export const metadata = { title: "Contact — Roots" };
 
@@ -12,16 +13,9 @@ export default function ContactPage() {
           Contact
         </h1>
         <p className="mt-5 max-w-prose leading-7 text-muted-foreground">
-          Have a question, found a bug, or just want to say hello? Send us an
-          email at{" "}
-          <a
-            href="mailto:dan.rohin.crm@gmail.com"
-            className="text-primary underline underline-offset-2"
-          >
-            dan.rohin.crm@gmail.com
-          </a>
-          . We read every message and typically reply within a day or two.
+          Have a question, found a bug, or just want to say hello? Send us a message below. We read every message and typically reply within a day or two.
         </p>
+        <ContactForm />
       </main>
       <SiteFooter />
     </div>

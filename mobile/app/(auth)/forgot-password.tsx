@@ -16,6 +16,10 @@ export default function ForgotPasswordScreen() {
 
   async function handleReset() {
     setError(null)
+    if (!email.trim()) {
+      setError("Email is required")
+      return
+    }
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: "roots://update-password",

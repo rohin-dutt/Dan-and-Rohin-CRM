@@ -5,6 +5,8 @@ import {
   findDuplicateContacts,
   getFollowUpState,
   getFollowUpQueue,
+  getTotalInteractions,
+  isTouchPoint,
   shouldTouchLastContacted,
 } from "../packages/shared/index.ts";
 
@@ -106,6 +108,19 @@ test("follow-up queue separates overdue, due, done, and snoozed states", () => {
   assert.deepEqual(queue.due.map((item) => item.id), ["due"]);
   assert.deepEqual(queue.done.map((item) => item.id), ["done"]);
   assert.deepEqual(queue.snoozed.map((item) => item.id), ["snoozed"]);
+});
+
+test("note interactions are not counted as touch points", () => {
+  const interactions = [
+    { id: "call", type: "Call", is_touch_point: true },
+    { id: "note-type", type: "Note", is_touch_point: true },
+    { id: "note-flag", type: "Text", is_touch_point: false },
+  ];
+
+  assert.equal(isTouchPoint(interactions[0]), true);
+  assert.equal(isTouchPoint(interactions[1]), false);
+  assert.equal(isTouchPoint(interactions[2]), false);
+  assert.equal(getTotalInteractions(interactions), 1);
 });
 
 test("follow-up state transitions expired snoozes back into due or overdue", () => {

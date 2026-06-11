@@ -6,12 +6,11 @@ import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { PillButton } from "@/components/PillButton"
-import { ONBOARDING_CATEGORY_PILLS, ONBOARDING_FREQ_OPTIONS } from "@/constants/onboarding"
-import { INTERACTION_TYPES } from "@roots/shared"
-
-function todayString() {
-  return new Date().toISOString().split("T")[0]
-}
+import { InlineDateField } from "@/components/InlineDateField"
+import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
+import { RELATIONSHIP_CATEGORIES } from "@/constants/categories"
+import { CONTACT_FREQUENCY_OPTIONS } from "@/constants/frequencies"
+import { INTERACTION_TYPES, toLocalDateString } from "@roots/shared"
 
 export default function OnboardingScreen() {
   const router = useRouter()
@@ -29,7 +28,8 @@ export default function OnboardingScreen() {
   const [selectedCategory, setSelectedCategory] = useState("")
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthday, setBirthday] = useState("")
+  const [birthday, setBirthday] = useState<Date | null>(null)
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false)
   const [relationship, setRelationship] = useState("")
   const [howMet, setHowMet] = useState("")
   const [selectedFreq, setSelectedFreq] = useState(30)
@@ -38,7 +38,8 @@ export default function OnboardingScreen() {
 
   // Step 3 form
   const [interactionType, setInteractionType] = useState("Call")
-  const [interactionDate, setInteractionDate] = useState(todayString())
+  const [interactionDate, setInteractionDate] = useState<Date>(new Date())
+  const [showInteractionDatePicker, setShowInteractionDatePicker] = useState(false)
   const [interactionNotes, setInteractionNotes] = useState("")
   const [step3Saving, setStep3Saving] = useState(false)
   const [step3Error, setStep3Error] = useState<string | null>(null)
@@ -60,7 +61,8 @@ export default function OnboardingScreen() {
     setSelectedCategory("")
     setCompany("")
     setRole("")
-    setBirthday("")
+    setBirthday(null)
+    setShowBirthdayPicker(false)
     setRelationship("")
     setHowMet("")
     setSelectedFreq(30)
@@ -73,7 +75,7 @@ export default function OnboardingScreen() {
       setFormError("First name is required.")
       return
     }
-    if (!userId) return
+    if (!userId || saving) return
     setSaving(true)
     setFormError(null)
 
@@ -82,53 +84,34 @@ export default function OnboardingScreen() {
     const hasBirthday = selectedCategory === "Friend" || isFamily
     const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(" ")
 
-    const { data, error: insertError } = await supabase
-      .from("people")
-      .insert({
-        user_id: userId,
-        name,
-        how_met: howMet.trim() || null,
-        contact_frequency_days: selectedFreq,
-        company: isProfessional && company.trim() ? company.trim() : null,
-        role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: hasBirthday && birthday ? birthday : null,
-        relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
+    let personId: string
+    try {
+      personId = await createPersonWithRelations({
+        userId,
+        person: {
+          name,
+          how_met: howMet.trim() || null,
+          contact_frequency_days: selectedFreq,
+          company: isProfessional && company.trim() ? company.trim() : null,
+          role: isProfessional && role.trim() ? role.trim() : null,
+          birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
+          relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
+        },
+        categoryLabel: selectedCategory || null,
       })
-      .select()
-      .single()
-
-    if (insertError || !data) {
-      setFormError(insertError?.message ?? "Failed to save. Please try again.")
-      setSaving(false)
-      return
-    }
-
-    if (selectedCategory) {
-      const catPill = ONBOARDING_CATEGORY_PILLS.find((p) => p.label === selectedCategory)
-      if (catPill) {
-        const { data: existing } = await supabase
-          .from("tags")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("name", catPill.tagName)
-          .limit(1)
-
-        let tagId: string | null = existing?.[0]?.id ?? null
-        if (!tagId) {
-          const { data: newTag } = await supabase
-            .from("tags")
-            .insert({ user_id: userId, name: catPill.tagName, color: catPill.tagColor })
-            .select("id")
-            .single()
-          tagId = newTag?.id ?? null
-        }
-        if (tagId) {
-          await supabase.from("person_tags").insert({ person_id: data.id, tag_id: tagId })
-        }
+    } catch (e) {
+      if (e instanceof PersonRelationsError) {
+        // Person was saved; category tag assignment is best-effort during
+        // onboarding, so continue instead of blocking the flow.
+        personId = e.personId
+      } else {
+        setFormError(e instanceof Error ? e.message : "Failed to save. Please try again.")
+        setSaving(false)
+        return
       }
     }
 
-    setSavedPersonId(data.id)
+    setSavedPersonId(personId)
     setLastSavedFirstName(trimmedFirst)
     resetForm()
     setSaving(false)
@@ -143,7 +126,7 @@ export default function OnboardingScreen() {
     const { error } = await supabase.rpc("create_interaction_and_touch_person", {
       p_person_id: savedPersonId,
       p_type: interactionType,
-      p_date: interactionDate,
+      p_date: toLocalDateString(interactionDate),
       p_notes: interactionNotes.trim() || null,
       p_follow_up_needed: false,
       p_follow_up_date: null,
@@ -230,7 +213,7 @@ export default function OnboardingScreen() {
 
           <Text className="text-sm font-medium text-warm-black mb-2">Relationship type</Text>
           <View className="flex-row flex-wrap gap-2 mb-4">
-            {ONBOARDING_CATEGORY_PILLS.map(({ label }) => (
+            {RELATIONSHIP_CATEGORIES.map(({ label }) => (
               <PillButton
                 key={label}
                 label={label}
@@ -264,11 +247,13 @@ export default function OnboardingScreen() {
           {showBirthday && (
             <View className="mb-4">
               <Text className="text-sm font-medium text-warm-black mb-1">Birthday</Text>
-              <TextInput
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+              <InlineDateField
+                date={birthday}
+                placeholder="Select birthday"
+                open={showBirthdayPicker}
+                onToggle={() => setShowBirthdayPicker((v) => !v)}
+                onChange={setBirthday}
+                onDone={() => setShowBirthdayPicker(false)}
               />
             </View>
           )}
@@ -298,7 +283,7 @@ export default function OnboardingScreen() {
 
           <Text className="text-sm font-medium text-warm-black mb-2">Stay in touch</Text>
           <View className="flex-row flex-wrap gap-2 mb-6">
-            {ONBOARDING_FREQ_OPTIONS.map(({ label, value }) => (
+            {CONTACT_FREQUENCY_OPTIONS.map(({ label, value }) => (
               <PillButton
                 key={value}
                 label={label}
@@ -342,11 +327,14 @@ export default function OnboardingScreen() {
 
         <View className="mb-4">
           <Text className="text-sm font-medium text-warm-black mb-1">When?</Text>
-          <TextInput
-            value={interactionDate}
-            onChangeText={setInteractionDate}
-            placeholder="YYYY-MM-DD"
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+          <InlineDateField
+            date={interactionDate}
+            placeholder="Select date"
+            open={showInteractionDatePicker}
+            onToggle={() => setShowInteractionDatePicker((v) => !v)}
+            onChange={setInteractionDate}
+            onDone={() => setShowInteractionDatePicker(false)}
+            maximumDate={new Date()}
           />
         </View>
 

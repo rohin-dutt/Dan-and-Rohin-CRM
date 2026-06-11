@@ -18,11 +18,11 @@ export function Button({ title, onPress, loading, variant = "primary", disabled 
       accessibilityRole="button"
       accessibilityLabel={title}
       className={`w-full min-h-11 rounded-xl py-3.5 items-center justify-center ${
-        isPrimary ? "bg-sage" : "bg-white border border-gray-200"
+        isPrimary ? "bg-forest" : "bg-white border border-gray-200"
       } ${disabled || loading ? "opacity-50" : ""}`}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? "#fff" : colors.sage} />
+        <ActivityIndicator color={isPrimary ? "#fff" : colors.forest} />
       ) : (
         <Text
           className={`text-sm font-semibold ${isPrimary ? "text-white" : "text-warm-black"}`}

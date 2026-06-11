@@ -1,24 +1,27 @@
-import { useCallback, useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
-import { useRouter, useFocusEffect } from "expo-router"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { DeviceEventEmitter, Share, Text, TouchableOpacity, View } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
+import { useFocusEffect, useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
-import { Card } from "@/components/Card"
-import { EmptyState } from "@/components/EmptyState"
+import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard, StatusDot } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import type { Person, Interaction, Settings } from "@/types"
+import { loadImportantMomentsForUser } from "@/lib/important-moments"
+import { loadPersonNotesForPeople } from "@/lib/person-notes"
+import { personImageUrl } from "@/lib/person-display"
+import { firstNameFromMetadata } from "@/lib/user-metadata"
+import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
+import type { ImportantMoment, Person, PersonNote, Settings } from "@/types"
+import { colors, fonts } from "@/constants/theme"
+import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
 import {
-  categorizePeople,
-  getBirthdayReminders,
-  getMostContacted,
-  getNeedsAttention,
-  getNextDueDays,
-  getOnTimeRate,
-  getTotalContacts,
-  getTotalInteractions,
-  pluralize,
-} from "@roots/shared"
+  buildDashboardModel,
+  DASHBOARD_INTERACTION_COLUMNS,
+  statusDotForPerson,
+  type DashboardInteraction,
+} from "@/features/dashboard/derive"
+import { MetricCard, SummaryDivider, SummaryStat } from "@/features/dashboard/components"
 
 function getGreeting(firstName: string): string {
   const hour = new Date().getHours()
@@ -26,21 +29,14 @@ function getGreeting(firstName: string): string {
   return `${time}, ${firstName}`
 }
 
-function getFirstNameFromMetadata(metadata: Record<string, unknown> | null | undefined): string {
-  const fullName =
-    typeof metadata?.full_name === "string" ? metadata.full_name
-      : typeof metadata?.name === "string" ? metadata.name
-        : typeof metadata?.display_name === "string" ? metadata.display_name
-          : ""
-  return fullName.trim().split(/\s+/)[0] || "there"
-}
-
 export default function DashboardScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
-  const [interactions, setInteractions] = useState<Interaction[]>([])
+  const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
+  const [personNotes, setPersonNotes] = useState<PersonNote[]>([])
+  const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [firstName, setFirstName] = useState("there")
 
@@ -53,32 +49,38 @@ export default function DashboardScreen() {
       if (!session) return
 
       const userId = session.user.id
-      setFirstName(getFirstNameFromMetadata(session.user.user_metadata))
+      setFirstName(firstNameFromMetadata(session.user.user_metadata))
 
-      const [peopleRes, settingsRes] = await Promise.all([
+      const [peopleRes, settingsRes, loadedMoments] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", userId),
-        supabase.from("settings").select("*").eq("user_id", userId).single(),
+        supabase.from("settings").select("*").eq("user_id", userId).maybeSingle(),
+        loadImportantMomentsForUser(userId),
       ])
 
       if (peopleRes.error) throw peopleRes.error
-      const loaded = peopleRes.data ?? []
-      setPeople(loaded)
+      const loadedPeople = peopleRes.data ?? []
+      setPeople(loadedPeople)
       setSettings(settingsRes.data ?? null)
+      setImportantMoments(loadedMoments)
 
-      if (loaded.length > 0) {
-        const { data: ints } = await supabase
-          .from("interactions")
-          .select("*")
-          .in(
-            "person_id",
-            loaded.map((p) => p.id),
-          )
-        setInteractions(ints ?? [])
+      if (loadedPeople.length > 0) {
+        const personIds = loadedPeople.map((person) => person.id)
+        const [{ data: loadedInteractions, error: interactionsError }, loadedNotes] = await Promise.all([
+          supabase
+            .from("interactions")
+            .select(DASHBOARD_INTERACTION_COLUMNS)
+            .in("person_id", personIds),
+          loadPersonNotesForPeople(personIds),
+        ])
+        if (interactionsError) throw interactionsError
+        setInteractions(loadedInteractions ?? [])
+        setPersonNotes(loadedNotes)
       } else {
         setInteractions([])
+        setPersonNotes([])
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard")
+      setError(e instanceof Error ? e.message : "Failed to load dashboard.")
     } finally {
       setLoading(false)
     }
@@ -91,200 +93,265 @@ export default function DashboardScreen() {
     }, [load]),
   )
 
+  useEffect(() => {
+    const noteSub = DeviceEventEmitter.addListener("noteAdded", load)
+    const interactionSub = DeviceEventEmitter.addListener("interactionAdded", load)
+    return () => {
+      noteSub.remove()
+      interactionSub.remove()
+    }
+  }, [load])
+
+  const dashboard = useMemo(
+    () => buildDashboardModel({ people, interactions, personNotes, importantMoments }),
+    [importantMoments, interactions, people, personNotes],
+  )
+
+  const inviteFriend = useCallback(async () => {
+    try {
+      await Share.share({
+        message:
+          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at useroots.app",
+      })
+    } catch {
+      // user dismissed share sheet
+    }
+  }, [])
+
   if (loading) return <LoadingState />
-
-  if (people.length === 0) {
-    return (
-      <Screen>
-        <View className="px-5 pt-6 pb-2">
-          <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
-          <Text className="mt-2 text-sm text-gray-500">
-            Keep close to the people who matter most.
-          </Text>
-        </View>
-        {error && (
-          <View className="px-5">
-            <ErrorBanner message={error} />
-          </View>
-        )}
-        <EmptyState
-          title="No people yet"
-          description="Add someone you want to stay in touch with to get started."
-          actionLabel="Add someone"
-          onAction={() => router.push("/people/new")}
-        />
-      </Screen>
-    )
-  }
-
-  const { overdue, dueThisWeek, comingUp } = categorizePeople(people, new Date(), interactions)
-  const birthdays = getBirthdayReminders(people, new Date(), 7)
-  const reachOut = [...overdue, ...dueThisWeek].slice(0, 5)
-  const streak = settings?.current_streak ?? 0
-  const onTimeRate = getOnTimeRate(people)
-  const mostContacted = getMostContacted(people, interactions)
-  const needsAttention = getNeedsAttention(people)
 
   return (
     <Screen>
-      <View className="px-5 pt-6 pb-2">
-        <Text className="text-2xl font-bold text-warm-black">{getGreeting(firstName)}</Text>
-        <Text className="mt-2 text-sm text-gray-500">
-          Keep close to the people who matter most.
-        </Text>
-        {streak > 0 && (
-          <View className="mt-3 self-start bg-orange-50 border border-orange-200 rounded-full px-3 py-1">
-            <Text className="text-xs font-semibold text-terracotta">Streak: {streak} days</Text>
+      <View className="px-5 pt-4 pb-2">
+        <View className="flex-row items-start">
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text
+                style={{ fontFamily: fonts.heading, color: colors.forest }}
+                className="text-[32px] leading-[38px]"
+              >
+                Roots
+              </Text>
+              <View className="ml-2 mt-1">
+                <Ionicons name="leaf-outline" size={24} color={colors.sage} />
+              </View>
+            </View>
+            <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[15px]">
+              {getGreeting(firstName)}
+            </Text>
+            {settings?.current_streak ? (
+              <Text style={{ fontFamily: fonts.medium, color: colors.amber }} className="mt-1 text-sm">
+                {settings.current_streak} day streak 🔥
+              </Text>
+            ) : (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                Start your streak — log a chat today 🌱
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={inviteFriend}
+              accessibilityRole="button"
+              accessibilityLabel="Invite a friend"
+              activeOpacity={0.76}
+              className="mt-3 flex-row items-center rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm"
+            >
+              <Ionicons name="share-outline" size={18} color={colors.forest} />
+              <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="ml-2 flex-1 text-sm">
+                Invite a friend
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
       </View>
 
-      <View className="px-5 mt-4">
-        {error && <ErrorBanner message={error} />}
-
-        <View className="flex-row gap-3 mb-6">
-          <DashboardStatButton
-            label="Overdue"
-            count={overdue.length}
-            countClassName="text-terracotta"
-            accessibilityLabel="Show overdue people"
-            onPress={() => router.push("/people?status=overdue")}
-          />
-          <DashboardStatButton
-            label="Due this week"
-            count={dueThisWeek.length}
-            countClassName="text-sage"
-            accessibilityLabel="Show people due this week"
-            onPress={() => router.push("/people?status=due_this_week")}
-          />
-          <DashboardStatButton
-            label="Coming up"
-            count={comingUp.length}
-            countClassName="text-warm-black"
-            accessibilityLabel="Show people coming up"
-            onPress={() => router.push("/people?status=coming_up")}
-          />
+      {error ? (
+        <View className="px-5">
+          <ErrorBanner message={error} />
         </View>
+      ) : null}
 
-        {reachOut.length > 0 && (
-          <View className="mb-6">
-            <Text className="text-base font-semibold text-warm-black mb-3">Reach out</Text>
-            {reachOut.map((person) => {
-              const days = getNextDueDays(person)
-              const isOverdue = days !== null && days < 0
-              return (
-                <TouchableOpacity
-                  key={person.id}
-                  onPress={() => router.push(`/people/${person.id}`)}
-                  activeOpacity={0.7}
-                >
-                  <Card className="mb-2">
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-1 mr-3">
-                        <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
-                        {person.company != null && (
-                          <Text className="text-xs text-gray-500 mt-0.5">{person.company}</Text>
-                        )}
-                      </View>
-                      <View
-                        className={`rounded-full px-2.5 py-1 ${
-                          isOverdue ? "bg-red-50" : "bg-amber-50"
-                        }`}
-                      >
-                        <Text
-                          className={`text-xs font-medium ${
-                            isOverdue ? "text-red-600" : "text-amber-700"
-                          }`}
-                        >
-                          {isOverdue
-                            ? `${pluralize(Math.abs(days!), "day")} overdue`
-                            : `Due in ${pluralize(days!, "day")}`}
-                        </Text>
-                      </View>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              )
-            })}
+      {people.length === 0 ? (
+        <EmptyPanel
+          title="No people yet"
+          body="Add someone you want to stay in touch with to start building your relationship dashboard."
+        />
+      ) : (
+        <>
+          <View className="mt-5 flex-row gap-3 px-5">
+            <MetricCard
+              icon="alert-circle"
+              value={dashboard.overdueList.length}
+              label="Overdue"
+              onPress={() => router.push("/people?status=overdue")}
+            />
+            <MetricCard
+              icon="time"
+              value={dashboard.dueThisWeekList.length}
+              label="Due This Week"
+              tone="amber"
+              onPress={() => router.push("/people?status=due_this_week")}
+            />
+            <MetricCard
+              icon="calendar-outline"
+              value={dashboard.comingUpList.length}
+              label="Coming Up"
+              tone="blue"
+              onPress={() => router.push("/people?status=coming_up")}
+            />
           </View>
-        )}
 
-        <View className="mb-6">
-          <Text className="text-base font-semibold text-warm-black mb-3">
-            Upcoming birthdays
-          </Text>
-          {birthdays.length === 0 ? (
-            <Card>
-              <Text className="text-sm text-gray-500">No upcoming birthdays this week.</Text>
-            </Card>
-          ) : (
-            birthdays.map(({ person, daysUntil }) => (
+          <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle
+              title="People to follow up with"
+              actionLabel="View all"
+              onAction={() => router.push("/people?status=overdue&status=due_this_week")}
+            />
+            {dashboard.followUps.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                No follow-ups need attention right now.
+              </Text>
+            ) : (
+              dashboard.followUps.map((person, index) => (
+                <View key={person.id}>
+                  {index > 0 ? <View className="my-4 h-px bg-stone-200" /> : null}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${person.name}`}
+                    onPress={() => router.push(`/people/${person.id}`)}
+                    activeOpacity={0.76}
+                    className="flex-row items-center"
+                  >
+                    <View className="mr-3 items-center">
+                      <StatusDot status={statusDotForPerson(person)} />
+                    </View>
+                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
+                    <View className="ml-4 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                        {person.name}
+                      </Text>
+                      {(person.relationship_type ?? person.company) ? (
+                        <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-0.5 text-sm">
+                          {person.relationship_type ?? person.company}
+                        </Text>
+                      ) : null}
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                        {formatLastTalkedLine(person.last_contacted_at)}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            {dashboard.followUpExtraCount > 0 ? (
               <TouchableOpacity
-                key={person.id}
-                onPress={() => router.push(`/people/${person.id}`)}
-                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${dashboard.followUpExtraCount} more follow-ups`}
+                onPress={() => router.push("/people?status=overdue&status=due_this_week")}
+                className="mt-4"
               >
-                <Card className="mb-2">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-semibold text-warm-black">{person.name}</Text>
-                    <Text className="text-xs text-gray-500">
-                      {daysUntil === 0 ? "Today" : `In ${pluralize(daysUntil, "day")}`}
+                <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+                  {dashboard.followUpExtraCount} more
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </SoftCard>
+
+          <SoftCard className="mx-5 mt-5 p-4">
+            <SectionTitle title="Upcoming moments" actionLabel="View all" onAction={() => router.push("/people?moments=upcoming")} />
+            {dashboard.upcomingMoments.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                No birthdays or important moments in the next two weeks.
+              </Text>
+            ) : (
+              dashboard.upcomingMoments.slice(0, 3).map((moment, index) => (
+                <TouchableOpacity
+                  key={moment.id}
+                  onPress={() => router.push(`/people/${moment.person.id}`)}
+                  className={`flex-row items-center ${index > 0 ? "mt-5" : ""}`}
+                >
+                  <IconTile
+                    icon={moment.kind === "birthday" ? "calendar-outline" : "sparkles-outline"}
+                    color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
+                    background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
+                    size={38}
+                  />
+                  <View className="ml-3 flex-1">
+                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
+                      {moment.person.name}
+                    </Text>
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                      {moment.label} - {moment.daysUntil === 0 ? "Today" : `In ${moment.daysUntil} days`} - {formatShortMonthDay(moment.sourceDate)}
                     </Text>
                   </View>
-                </Card>
+                </TouchableOpacity>
+              ))
+            )}
+            {dashboard.upcomingMoments.length > 3 ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`${dashboard.upcomingMoments.length - 3} more upcoming moments`}
+                onPress={() => router.push("/people?moments=upcoming")}
+                className="mt-4"
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
+                  {dashboard.upcomingMoments.length - 3} more
+                </Text>
               </TouchableOpacity>
-            ))
-          )}
-        </View>
+            ) : null}
+          </SoftCard>
 
-        <View className="mb-8">
-          <Text className="text-base font-semibold text-warm-black mb-3">Your Roots</Text>
-          <View className="flex-row flex-wrap gap-3">
-            <RootStat label="Total contacts" value={String(getTotalContacts(people))} />
-            <RootStat label="Interactions logged" value={String(getTotalInteractions(interactions))} />
-            <RootStat label="On-time rate" value={onTimeRate === null ? "-" : `${onTimeRate}%`} />
-            <RootStat label="Most contacted" value={mostContacted?.name ?? "-"} />
-            <RootStat label="Needs attention" value={needsAttention?.name ?? "-"} />
-          </View>
-        </View>
-      </View>
+          <SoftCard className="mx-5 mt-5 p-4">
+            <SectionTitle title="Recent notes" />
+            {dashboard.recentNotes.length === 0 ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
+                Notes you log will appear here.
+              </Text>
+            ) : (
+              dashboard.recentNotes.map(({ note, person }, index) => (
+                <View key={note.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
+                  <TouchableOpacity
+                    onPress={() => person && router.push(`/people/${person.id}`)}
+                    activeOpacity={0.76}
+                    className="flex-row"
+                  >
+                    <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
+                    <View className="ml-3 flex-1">
+                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
+                        {person ? `Note with ${person.name}` : "Recent note"}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
+                        {note.body}
+                      </Text>
+                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                        {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(note.note_date ? `${note.note_date}T12:00:00` : note.created_at))}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </SoftCard>
+
+          <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle title="Your Roots Stats" />
+            <View className="flex-row items-start">
+              <SummaryStat icon="people" value={String(getTotalContacts(people))} label="Total contacts" />
+              <SummaryDivider />
+              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions.filter(isTouchPoint)))} label="Interactions logged" />
+              <SummaryDivider />
+              <SummaryStat icon="golf" value={dashboard.onTimeRate == null ? "-" : `${dashboard.onTimeRate}%`} label="On-time outreach" />
+              <SummaryDivider />
+              <SummaryStat
+                icon="star"
+                value={dashboard.mostContacted?.name.split(/\s+/).slice(0, 2).join(" ") ?? "-"}
+                label="Most contacted"
+              />
+            </View>
+          </SoftCard>
+        </>
+      )}
     </Screen>
-  )
-}
-
-function DashboardStatButton({
-  label,
-  count,
-  countClassName,
-  accessibilityLabel,
-  onPress,
-}: {
-  label: string
-  count: number
-  countClassName: string
-  accessibilityLabel: string
-  onPress: () => void
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm items-center"
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Text className={`text-2xl font-bold ${countClassName}`}>{count}</Text>
-      <Text className="text-xs text-gray-500 mt-0.5 text-center">{label}</Text>
-    </TouchableOpacity>
-  )
-}
-
-function RootStat({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="min-w-[30%] flex-1 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm">
-      <Text className="text-xs text-gray-500">{label}</Text>
-      <Text className="mt-1 text-base font-semibold text-warm-black" numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
   )
 }

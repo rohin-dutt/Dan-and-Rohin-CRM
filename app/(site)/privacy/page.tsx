@@ -13,7 +13,7 @@ export default function PrivacyPage() {
           Privacy policy
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Last updated: May 2026
+          Last updated: June 2026
         </p>
         <div className="mt-8 max-w-prose space-y-8 text-sm leading-7 text-muted-foreground">
           <section>
@@ -23,6 +23,12 @@ export default function PrivacyPage() {
               address, and the relationship data you enter (names, notes,
               interactions, follow-ups). We do not collect behavioral analytics
               or sell your data to third parties.
+            </p>
+          </section>
+          <section>
+            <h2 className="font-medium text-foreground">Mobile app data</h2>
+            <p className="mt-2">
+              The Roots iOS app may request access to your device contacts solely to help you add people you already know. Contact data is never uploaded without your explicit selection and confirmation. The app may also register a push notification token to send you relationship reminders. You can revoke notification permissions at any time from your device settings.
             </p>
           </section>
           <section>

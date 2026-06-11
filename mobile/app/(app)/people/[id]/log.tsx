@@ -1,14 +1,15 @@
 import { useState } from "react"
-import { Switch, Text, TouchableOpacity, View } from "react-native"
+import { DeviceEventEmitter, Switch, Text, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { PillButton } from "@/components/PillButton"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { InlineDateField } from "@/components/InlineDateField"
 import { supabase } from "@/lib/supabase"
 import { colors } from "@/constants/theme"
-import { INTERACTION_TYPES, updateStreakAfterAction, todayInputValue } from "@roots/shared"
+import { INTERACTION_TYPES, toLocalDateString, updateStreakAfterAction } from "@roots/shared"
 
 export default function LogInteractionScreen() {
   const router = useRouter()
@@ -19,14 +20,21 @@ export default function LogInteractionScreen() {
 
   const isNoteMode = action === "note"
   const [interactionType, setInteractionType] = useState(isNoteMode ? "Other" : INTERACTION_TYPES[0])
-  const [date, setDate] = useState(todayInputValue())
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [notes, setNotes] = useState("")
   const [followUpEnabled, setFollowUpEnabled] = useState(false)
-  const [followUpDate, setFollowUpDate] = useState("")
+  const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
+  const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
 
   async function handleSave() {
-    if (!date.trim()) {
-      setError("Date is required")
+    if (saving) return
+    if (isNoteMode && !notes.trim()) {
+      setError("Note text is required")
+      return
+    }
+    if (!isNoteMode && followUpEnabled && !followUpDate) {
+      setError("Follow-up date is required when a follow-up is set")
       return
     }
 
@@ -39,18 +47,30 @@ export default function LogInteractionScreen() {
       } = await supabase.auth.getSession()
       if (!session) throw new Error("Not authenticated")
 
-      const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
-        p_person_id: id,
-        p_type: interactionType,
-        p_date: date.trim(),
-        p_notes: notes.trim() || null,
-        p_follow_up_needed: followUpEnabled,
-        p_follow_up_date: followUpEnabled && followUpDate.trim() ? followUpDate.trim() : null,
-      })
+      if (isNoteMode) {
+        const { error: insertError } = await supabase.from("person_notes").insert({
+          user_id: session.user.id,
+          person_id: id,
+          body: notes.trim(),
+          note_date: toLocalDateString(selectedDate),
+        })
+        if (insertError) throw insertError
+        DeviceEventEmitter.emit("noteAdded")
+      } else {
+        const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
+          p_person_id: id,
+          p_type: interactionType,
+          p_date: toLocalDateString(selectedDate),
+          p_notes: notes.trim() || null,
+          p_follow_up_needed: followUpEnabled,
+          p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
+        })
 
-      if (rpcError) throw rpcError
+        if (rpcError) throw rpcError
 
-      await updateStreakAfterAction(supabase)
+        await updateStreakAfterAction(supabase)
+        DeviceEventEmitter.emit("interactionAdded")
+      }
 
       router.back()
     } catch (e) {
@@ -76,28 +96,34 @@ export default function LogInteractionScreen() {
       <View className="px-5 pb-8">
         {error != null && <ErrorBanner message={error} />}
 
-        {/* Interaction type */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-warm-black mb-2">Type</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {INTERACTION_TYPES.map((type) => (
-              <PillButton
-                key={type}
-                label={type}
-                selected={interactionType === type}
-                onPress={() => setInteractionType(type)}
-              />
-            ))}
+        {!isNoteMode ? (
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-warm-black mb-2">Type</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {INTERACTION_TYPES.map((type) => (
+                <PillButton
+                  key={type}
+                  label={type}
+                  selected={interactionType === type}
+                  onPress={() => setInteractionType(type)}
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
-        <TextField
+        <InlineDateField
           label="Date"
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          keyboardType="numbers-and-punctuation"
-          returnKeyType="next"
+          date={selectedDate}
+          placeholder="Select date"
+          open={showDatePicker}
+          onToggle={() => {
+            setShowDatePicker((v) => !v)
+            setShowFollowUpPicker(false)
+          }}
+          onChange={setSelectedDate}
+          onDone={() => setShowDatePicker(false)}
+          maximumDate={new Date()}
         />
 
         <TextField
@@ -110,7 +136,7 @@ export default function LogInteractionScreen() {
           returnKeyType="default"
         />
 
-        {/* Follow-up toggle */}
+        {!isNoteMode ? (
         <View className="mb-4">
           <View className="flex-row items-center justify-between py-2">
             <View className="flex-1 mr-4">
@@ -128,16 +154,22 @@ export default function LogInteractionScreen() {
           </View>
 
           {followUpEnabled && (
-            <TextField
+            <InlineDateField
               label="Follow-up date"
-              value={followUpDate}
-              onChangeText={setFollowUpDate}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numbers-and-punctuation"
-              returnKeyType="done"
+              date={followUpDate}
+              placeholder="Select follow-up date"
+              open={showFollowUpPicker}
+              onToggle={() => {
+                setShowFollowUpPicker((v) => !v)
+                setShowDatePicker(false)
+              }}
+              onChange={setFollowUpDate}
+              onDone={() => setShowFollowUpPicker(false)}
+              minimumDate={new Date()}
             />
           )}
         </View>
+        ) : null}
 
         <Button title={isNoteMode ? "Save note" : "Save"} onPress={handleSave} loading={saving} />
       </View>

@@ -540,11 +540,13 @@ If the refactor cannot name the risk it reduces, skip it for now.
 
 ## Immediate Next Steps
 
-1. Align docs around this file.
-2. Run the safety baseline.
-3. Fix any baseline bugs before structural changes.
-4. Move routes into `(site)`, `(auth)`, and `(app)` groups.
-5. Refactor the largest pages in small behavior-preserving passes.
-6. Expand tests around the core CRM loop.
-7. Resume new feature work.
+1. Keep `TODO.md` and `docs/MOBILE_TODO.md` as the active execution queues.
+2. Release the pending June 9 mobile schema migrations only through the required
+   database preflight.
+3. Complete real-device Expo Go/TestFlight QA for auth, contacts import, Your
+   Roots, settings data flows, push registration, and account deletion.
+4. Finish remaining mobile v1 gaps: interaction edit/delete, follow-up reopen,
+   encrypted offline read cache, scheduled push sender, and TestFlight setup.
+5. Continue using narrow, verified changes with `npm test`, `npm run lint`, and
+   `npm run build` before finishing meaningful implementation work.
 

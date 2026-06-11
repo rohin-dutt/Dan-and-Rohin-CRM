@@ -13,6 +13,7 @@ import {
 import {
   findDuplicateContacts,
   getRelationshipStatus,
+  isTouchPoint,
   normalizeContactText,
 } from "@roots/shared";
 import { supabase } from "@/lib/supabase";
@@ -86,7 +87,7 @@ function PeoplePageInner() {
             .neq("follow_up_status", "done"),
           supabase
             .from("interactions")
-            .select("person_id, type, date, notes")
+            .select("person_id, type, date, notes, is_touch_point")
             .in("person_id", ids)
             .order("date", { ascending: false })
             .limit(500),
@@ -104,10 +105,10 @@ function PeoplePageInner() {
         }
 
         setPersonTags(personTagsRes.data ?? []);
-        setFollowUps(followUpsRes.data ?? []);
+        setFollowUps((followUpsRes.data ?? []).filter(isTouchPoint));
 
         const lastInteractionMap = new Map<string, { type: string; date: string; notes: string | null }>();
-        for (const interaction of lastInteractionsRes.data ?? []) {
+        for (const interaction of (lastInteractionsRes.data ?? []).filter(isTouchPoint)) {
           if (!lastInteractionMap.has(interaction.person_id)) {
             lastInteractionMap.set(interaction.person_id, {
               type: interaction.type,
@@ -210,7 +211,6 @@ function PeoplePageInner() {
             person.company,
             person.role,
             person.email,
-            person.notes,
             tagText,
           ].join(" ")
         );

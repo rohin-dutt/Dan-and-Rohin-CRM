@@ -275,7 +275,8 @@ Data:
 
 - person
 - tags
-- interactions
+- touch-point interactions
+- person notes
 - follow-up state
 
 Actions:
@@ -283,11 +284,13 @@ Actions:
 - edit person
 - delete person
 - log interaction
-- edit interaction
-- delete interaction
+- edit interaction (planned; no dedicated mobile route yet)
+- delete interaction (planned; no dedicated mobile UI yet)
+- edit note
+- delete note
 - mark follow-up done
 - snooze follow-up
-- reopen follow-up
+- reopen follow-up (planned; not currently exposed in mobile)
 
 States:
 
@@ -307,6 +310,7 @@ Fields:
 - role
 - location
 - birthday
+- important moments (label, date, recurring yearly or one-time)
 - how met
 - relationship type
 - relationship strength
@@ -335,6 +339,7 @@ Same fields and states as Add Person.
 Additional actions:
 
 - delete person
+- add, edit, and delete important moments
 
 ### Log Interaction
 
@@ -345,6 +350,10 @@ Fields:
 - notes
 - follow-up needed
 - follow-up date
+
+Add-note mode uses the same screen shell but writes to `person_notes` instead
+of `interactions`; note saves do not update Last talked, streaks, follow-ups,
+or interaction counters.
 
 Actions:
 
@@ -360,7 +369,9 @@ States:
 
 ### Edit Interaction
 
-Same fields as Log Interaction.
+Planned screen. Current mobile app can create touch-point interactions and
+display recent timeline entries, but does not expose a dedicated edit
+interaction route yet.
 
 Additional actions:
 
@@ -458,8 +469,7 @@ Actions:
 
 - choose file
 - validate
-- review summary
-- import
+- import/update
 
 States:
 
