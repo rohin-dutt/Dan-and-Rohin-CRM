@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import { handlePasswordRecoveryUrl } from "@/lib/auth-links"
+import { getOnboardingCompleted } from "@/lib/onboarding"
 import "../global.css"
 
 export default function RootLayout() {
@@ -60,13 +61,32 @@ export default function RootLayout() {
   }, [router])
 
   useEffect(() => {
+    let cancelled = false
     if (loading) return
-    const inAuthGroup = segments[0] === "(auth)"
-    const inUpdatePassword = inAuthGroup && segments.join("/") === "(auth)/update-password"
-    if (!session && !inAuthGroup) {
-      router.replace("/(auth)/login")
-    } else if (session && inAuthGroup && !inUpdatePassword) {
-      router.replace("/(app)/(tabs)/dashboard")
+    async function routeForSession() {
+      const inAuthGroup = segments[0] === "(auth)"
+      const inAppGroup = segments[0] === "(app)"
+      const segmentPath = segments.join("/")
+      const inOnboarding = inAppGroup && segmentPath === "(app)/onboarding"
+      const inUpdatePassword = inAuthGroup && segmentPath === "(auth)/update-password"
+      if (!session && !inAuthGroup) {
+        router.replace("/(auth)/login")
+        return
+      }
+      if (!session || inUpdatePassword) return
+      const onboardingComplete = await getOnboardingCompleted(session.user.id)
+      if (cancelled) return
+      if (!onboardingComplete && !inOnboarding) {
+        router.replace("/(app)/onboarding")
+        return
+      }
+      if (onboardingComplete && (inAuthGroup || inOnboarding)) {
+        router.replace("/(app)/(tabs)/dashboard")
+      }
+    }
+    void routeForSession()
+    return () => {
+      cancelled = true
     }
   }, [session, loading, segments])
 

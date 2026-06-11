@@ -2,6 +2,184 @@
 
 Date: 2026-06-10 America/Indianapolis
 
+## 0. Final Remediation Status - 2026-06-11
+
+This section supersedes the original audit history below. The original findings are retained for readability, but the current status is the table in this section.
+
+### Final Summary
+
+Overall remediation status: most audit findings have been fixed in code and verified by automated tests, build checks, Supabase remote schema checks, API checks, and Codex in-app-browser Expo web QA at `http://127.0.0.1:8081`. The remaining blockers are environment, browser-tool, or native-only verification gaps, not ignored code paths.
+
+Key completed items:
+
+- Applied pending Supabase release work to linked project `ojebeswabngvcktqsduc`: `20260609193834_separate_person_notes` and new `20260611031202_onboarding_completion`.
+- Verified remote migration history includes `20260609090000`, `20260609193834`, and `20260611031202`.
+- Verified remote `public.person_notes`, `public.important_moments`, `public.push_tokens`, `public.notification_deliveries`, and `public.settings.onboarding_completed` exist with RLS enabled.
+- Verified remote policies exist for `person_notes`, `important_moments`, `push_tokens`, `notification_deliveries` read access, and settings read/insert/update.
+- Verified remote RPCs exist: `restore_crm_snapshot`, `create_interaction_and_touch_person`, `recalculate_person_last_contacted`, and `recalculate_all_last_contacted_from_touch_points`.
+- Split cadence reminders from explicit follow-ups in mobile dashboard/detail behavior and root shared tests.
+- Added durable onboarding completion in `settings`, enforced onboarding routing for first-run users, and aligned mobile docs.
+- Expanded People search, fixed overdue labels, and corrected status helper behavior.
+- Moved quick-add note/interaction flows onto the same core fields as person-detail note/log flows.
+- Implemented contacts import duplicate actions: update existing, skip duplicate, create anyway.
+- Added missing-coordinate surfacing and missing-Mapbox-token disabled states for Your Roots/location search.
+- Removed mobile Settings tag-management from v1 readiness expectations.
+- Added account-deletion JSON config failure handling and documented `SUPABASE_SERVICE_ROLE_KEY`.
+- Removed the update-password screen's blank waiting state for invalid/no-session routes.
+- Actually launched the Roots Expo app in the Codex in-app browser against `http://127.0.0.1:8081` with Next running at `http://127.0.0.1:3000`.
+- Verified disposable-account first-login onboarding cannot be skipped: direct `/dashboard` redirected back to `/onboarding` until onboarding completion.
+- Verified browser QA for dashboard, people search, add-person validation, person detail timeline/notes/follow-ups, full log with follow-up date, quick-add note, quick-add interaction with follow-up date, contacts-import denied fallback, Your Roots missing-coordinate/missing-Mapbox fallback, and Settings rendering/logout.
+- Fixed browser-found regressions in Settings web logout, note edit/delete modals, web date inputs, Quick Add sheet layout, and dashboard cadence-vs-explicit-follow-up derivation.
+
+Remaining blockers:
+
+- `SUPABASE_SERVICE_ROLE_KEY` is missing in the local environment, so authenticated missing-config and successful disposable account deletion could not be verified end-to-end. Unauthenticated JSON 401 was verified.
+- `npm.cmd run test:e2e:signed-in` is blocked because the local Supabase Docker stack is not running; escalated `npx.cmd supabase status -o env` failed because Docker Desktop's Linux engine pipe is unavailable.
+- Expo web `/update-password` without a recovery session still hangs the Codex in-app browser after sign-out. Metro serves `/update-password` with HTTP 200, and the screen code has an expired-link state, but the direct in-app browser route could not be stably inspected; this remains browser-blocked.
+- In-app browser downloads are unsupported, so Settings export download could not be completed through Codex Browser even though the UI is visible and schema/RPC blockers are fixed.
+- Physical iPhone/TestFlight-only items remain not browser-verifiable by product decision.
+- Supabase security advisor still reports leaked password protection disabled; that is a project auth setting outside this code patch.
+
+### Codex In-App Browser QA - 2026-06-11
+
+Environment:
+
+- Next backend: `http://127.0.0.1:3000` returned HTTP 200 while launched with `0.0.0.0:3000`.
+- Expo Metro: `http://127.0.0.1:8081/status` returned `packager-status:running`.
+- Expo web app: opened in Codex in-app Browser at `http://127.0.0.1:8081`; page title `Roots`.
+- Disposable account used for browser QA: `roots.codex.qa.1781151322631@example.com`.
+
+Verified:
+
+- Login validation: empty submit showed `Email is required`.
+- Signup validation: empty submit showed `First name is required`.
+- Forgot password validation: empty submit showed `Email is required`.
+- First-login onboarding: disposable signup routed to `/onboarding`; direct `/dashboard` before completion redirected back to `/onboarding`; completion reached dashboard.
+- Dashboard: empty/populated states rendered; cadence check-ins stayed at `0` while explicit follow-ups appeared under Open follow-ups.
+- People: search for `Jordan` matched `Jordan Disposable`; non-match search showed no results.
+- Add Person: direct `/people/new` empty save showed `First name is required`; cancel fallback returned to People.
+- Full log interaction: web date fallback accepted `2026-06-12`, saved, and appeared as an explicit follow-up.
+- Person detail: timeline, notes, and follow-ups rendered consistently; follow-up tab showed snooze/done actions and due dates.
+- Notes: full add note saved to `person_notes`; note edit/delete modals worked; quick-add note saved to the same Notes tab.
+- Quick Add: note saved with unique text `Quick add note browser QA 1781153791627`; interaction saved with unique text `Quick add interaction browser QA 1781154025978` and explicit follow-up due `Jun 13, 2026`.
+- Contacts import web fallback: `Review contacts` produced safe denied-permission copy and did not upload contacts.
+- Your Roots: missing Mapbox token disabled location search with clear copy; missing-coordinate person state rendered.
+- Settings: rendered account/settings rows; web logout worked after the patch; no mobile tag-management placeholder was present.
+
+Browser-found issues fixed during this pass:
+
+- `mobile/app/(app)/(tabs)/settings.tsx`: web logout now signs out directly instead of relying on native `Alert.alert`.
+- `mobile/app/(app)/people/[id].tsx`: note edit/delete use in-app modals instead of unsupported web `Alert.prompt`.
+- `mobile/components/InlineDateField.tsx` and `mobile/features/quick-add/QuickAddFormSheet.tsx`: web date fields use controlled text input fallback.
+- `mobile/features/dashboard/derive.ts`: cadence sections no longer consume explicit follow-up interactions.
+- `mobile/components/BottomSheetModal.tsx`: backdrop no longer wraps sheet buttons, avoiding nested button markup.
+- `mobile/features/quick-add/QuickAddFormSheet.tsx`: save button is fixed in the sheet footer and reachable in Expo web for long interaction forms.
+
+Browser-blocked or not browser-verifiable:
+
+- `/update-password` no-session route: after signing out, direct `http://127.0.0.1:8081/update-password` wedged the in-app browser; Metro still served the route HTML with HTTP 200. Needs fresh browser/runtime or native/recovery-link validation.
+- Export download: Codex in-app Browser reports downloads unsupported; Settings export UI is visible but browser download completion cannot be verified there.
+- Native Contacts picker, push token registration, native map markers/callouts, native document picker/share sheet, secure storage, notification deep links, VoiceOver/Dynamic Type/safe-area, and TestFlight install remain native-only.
+
+Data safety note:
+
+- During an earlier browser session, onboarding was accidentally completed in the existing signed-in account, creating one `Taylor QA` person. That exact artifact was immediately cleaned up by id/name/how_met in Supabase: one person row, one tag row, and one interaction row removed; no notes or important moments were removed.
+
+### Final Verification Commands
+
+| Command/check | Final result | Evidence |
+| --- | --- | --- |
+| `git branch --show-current` | Verified | `codex/mobile-roots-ui-overhaul`; no new branch created. |
+| `git status --short` before work | Verified | Starting tree was clean. |
+| `npx.cmd supabase migration list` | Blocked, fallback used | Failed: `Cannot find project ref. Have you run supabase link?` |
+| `npx.cmd supabase db push --dry-run` | Blocked, fallback used | Failed with same missing-link error after escalation. |
+| Supabase plugin migration apply | Verified | Applied `separate_person_notes`; added/applied `onboarding_completion`; repaired generated history rows to checked-in versions. |
+| Supabase migration history | Verified | Remote list includes `20260609090000`, `20260609193834`, `20260611031202`. |
+| Supabase schema/RLS check | Verified | Remote table list shows RLS enabled for `person_notes`, `important_moments`, `push_tokens`, `notification_deliveries`, `settings`; policies and RPCs queried successfully. |
+| root `npm.cmd test` | Pass | Re-run after browser QA/Quick Add patch; all root unit tests passed, including follow-up/cadence cases. |
+| root `npm.cmd run lint` | Pass with warnings | Re-run after browser QA/Quick Add patch; 0 errors, 7 existing warnings (`onStreakUpdate`, `<img>` usage). |
+| root `npm.cmd run build` | Pass | Re-run after browser QA/Quick Add patch; Next 16.2.6 production build passed. |
+| mobile `npm.cmd run typecheck` | Pass | Re-run after browser QA/Quick Add patch; `tsc --noEmit` passed. |
+| mobile `npm.cmd run lint` | Pass | Re-run after browser QA/Quick Add patch; `expo lint` passed. |
+| mobile `npx.cmd expo-doctor` | Pass | Re-run after browser QA/Quick Add patch; 18/18 checks passed. |
+| root `npm.cmd run test:e2e` | Verified pass via existing server | Initial run blocked by existing Next server on port 3000; rerun with `E2E_BASE_URL=http://localhost:3000` passed 7/7 unauthenticated tests. |
+| root `npm.cmd run test:e2e:signed-in` | Blocked | Local Supabase status failed; escalated status showed Docker Desktop Linux engine pipe unavailable. |
+| `/api/account/delete` unauthenticated POST | Verified | Returned JSON 401: `{"ok":false,"error":{"code":"unauthorized","message":"Unauthorized"}}`. |
+| `SUPABASE_SERVICE_ROLE_KEY` presence | Blocked | Local env check returned missing; valid auth-user deletion not testable here. |
+| Expo web app launch | Verified | Codex in-app Browser opened `http://127.0.0.1:8081`; title `Roots`; disposable account exercised authenticated flows. |
+| Expo web auth routes | Verified / partial | Login, signup, and forgot-password validation verified. Update-password no-session route remains browser-blocked by in-app browser hang. |
+| Expo web protected/direct routes | Verified / partial | Dashboard, People, Add Person, Person Detail, Quick Add, Contacts import, Your Roots, and Settings verified in browser. `/update-password` remains browser-blocked. |
+
+### Final Coverage Matrix
+
+| Area | Final status | Current evidence |
+| --- | --- | --- |
+| Branch/status guard | Verified | Existing branch retained; no commit/push/merge. |
+| Auth login validation | Verified | Expo web login empty submit showed `Email is required`; unauthenticated e2e also renders login. |
+| Signup validation | Verified | Expo web signup empty submit showed `First name is required`; unauthenticated e2e also renders signup fields. |
+| Signup success | Verified | Disposable account `roots.codex.qa.1781151322631@example.com` signed up and routed into onboarding before dashboard access. |
+| Forgot password validation | Verified | Expo web forgot-password empty submit showed `Email is required`; `safeBack` fallback added in `mobile/app/(auth)/forgot-password.tsx`. |
+| Update password | Partially fixed / browser-blocked | Blank screen code path removed and invalid-link message exists in `mobile/app/(auth)/update-password.tsx`; direct no-session `/update-password` wedged Codex in-app Browser after sign-out even though Metro returned HTTP 200. Deep-link recovery support preserved in `mobile/app/_layout.tsx`. |
+| Session persistence | Not browser-verifiable | Native close/reopen and secure storage persistence still require device/simulator. |
+| Onboarding | Fixed and verified | Durable completion columns/migration added; browser QA confirmed first-run disposable user could not skip onboarding and reached dashboard only after completion. |
+| Dashboard empty state | Verified | Browser QA saw empty dashboard after onboarding before extra data was added. |
+| Dashboard populated state | Fixed and verified | Browser QA showed cadence due `0` while explicit follow-ups appeared under Open follow-ups; root tests cover cadence vs completed/snoozed explicit follow-ups. |
+| Dashboard upcoming moments | Verified | Existing behavior retained; root tests for moment draft helpers pass. |
+| Dashboard recent notes | Fixed and verified | Quick-add note appeared in dashboard Recent notes and person-detail Notes tab. |
+| People list | Verified | Browser QA rendered `Jordan Disposable`; mobile type/lint pass. |
+| People search | Fixed and verified | Browser QA confirmed `Jordan` matched and a no-match search showed no results; helper searches name, company, email, phone, location, relationship type, and tags. |
+| People filters | Fixed | Status labels now distinguish overdue/today/tomorrow/future; explicit snoozed/done follow-ups are not treated as urgent by shared follow-up helpers. |
+| People sorting | Verified | Existing sort behavior retained; mobile type/lint pass. |
+| Add person | Fixed and verified | Browser direct `/people/new` empty save showed `First name is required`; cancel fallback returned to People. |
+| Edit person | Fixed | Safe fallback added in `mobile/app/(app)/people/[id]/edit.tsx`; no broad destructive browser edit performed. |
+| Delete person | Not browser-verifiable | Broad destructive UI deletion not executed against real/disposable remote data in this pass. |
+| Person detail | Fixed and verified | Browser QA verified timeline, notes, and follow-ups agree; follow-up tab shows due dates with snooze/done controls. |
+| Add note | Fixed and verified | Full add note saved to `person_notes`; note edit/delete modals worked; quick-add note saved to same Notes tab. |
+| Log interaction | Fixed and verified | Full log saved explicit follow-up due `2026-06-12`; quick add and full log share interaction options/follow-up fields. |
+| Follow-up done/snooze | Fixed | Shared tests cover open overdue, open due, future snooze, expired snooze, done, cadence-only overdue, and completed-follow-up-with-cadence-overdue. |
+| Quick add | Fixed and verified | Browser QA saved quick-add note and quick-add interaction with follow-up due `Jun 13, 2026`; layout patched so save is reachable in Expo web. |
+| Contacts import web preview | Verified / native partial | Browser `Review contacts` produced denied-permission copy and did not upload contacts; native permission prompt remains native-only. |
+| Contacts import API | Fixed | `app/api/import/contacts/route.ts` supports user-scoped update existing, skip duplicate, and create anyway. |
+| Your Roots web fallback | Fixed and verified | Browser QA showed missing-Mapbox-token disabled copy and missing-coordinate people state. |
+| Native map | Not browser-verifiable | Native `react-native-maps` marker/callout behavior requires device/simulator. |
+| Settings account/profile | Verified | Browser QA rendered Settings rows, confirmed no mobile tag-management placeholder, and verified web logout. Mutating profile/email/password not re-run against production data. |
+| Settings push preferences | Not browser-verifiable | Web warning expected; native push token registration requires device. |
+| Export data | Partially fixed / browser-blocked | Remote `person_notes` exists and restore/export RPC compatibility verified; Settings export UI visible, but Codex in-app Browser does not support downloads. |
+| Import/update | Fixed | Contacts API duplicate behavior implemented; JSON import/restore validation tests still pass. Native document picker not browser-verifiable. |
+| Restore/replace | Partially fixed | `restore_crm_snapshot` RPC verified remotely and build passes; destructive restore not executed. |
+| Account deletion | Partially fixed | JSON missing-config handling implemented and service-role docs added; unauth JSON 401 verified; valid deletion blocked by missing local service role key. |
+| Offline/private cache | Not browser-verifiable | Offline encrypted cache remains outside this remediation and requires native storage validation. |
+| Accessibility/polish | Partially fixed | NativeWind dark-mode config warning fixed; physical VoiceOver/Dynamic Type/safe-area checks remain native-only. |
+| API auth errors | Verified | Unauthenticated e2e passed JSON auth errors; account deletion unauth JSON 401 manually verified. |
+| API bad input | Verified | Existing root/API validation tests passed; import route still rejects bad JSON. |
+
+### Final Finding Status
+
+| Finding | Final status | Current evidence |
+| --- | --- | --- |
+| P0-1 linked Supabase missing `person_notes` | Fixed and verified | Migration applied; remote `person_notes` exists with RLS/policies; migration history aligned to `20260609193834`. |
+| P1-1 account deletion service-role failure | Partially fixed / blocked | `app/api/account/delete/route.ts` returns JSON config error; `README.md` documents `SUPABASE_SERVICE_ROLE_KEY`; local key missing blocks valid deletion test. |
+| P1-2 Home/People follow-up disagreement | Fixed and verified | Dashboard/detail helpers updated; browser QA showed cadence due `0` while open explicit follow-ups remained listed; `tests/crm-rules.test.mjs` covers explicit follow-ups separately from cadence. |
+| P1-3 empty new accounts bypass onboarding | Fixed and verified | Browser QA with disposable account confirmed first-run users route to onboarding and direct `/dashboard` redirects back until completion. |
+| P1-4 onboarding docs mismatch | Fixed | `docs/MOBILE_SCREEN_MAP.md`, `docs/MOBILE_TODO.md`, and implementation now agree on v1 flow. |
+| P1-5 update password blank invalid route | Partially fixed / browser-blocked | Blank waiting state removed and invalid-link message exists; direct no-session `/update-password` still wedged Codex in-app Browser after sign-out while Metro returned HTTP 200. |
+| P1-6 settings export/import/restore releasability | Partially fixed | Schema/RPC blocker fixed; Settings export/import/restore UI visible, but in-app Browser downloads are unsupported and native picker/share checks remain not browser-verifiable. |
+| P2-1 overdue label says Due today | Fixed | `statusLabel` now emits overdue/today/tomorrow/future labels. |
+| P2-2 snoozed follow-ups lack snoozed state/date | Fixed | Person detail follow-up tab shows snoozed state and snoozed-until date; browser QA verified normal open due follow-ups render with snooze/done controls. |
+| P2-3 quick-add interaction differs | Fixed and verified | Browser QA saved quick-add interaction with shared interaction type, notes, web follow-up date input, and explicit follow-up due `Jun 13, 2026`. |
+| P2-4 quick-add note differs/fails | Fixed and verified | Browser QA saved quick-add note into `person_notes`; it appeared on person-detail Notes and dashboard Recent notes. |
+| P2-5 Add Person/onboarding/import defaults differ | Fixed | Onboarding/import default cadence aligned to 90 days where touched; onboarding now requires first/last/category. |
+| P2-6 Add Person stale errors | Fixed | Save clears error/category error before validation. |
+| P2-7 direct route weak back navigation | Fixed | `mobile/lib/navigation.ts` added and used by touched secondary screens. |
+| P2-8 Your Roots hides no-coordinate people | Fixed and verified | Missing-coordinate section added with edit links; browser QA showed missing-coordinate state. |
+| P2-9 Mapbox token absence silently no-ops | Fixed and verified | Browser QA showed location search disabled copy when `EXPO_PUBLIC_MAPBOX_TOKEN` was absent. |
+| P2-10 contacts import update/import-all missing | Fixed | API/mobile contract supports update existing, skip duplicate, and create anyway; browser QA verified denied-permission fallback. |
+| P2-11 settings tag management placeholder | Fixed | Mobile Settings tag-management placeholder removed from UI and v1 readiness docs. |
+| P2-12 People search too narrow | Fixed | Search now covers company/email/phone/tags/location/relationship type. |
+| P3-1 Expo web console warnings/errors | Partially fixed | NativeWind dark mode set to `class`; Expo notifications web warning remains expected; `/update-password` in-app browser hang remains browser-blocked. |
+| P3-2 root lint warnings | Verified remaining | Root lint passes with 7 warnings; not broadened into unrelated web cleanup. |
+| P3-3 confidence copy exposes gaps | Partially fixed | Settings tag placeholder removed and docs cleaned; push/native readiness copy remains accurate. |
+
 ## 1. Executive Summary
 
 Overall readiness: not ready for TestFlight or App Store submission. The app is coherent as a relationship-focused product and the main navigation model is understandable, but several launch-blocking backend and business-logic issues remain.

@@ -110,6 +110,89 @@ test("follow-up queue separates overdue, due, done, and snoozed states", () => {
   assert.deepEqual(queue.snoozed.map((item) => item.id), ["snoozed"]);
 });
 
+test("follow-up queue covers due today and expired snoozes", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+  const interactions = [
+    {
+      id: "due-today",
+      type: "Call",
+      is_touch_point: true,
+      follow_up_needed: true,
+      follow_up_date: "2026-05-11",
+      follow_up_status: "open",
+      follow_up_snoozed_until: null,
+      date: "2026-05-01",
+    },
+    {
+      id: "expired-snooze",
+      type: "Email",
+      is_touch_point: true,
+      follow_up_needed: true,
+      follow_up_date: "2026-05-12",
+      follow_up_status: "snoozed",
+      follow_up_snoozed_until: "2026-05-10",
+      date: "2026-05-01",
+    },
+  ];
+
+  const queue = getFollowUpQueue(interactions, today);
+  assert.deepEqual(queue.due_today.map((item) => item.id), ["due-today"]);
+  assert.deepEqual(queue.due.map((item) => item.id), ["expired-snooze"]);
+});
+
+test("cadence categorization remains separate from explicit follow-up completion", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+  const people = [
+    {
+      id: "cadence-overdue",
+      last_contacted_at: "2026-03-01",
+      contact_frequency_days: 30,
+    },
+    {
+      id: "done-followup-cadence-overdue",
+      last_contacted_at: "2026-03-01",
+      contact_frequency_days: 30,
+    },
+    {
+      id: "future-snoozed-cadence-overdue",
+      last_contacted_at: "2026-03-01",
+      contact_frequency_days: 30,
+    },
+  ];
+  const interactions = [
+    {
+      id: "done-followup",
+      person_id: "done-followup-cadence-overdue",
+      type: "Call",
+      is_touch_point: true,
+      follow_up_needed: true,
+      follow_up_date: "2026-05-01",
+      follow_up_status: "done",
+      date: "2026-04-01",
+    },
+    {
+      id: "future-snoozed",
+      person_id: "future-snoozed-cadence-overdue",
+      type: "Email",
+      is_touch_point: true,
+      follow_up_needed: true,
+      follow_up_date: "2026-05-01",
+      follow_up_status: "snoozed",
+      follow_up_snoozed_until: "2026-05-18",
+      date: "2026-04-01",
+    },
+  ];
+
+  const sections = categorizePeople(people, today, interactions);
+  assert.deepEqual(
+    sections.overdue.map((person) => person.id).sort(),
+    ["cadence-overdue", "done-followup-cadence-overdue", "future-snoozed-cadence-overdue"].sort()
+  );
+  const queue = getFollowUpQueue(interactions, today);
+  assert.deepEqual(queue.done.map((item) => item.id), ["done-followup"]);
+  assert.deepEqual(queue.snoozed.map((item) => item.id), ["future-snoozed"]);
+});
+
 test("note interactions are not counted as touch points", () => {
   const interactions = [
     { id: "call", type: "Call", is_touch_point: true },

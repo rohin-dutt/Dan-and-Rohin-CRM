@@ -29,6 +29,7 @@ npm install
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ```
 
 3. Apply the SQL migrations in `supabase/migrations` to the target Supabase
@@ -48,9 +49,11 @@ npm run dev
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase browser/server clients |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase browser/server clients |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required for account deletion | Server-only Supabase Auth admin deletion in `/api/account/delete` |
 
 Only expose variables with `NEXT_PUBLIC_` when they are safe to ship to the
-browser. Do not commit `.env.local`.
+browser. `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to browser or mobile
+builds. Do not commit `.env.local`.
 
 ## Scripts
 

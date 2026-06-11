@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useRouter } from "expo-router"
 import { Text, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
+import { safeBack } from "@/lib/navigation"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
@@ -35,7 +36,7 @@ export default function ForgotPasswordScreen() {
   return (
     <Screen>
       <View className="flex-1 justify-center px-6 py-12">
-        <TouchableOpacity onPress={() => router.back()} className="mb-6">
+        <TouchableOpacity onPress={() => safeBack(router, "/(auth)/login")} className="mb-6">
           <Text className="text-sage text-sm">← Back</Text>
         </TouchableOpacity>
 

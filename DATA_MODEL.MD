@@ -117,6 +117,8 @@ after their date passes.
 | quiet_hours_enabled | boolean | yes, default `false` |
 | quiet_hours_start | time | no |
 | quiet_hours_end | time | no |
+| onboarding_completed | boolean | yes, default `false` |
+| onboarding_completed_at | timestamptz | no |
 | created_at | timestamptz | yes, default `now()` |
 
 ## push_tokens
@@ -208,6 +210,8 @@ bodies, or raw contact payloads.
   `Unauthorized.` as expected. Supabase MCP recorded the remote migration
   history row as `20260602172604_restore_crm_snapshot`; the checked-in local
   migration file remains `20260602170834_restore_crm_snapshot.sql`.
+- The local migration `20260611031202_onboarding_completion.sql` adds durable
+  mobile onboarding completion fields to `settings`.
 - The local migration
   `20260609090000_important_moments_and_note_touchpoints.sql` adds
   user-owned important moments, marks note-only interactions with

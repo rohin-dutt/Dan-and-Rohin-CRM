@@ -8,7 +8,7 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
 import RootsMapSurface, { type RootsMapRegion, type RootsMapSurfaceHandle } from "@/components/RootsMapSurface"
 import { supabase } from "@/lib/supabase"
-import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
+import { geocodePlace, geocodingAvailable, type MapboxFeature } from "@/lib/mapbox"
 import { colors, fonts } from "@/constants/theme"
 
 type MapPerson = {
@@ -167,6 +167,15 @@ export default function RootsMapScreen() {
 
   const allGroups = useMemo(() => buildGroups(people), [people])
   const groups = useMemo(() => buildGroups(filteredPeople), [filteredPeople])
+  const needsMappedLocation = useMemo(
+    () =>
+      filteredPeople.filter((person) => {
+        const hasLocation = Boolean(person.location?.trim())
+        const hasCoordinates = Number.isFinite(Number(person.latitude)) && Number.isFinite(Number(person.longitude))
+        return hasLocation && !hasCoordinates
+      }),
+    [filteredPeople],
+  )
   const animateSheet = useCallback(
     (expanded: boolean) => {
       const nextOffset = expanded ? 0 : SHEET_TRAVEL
@@ -213,7 +222,7 @@ export default function RootsMapScreen() {
   function handleQueryChange(text: string) {
     setQuery(text)
     if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
-    if (!text.trim()) {
+    if (!text.trim() || !geocodingAvailable) {
       setGeocodeSuggestions([])
       return
     }
@@ -291,6 +300,11 @@ export default function RootsMapScreen() {
               </TouchableOpacity>
             ) : null}
           </SearchBox>
+          {!geocodingAvailable ? (
+            <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-xs">
+              Location search is unavailable until EXPO_PUBLIC_MAPBOX_TOKEN is configured.
+            </Text>
+          ) : null}
           {geocodeSuggestions.length > 0 ? (
             <View className="mt-1 rounded-xl border border-stone-200 bg-white shadow-lg" style={{ zIndex: 20 }}>
               {geocodeSuggestions.map((suggestion, index) => (
@@ -357,6 +371,31 @@ export default function RootsMapScreen() {
             </View>
             {sheetExpanded ? (
               <ScrollView className="mt-3" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
+                {needsMappedLocation.length > 0 ? (
+                  <View className="mb-4 rounded-2xl bg-amber-50 p-3">
+                    <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-sm">
+                      Needs mapped location
+                    </Text>
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-xs">
+                      {needsMappedLocation.length} {needsMappedLocation.length === 1 ? "person has" : "people have"} a location without coordinates.
+                    </Text>
+                    {needsMappedLocation.slice(0, 3).map((person) => (
+                      <TouchableOpacity
+                        key={person.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit mapped location for ${person.name}`}
+                        onPress={() => router.push(`/people/${person.id}/edit`)}
+                        className="mt-3 flex-row items-center"
+                      >
+                        <Ionicons name="location-outline" size={16} color={colors.amber} />
+                        <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="ml-2 flex-1 text-sm" numberOfLines={1}>
+                          {person.name} - {person.location}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
                 {groups.map((group) => (
                   <TouchableOpacity
                     key={group.key}
@@ -398,6 +437,31 @@ export default function RootsMapScreen() {
               None of the matching people have saved latitude and longitude. Add a location with geocoding enabled to place people on the map.
             </Text>
           </SoftCard>
+          {needsMappedLocation.length > 0 ? (
+            <SoftCard className="mt-4 p-5">
+              <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                Needs mapped location
+              </Text>
+              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
+                These people have a location string but no saved coordinates.
+              </Text>
+              {needsMappedLocation.map((person) => (
+                <TouchableOpacity
+                  key={person.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit mapped location for ${person.name}`}
+                  onPress={() => router.push(`/people/${person.id}/edit`)}
+                  className="mt-4 flex-row items-center"
+                >
+                  <Ionicons name="location-outline" size={18} color={colors.amber} />
+                  <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="ml-2 flex-1 text-sm" numberOfLines={1}>
+                    {person.name} - {person.location}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </TouchableOpacity>
+              ))}
+            </SoftCard>
+          ) : null}
         </View>
       )}
     </Screen>

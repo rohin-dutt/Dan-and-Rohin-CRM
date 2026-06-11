@@ -48,10 +48,21 @@ export function parseMultiParam(value: string | string[] | undefined): string[] 
     .filter(Boolean)
 }
 
-export function matchesSearch(person: Person, rawQuery: string) {
+export function matchesSearch(person: Person, rawQuery: string, tags: Tag[] = []) {
   const query = rawQuery.trim().toLowerCase()
   if (!query) return true
-  return normalize(person.name).includes(query)
+  const haystack = [
+    person.name,
+    person.company,
+    person.email,
+    person.phone,
+    person.location,
+    person.relationship_type,
+    ...tags.map((tag) => tag.name),
+  ]
+    .map((value) => normalize(value))
+    .join(" ")
+  return haystack.includes(query)
 }
 
 export function matchesCategory(person: Person, category: CategoryFilter) {
@@ -87,13 +98,16 @@ export function statusDotForPerson(person: Person): "red" | "amber" | "green" | 
 export function statusLabel(person: Person) {
   const days = getNextDueDays(person)
   if (days == null || days > 7) return "Active"
-  if (days <= 0) return "Due today"
+  if (days < 0) return `Overdue by ${Math.abs(days)} ${Math.abs(days) === 1 ? "day" : "days"}`
+  if (days === 0) return "Due today"
+  if (days === 1) return "Due tomorrow"
   return `Due in ${days} ${days === 1 ? "day" : "days"}`
 }
 
 export function statusTone(person: Person) {
   const days = getNextDueDays(person)
   if (days == null || days > 7) return { bg: colors.mint, text: colors.forest }
+  if (days < 0) return { bg: "#FEECEC", text: "#B91C1C" }
   return { bg: "#FFF3DE", text: "#98520B" }
 }
 
@@ -175,7 +189,7 @@ export function filterAndSortPeople(input: {
   } = input
 
   const filtered = people.filter((person) => {
-    if (!matchesSearch(person, search)) return false
+    if (!matchesSearch(person, search, tagsByPerson.get(person.id) ?? [])) return false
     if (!matchesCategory(person, category)) return false
     if (!matchesStatusFilter(person, statusFilters)) return false
     if (momentsUpcomingOnly && !upcomingMomentPersonIds.has(person.id)) return false

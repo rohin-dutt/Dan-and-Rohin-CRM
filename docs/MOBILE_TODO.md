@@ -276,10 +276,9 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
     Settings on June 10, 2026 because email reminders are out of scope for
     mobile v1 and no email sender exists; `settings.email_reminders_enabled`
     remains a web/compatibility-only column.
-- [ ] Settings tag management.
-  - Mobile Settings now labels tag management as not available in the app yet
-    and points users to a person's edit screen; the dedicated management UI
-    remains open.
+- [x] Remove mobile Settings tag management from v1 readiness.
+  - Mobile v1 keeps tag assignment on person forms. Dedicated mobile Settings
+    tag management is out of v1 scope; use the website for full tag management.
 - [ ] Unsaved-change handling for edit/create flows.
 
 ## Phase 8: Native Contacts Import
@@ -441,9 +440,9 @@ restore, or account deletion.
   into pure helpers so server-side summaries or pagination can replace them
   later. People list pagination is deferred as a future scale item.
 - Settings honesty: push notification row states delivery is not live, the
-  email digest toggle was removed (out of mobile v1 scope), tag management is
-  labeled as not yet built, and import/restore file picks are validated with
-  clear error messages before upload.
+  email digest toggle and Settings tag-management placeholder were removed
+  from mobile v1 scope, and import/restore file picks are validated with clear
+  error messages before upload.
 
 ## June 8, 2026 Mobile Review Fix Pass Notes
 

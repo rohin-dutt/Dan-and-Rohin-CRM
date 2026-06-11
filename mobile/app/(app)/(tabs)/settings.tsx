@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Alert, Linking, Share, Text, View } from "react-native"
+import { Alert, Linking, Platform, Share, Text, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
@@ -81,18 +81,25 @@ export default function SettingsScreen() {
   }, [])
 
   async function handleSignOut() {
+    async function signOut() {
+      // Token revocation is best-effort; sign-out must not be blocked by it.
+      await revokePushToken().catch(() => null)
+      await clearLocalPrivateData()
+      const { error: signOutError } = await supabase.auth.signOut()
+      if (signOutError) setFailure(signOutError.message)
+    }
+
+    if (Platform.OS === "web") {
+      await signOut()
+      return
+    }
+
     Alert.alert("Log out", "Sign out of your Roots account?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Log out",
         style: "destructive",
-        onPress: async () => {
-          // Token revocation is best-effort; sign-out must not be blocked by it.
-          await revokePushToken().catch(() => null)
-          await clearLocalPrivateData()
-          const { error: signOutError } = await supabase.auth.signOut()
-          if (signOutError) setFailure(signOutError.message)
-        },
+        onPress: signOut,
       },
     ])
   }
@@ -354,20 +361,6 @@ export default function SettingsScreen() {
             description="Replace all your data with a backup"
             disabled={dataManagement.dataWorking}
             onPress={dataManagement.restoreData}
-          />
-        </SettingsSection>
-
-        <SettingsSection title="Tags" subtitle="Organize your people with tags.">
-          <SettingsRow
-            icon="pricetag-outline"
-            title="Manage tags"
-            description="Not available in the app yet — add or remove tags from a person's edit screen"
-            onPress={() =>
-              Alert.alert(
-                "Manage tags",
-                "Dedicated tag management has not been built in the mobile app yet. You can add or remove a person's tags from their edit screen, or manage all tags on the website.",
-              )
-            }
           />
         </SettingsSection>
 
