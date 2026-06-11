@@ -8,11 +8,10 @@ import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForUser } from "@/lib/important-moments"
-import { loadPersonNotesForPeople } from "@/lib/person-notes"
 import { personImageUrl } from "@/lib/person-display"
 import { firstNameFromMetadata } from "@/lib/user-metadata"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
-import type { ImportantMoment, Person, PersonNote, Settings } from "@/types"
+import type { ImportantMoment, Person, Settings } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
 import {
@@ -35,7 +34,6 @@ export default function DashboardScreen() {
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
-  const [personNotes, setPersonNotes] = useState<PersonNote[]>([])
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [firstName, setFirstName] = useState("there")
@@ -65,19 +63,14 @@ export default function DashboardScreen() {
 
       if (loadedPeople.length > 0) {
         const personIds = loadedPeople.map((person) => person.id)
-        const [{ data: loadedInteractions, error: interactionsError }, loadedNotes] = await Promise.all([
-          supabase
-            .from("interactions")
-            .select(DASHBOARD_INTERACTION_COLUMNS)
-            .in("person_id", personIds),
-          loadPersonNotesForPeople(personIds),
-        ])
+        const { data: loadedInteractions, error: interactionsError } = await supabase
+          .from("interactions")
+          .select(DASHBOARD_INTERACTION_COLUMNS)
+          .in("person_id", personIds)
         if (interactionsError) throw interactionsError
         setInteractions(loadedInteractions ?? [])
-        setPersonNotes(loadedNotes)
       } else {
         setInteractions([])
-        setPersonNotes([])
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load dashboard.")
@@ -103,8 +96,8 @@ export default function DashboardScreen() {
   }, [load])
 
   const dashboard = useMemo(
-    () => buildDashboardModel({ people, interactions, personNotes, importantMoments }),
-    [importantMoments, interactions, people, personNotes],
+    () => buildDashboardModel({ people, interactions, importantMoments }),
+    [importantMoments, interactions, people],
   )
 
   const inviteFriend = useCallback(async () => {
@@ -300,38 +293,6 @@ export default function DashboardScreen() {
                 </Text>
               </TouchableOpacity>
             ) : null}
-          </SoftCard>
-
-          <SoftCard className="mx-5 mt-5 p-4">
-            <SectionTitle title="Recent notes" />
-            {dashboard.recentNotes.length === 0 ? (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                Notes you log will appear here.
-              </Text>
-            ) : (
-              dashboard.recentNotes.map(({ note, person }, index) => (
-                <View key={note.id} className={index > 0 ? "mt-5 border-t border-stone-200 pt-5" : ""}>
-                  <TouchableOpacity
-                    onPress={() => person && router.push(`/people/${person.id}`)}
-                    activeOpacity={0.76}
-                    className="flex-row"
-                  >
-                    <IconTile icon="document-text-outline" color={index === 0 ? colors.forest : colors.amber} background={index === 0 ? colors.mint : "#FFF3DE"} size={38} />
-                    <View className="ml-3 flex-1">
-                      <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-base">
-                        {person ? `Note with ${person.name}` : "Recent note"}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={2} className="mt-1 text-sm leading-5">
-                        {note.body}
-                      </Text>
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                        {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(note.note_date ? `${note.note_date}T12:00:00` : note.created_at))}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ))
-            )}
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-5">

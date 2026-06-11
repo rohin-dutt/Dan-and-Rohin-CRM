@@ -234,10 +234,10 @@ function QuickAddModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/20 p-4">
       <div
         ref={modalRef}
-        className="mx-4 w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"
       >
         {saveResult === "success" ? (
           <div className="py-8 text-center">

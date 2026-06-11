@@ -98,7 +98,7 @@ export function BottomSheetModal({
           sheetStyle,
         ]}
       >
-        <Pressable onPress={() => null}>{children}</Pressable>
+        {children}
       </Animated.View>
     </Pressable>
   )
