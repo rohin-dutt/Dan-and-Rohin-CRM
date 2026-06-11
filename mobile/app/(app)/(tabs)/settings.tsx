@@ -16,7 +16,7 @@ import { useDataManagement } from "@/features/settings/use-data-management"
 import type { Settings } from "@/types"
 
 type Status = { ok: boolean; message: string } | null
-type ExpandedPanel = "profile" | "email" | "password" | null
+type ExpandedPanel = "profile" | "password" | null
 
 export default function SettingsScreen() {
   const [loading, setLoading] = useState(true)
@@ -25,13 +25,12 @@ export default function SettingsScreen() {
   const [expanded, setExpanded] = useState<ExpandedPanel>(null)
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
-  const [newEmail, setNewEmail] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
   const [toggling, setToggling] = useState(false)
+  const [togglingDigest, setTogglingDigest] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
-  const [savingEmail, setSavingEmail] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
   function setOk(message: string) {
@@ -114,26 +113,6 @@ export default function SettingsScreen() {
     }
   }
 
-  async function saveEmail() {
-    if (!newEmail.trim()) {
-      setFailure("Enter a new email address.")
-      return
-    }
-    setSavingEmail(true)
-    setStatus(null)
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({ email: newEmail.trim() })
-      if (updateError) throw updateError
-      setNewEmail("")
-      setExpanded(null)
-      setOk("Confirmation sent. Check your inbox.")
-    } catch (e) {
-      setFailure(e instanceof Error ? e.message : "Failed to update email.")
-    } finally {
-      setSavingEmail(false)
-    }
-  }
-
   async function savePassword() {
     if (newPassword.length < 8) {
       setFailure("Password must be at least 8 characters.")
@@ -173,6 +152,19 @@ export default function SettingsScreen() {
     if (err) throw err
     setSettings({ ...settings, ...patch })
     setError(null)
+  }
+
+  async function toggleEmailDigest() {
+    if (!settings || togglingDigest) return
+    setTogglingDigest(true)
+    try {
+      await updateSettingsPatch({ email_reminders_enabled: !settings.email_reminders_enabled })
+      setOk("Email digest preference saved.")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update email digest.")
+    } finally {
+      setTogglingDigest(false)
+    }
   }
 
   async function togglePushNotifications() {
@@ -252,25 +244,7 @@ export default function SettingsScreen() {
             </InlineForm>
           ) : null}
           <Divider />
-          <SettingsRow
-            icon="mail-outline"
-            title="Email"
-            description={email || "Update your email address"}
-            onPress={() => setExpanded((current) => current === "email" ? null : "email")}
-          />
-          {expanded === "email" ? (
-            <InlineForm>
-              <TextField
-                label="New email"
-                value={newEmail}
-                onChangeText={setNewEmail}
-                placeholder="new@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <Button title="Update email" onPress={saveEmail} loading={savingEmail} />
-            </InlineForm>
-          ) : null}
+          <SettingsRow icon="mail-outline" title="Email" description={email || "No email on file"} />
           <Divider />
           <SettingsRow
             icon="lock-closed-outline"
@@ -315,6 +289,15 @@ export default function SettingsScreen() {
             disabled={toggling || !settings}
             onPress={togglePushNotifications}
           />
+          <Divider />
+          <SettingsRow
+            icon="mail-open-outline"
+            title="Weekly email digest"
+            description="Get a weekly summary of who to reach out to"
+            value={settings?.email_reminders_enabled ? "On" : "Off"}
+            disabled={togglingDigest || !settings}
+            onPress={toggleEmailDigest}
+          />
         </SettingsSection>
 
         <SettingsSection title="Invite a Friend" subtitle="Share Roots with someone who would use it.">
@@ -325,35 +308,9 @@ export default function SettingsScreen() {
             onPress={() =>
               Share.share({
                 message:
-                  "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at useroots.app",
+                  "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at https://useroots.app",
               }).catch(() => null)
             }
-          />
-        </SettingsSection>
-
-        <SettingsSection title="Data" subtitle="Import, export, and manage your data.">
-          <SettingsRow
-            icon="cloud-download-outline"
-            title="Export data"
-            description="Download a copy of your data"
-            disabled={dataManagement.dataWorking}
-            onPress={dataManagement.exportData}
-          />
-          <Divider />
-          <SettingsRow
-            icon="cloud-upload-outline"
-            title="Import data"
-            description="Import or update from a file"
-            disabled={dataManagement.dataWorking}
-            onPress={dataManagement.importData}
-          />
-          <Divider />
-          <SettingsRow
-            icon="refresh-outline"
-            title="Restore / Replace"
-            description="Replace all your data with a backup"
-            disabled={dataManagement.dataWorking}
-            onPress={dataManagement.restoreData}
           />
         </SettingsSection>
 

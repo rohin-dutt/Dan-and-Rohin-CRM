@@ -129,29 +129,18 @@ export function SectionCard({
   icon,
   title,
   children,
-  onEdit,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   title: string
   children: React.ReactNode
-  onEdit?: () => void
 }) {
   return (
     <SoftCard className="mb-4 p-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <View className="flex-1 flex-row items-center">
-          <IconTile icon={icon} size={36} />
-          <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="ml-3 text-lg">
-            {title}
-          </Text>
-        </View>
-        {onEdit ? (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit ${title}`} onPress={onEdit} className="px-2 py-1">
-            <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-              Edit
-            </Text>
-          </TouchableOpacity>
-        ) : null}
+      <View className="mb-3 flex-row items-center">
+        <IconTile icon={icon} size={36} />
+        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="ml-3 text-lg">
+          {title}
+        </Text>
       </View>
       {children}
     </SoftCard>

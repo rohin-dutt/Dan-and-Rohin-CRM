@@ -1,11 +1,13 @@
 import { useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Modal, Pressable, Text, TouchableOpacity, View } from "react-native"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 import { formatFullDate } from "@roots/shared"
 
-// Birthday chip + expandable spinner picker shared by add/edit person forms.
+// Birthday field shared by add/edit person forms. Opens a modal spinner
+// picker that only commits the date when the user confirms, so scrolling
+// the wheels never closes the picker.
 export function BirthdayField({
   date,
   onChange,
@@ -13,7 +15,18 @@ export function BirthdayField({
   date: Date | null
   onChange: (date: Date | null) => void
 }) {
-  const [showPicker, setShowPicker] = useState(false)
+  const [pickerVisible, setPickerVisible] = useState(false)
+  const [draftDate, setDraftDate] = useState<Date>(date ?? new Date(1990, 0, 1))
+
+  function openPicker() {
+    setDraftDate(date ?? new Date(1990, 0, 1))
+    setPickerVisible(true)
+  }
+
+  function confirmDraft() {
+    onChange(draftDate)
+    setPickerVisible(false)
+  }
 
   return (
     <View className="mb-3">
@@ -32,15 +45,22 @@ export function BirthdayField({
           }}
         >
           <Ionicons name="calendar-outline" size={18} color={colors.forest} style={{ marginRight: 8 }} />
-          <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14, flex: 1 }}>
-            {formatFullDate(date)}
-          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Change birthday"
+            onPress={openPicker}
+            style={{ flex: 1 }}
+          >
+            <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
+              {formatFullDate(date)}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Clear birthday"
             onPress={() => {
               onChange(null)
-              setShowPicker(false)
+              setPickerVisible(false)
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -51,13 +71,13 @@ export function BirthdayField({
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Select birthday"
-          onPress={() => setShowPicker((value) => !value)}
+          onPress={openPicker}
           style={{
             flexDirection: "row",
             alignItems: "center",
             height: 44,
             borderWidth: 1,
-            borderColor: showPicker ? colors.forest : "#E7E5E4",
+            borderColor: "#E7E5E4",
             borderRadius: 12,
             paddingHorizontal: 12,
             backgroundColor: "white",
@@ -67,36 +87,87 @@ export function BirthdayField({
           <Text style={{ fontFamily: fonts.body, color: "#8F96A3", fontSize: 14 }}>Select birthday</Text>
         </TouchableOpacity>
       )}
-      {showPicker && !date ? (
-        <View
-          style={{
-            borderWidth: 1,
-            borderTopWidth: 0,
-            borderColor: colors.forest,
-            borderBottomLeftRadius: 12,
-            borderBottomRightRadius: 12,
-            backgroundColor: "white",
-            overflow: "hidden",
-          }}
+
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.4)", paddingHorizontal: 24 }}
+          onPress={() => setPickerVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss birthday picker"
         >
-          <DateTimePicker
-            value={date ?? new Date(1990, 0, 1)}
-            mode="date"
-            display="spinner"
-            onChange={(_, picked) => {
-              if (picked) onChange(picked)
+          <Pressable
+            style={{
+              backgroundColor: "white",
+              borderRadius: 20,
+              paddingTop: 16,
+              paddingBottom: 12,
+              overflow: "hidden",
             }}
-          />
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Done selecting birthday"
-            onPress={() => setShowPicker(false)}
-            style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
           >
-            <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+            <Text
+              style={{ fontFamily: fonts.bold, color: colors.warmBlack, fontSize: 16, textAlign: "center" }}
+            >
+              Select birthday
+            </Text>
+            <DateTimePicker
+              value={draftDate}
+              mode="date"
+              display="spinner"
+              onChange={(_, picked) => {
+                if (picked) setDraftDate(picked)
+              }}
+              minimumDate={new Date(1900, 0, 1)}
+              maximumDate={new Date()}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                borderTopWidth: 1,
+                borderTopColor: "#F5F4F2",
+                paddingTop: 10,
+                paddingHorizontal: 16,
+                gap: 10,
+              }}
+            >
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Cancel birthday selection"
+                onPress={() => setPickerVisible(false)}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#E7E5E4",
+                  backgroundColor: "white",
+                }}
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: colors.muted, fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Confirm birthday"
+                onPress={confirmDraft}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.forest,
+                }}
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: "white", fontSize: 15 }}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }

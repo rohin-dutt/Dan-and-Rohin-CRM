@@ -79,7 +79,7 @@ export function InlineDateField({
             onChange={(_, picked) => {
               if (picked) onChange(picked)
             }}
-            minimumDate={minimumDate}
+            minimumDate={minimumDate ?? new Date(new Date().getFullYear() - 100, 0, 1)}
             maximumDate={maximumDate}
           />
           <TouchableOpacity

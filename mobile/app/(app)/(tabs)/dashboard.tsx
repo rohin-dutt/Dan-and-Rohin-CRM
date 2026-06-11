@@ -37,6 +37,7 @@ export default function DashboardScreen() {
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [firstName, setFirstName] = useState("there")
+  const [momentsExpanded, setMomentsExpanded] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -104,7 +105,7 @@ export default function DashboardScreen() {
     try {
       await Share.share({
         message:
-          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at useroots.app",
+          "Hey! I've been using Roots to stay close to the people who matter most to me. Thought you might like it — check it out at https://useroots.app",
       })
     } catch {
       // user dismissed share sheet
@@ -252,13 +253,13 @@ export default function DashboardScreen() {
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-4">
-            <SectionTitle title="Upcoming moments" actionLabel="View all" onAction={() => router.push("/people?moments=upcoming")} />
+            <SectionTitle title="Upcoming moments" />
             {dashboard.upcomingMoments.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
                 No birthdays or important moments in the next two weeks.
               </Text>
             ) : (
-              dashboard.upcomingMoments.slice(0, 3).map((moment, index) => (
+              (momentsExpanded ? dashboard.upcomingMoments : dashboard.upcomingMoments.slice(0, 3)).map((moment, index) => (
                 <TouchableOpacity
                   key={moment.id}
                   onPress={() => router.push(`/people/${moment.person.id}`)}
@@ -266,8 +267,8 @@ export default function DashboardScreen() {
                 >
                   <IconTile
                     icon={moment.kind === "birthday" ? "calendar-outline" : "sparkles-outline"}
-                    color={index === 0 ? colors.danger : index === 1 ? colors.purple : colors.amber}
-                    background={index === 0 ? "#FDECE8" : index === 1 ? "#F2EEFA" : "#FFF3DE"}
+                    color={index % 3 === 0 ? colors.danger : index % 3 === 1 ? colors.purple : colors.amber}
+                    background={index % 3 === 0 ? "#FDECE8" : index % 3 === 1 ? "#F2EEFA" : "#FFF3DE"}
                     size={38}
                   />
                   <View className="ml-3 flex-1">
@@ -275,17 +276,17 @@ export default function DashboardScreen() {
                       {moment.person.name}
                     </Text>
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                      {moment.label} - {moment.daysUntil === 0 ? "Today" : `In ${moment.daysUntil} days`} - {formatShortMonthDay(moment.sourceDate)}
+                      {moment.label} - {formatShortMonthDay(moment.sourceDate)}
                     </Text>
                   </View>
                 </TouchableOpacity>
               ))
             )}
-            {dashboard.upcomingMoments.length > 3 ? (
+            {!momentsExpanded && dashboard.upcomingMoments.length > 3 ? (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`${dashboard.upcomingMoments.length - 3} more upcoming moments`}
-                onPress={() => router.push("/people?moments=upcoming")}
+                accessibilityLabel={`Show ${dashboard.upcomingMoments.length - 3} more upcoming moments`}
+                onPress={() => setMomentsExpanded(true)}
                 className="mt-4"
               >
                 <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">

@@ -17,6 +17,7 @@ import {
   buildLatestTouchByPerson,
   filterAndSortPeople,
   INTERACTION_SUMMARY_COLUMNS,
+  parseLocationParam,
   parseMultiParam,
   PEOPLE_CATEGORIES,
   SORT_OPTIONS,
@@ -43,20 +44,23 @@ export default function PeopleScreen() {
   const [category, setCategory] = useState<CategoryFilter>("All")
   const [statusFilters, setStatusFilters] = useState<string[]>(parseMultiParam(params.status))
   const [tagFilters, setTagFilters] = useState<string[]>([])
-  const [locationFilters, setLocationFilters] = useState<string[]>(parseMultiParam(params.location))
+  const [locationFilters, setLocationFilters] = useState<string[]>(parseLocationParam(params.location))
   const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
   const sortMenu = useAnchoredMenu()
 
   const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
+  // Locations may contain commas ("Paris, France"), so they must never go
+  // through the comma-splitting multi-param parser.
+  const locationParam = Array.isArray(params.location) ? params.location.join("||") : (params.location ?? "")
 
   useEffect(() => {
     setStatusFilters(parseMultiParam(statusParam))
   }, [statusParam])
 
   useEffect(() => {
-    setLocationFilters(parseMultiParam(params.location))
-  }, [params.location])
+    setLocationFilters(parseLocationParam(locationParam))
+  }, [locationParam])
 
   const load = useCallback(async () => {
     try {
@@ -155,7 +159,9 @@ export default function PeopleScreen() {
     [category, interactionCounts, latestTouchByPerson, locationFilters, params.moments, people, search, sort, statusFilters, tagFilters, tagsByPerson, upcomingMomentPersonIds],
   )
 
-  const hasActiveFilter = statusFilters.length > 0 || tagFilters.length > 0 || locationFilters.length > 0 || params.moments === "upcoming"
+  const activeFilterCount =
+    statusFilters.length + tagFilters.length + locationFilters.length + (params.moments === "upcoming" ? 1 : 0)
+  const hasActiveFilter = activeFilterCount > 0
   const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last Contacted"
 
   if (loading) return <LoadingState />
@@ -212,16 +218,29 @@ export default function PeopleScreen() {
           ))}
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="More filters"
+            accessibilityLabel={hasActiveFilter ? `More filters, ${activeFilterCount} active` : "More filters"}
             onPress={() => setFilterSheetVisible(true)}
             className={`min-h-11 flex-row items-center rounded-full border px-4 ${
-              hasActiveFilter ? "border-forest bg-forest" : "border-stone-200 bg-white"
+              hasActiveFilter ? "border-forest bg-mint" : "border-stone-200 bg-white"
             }`}
           >
-            <Ionicons name="filter-outline" size={17} color={hasActiveFilter ? "#FFFFFF" : colors.ink} />
-            <Text style={{ fontFamily: fonts.medium }} className={`ml-2 text-sm ${hasActiveFilter ? "text-white" : "text-warm-black"}`}>
+            <Ionicons name="filter-outline" size={17} color={hasActiveFilter ? colors.forest : colors.ink} />
+            <Text
+              style={{ fontFamily: fonts.medium, color: hasActiveFilter ? colors.forest : colors.ink }}
+              className="ml-2 text-sm"
+            >
               Filters
             </Text>
+            {hasActiveFilter ? (
+              <View
+                className="ml-1.5 h-5 min-w-5 items-center justify-center rounded-full px-1"
+                style={{ backgroundColor: colors.forest }}
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: "#FFFFFF" }} className="text-[11px]">
+                  {activeFilterCount}
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
         </View>
 
@@ -242,9 +261,9 @@ export default function PeopleScreen() {
 
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Open filters"
+            accessibilityLabel={hasActiveFilter ? `Open filters, ${activeFilterCount} active` : "Open filters"}
             onPress={() => setFilterSheetVisible(true)}
-            className="min-h-10 flex-row items-center"
+            className={`min-h-10 flex-row items-center ${hasActiveFilter ? "rounded-full bg-mint px-3" : ""}`}
           >
             <Ionicons name="options-outline" size={20} color={hasActiveFilter ? colors.forest : colors.ink} />
             <Text
@@ -253,6 +272,16 @@ export default function PeopleScreen() {
             >
               Filters
             </Text>
+            {hasActiveFilter ? (
+              <View
+                className="ml-1.5 h-5 min-w-5 items-center justify-center rounded-full px-1"
+                style={{ backgroundColor: colors.forest }}
+              >
+                <Text style={{ fontFamily: fonts.semibold, color: "#FFFFFF" }} className="text-[11px]">
+                  {activeFilterCount}
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
         </View>
       </View>

@@ -31,7 +31,7 @@ export async function callTrustedApi(path: string, options: TrustedApiOptions = 
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(data?.error?.message ?? "Request failed.")
+    throw new Error(data?.error?.message ?? `Request failed (status ${response.status}).`)
   }
 
   return data

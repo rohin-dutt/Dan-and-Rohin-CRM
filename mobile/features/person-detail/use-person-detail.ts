@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { DeviceEventEmitter } from "react-native"
 import { useFocusEffect } from "expo-router"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import { loadPersonNotesForPerson } from "@/lib/person-notes"
-import { getFollowUpState, isTouchPoint, toLocalDateString } from "@roots/shared"
+import { getFollowUpState, isTouchPoint } from "@roots/shared"
 import { getTagFromJoin, type PersonTagRow } from "./helpers"
 import type { ImportantMoment, Interaction, Person, PersonNote, Tag } from "@/types"
 
@@ -28,7 +29,8 @@ export function usePersonDetail(id: string) {
           .from("interactions")
           .select("*")
           .eq("person_id", id)
-          .order("date", { ascending: false }),
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false }),
         supabase.from("person_tags").select("tag_id, tags(*)").eq("person_id", id),
         loadImportantMomentsForPerson(id),
         loadPersonNotesForPerson(id),
@@ -58,6 +60,17 @@ export function usePersonDetail(id: string) {
       load()
     }, [load]),
   )
+
+  // The log-interaction / add-note sheets are modals (no navigation focus
+  // change), so refresh on their events too.
+  useEffect(() => {
+    const interactionSub = DeviceEventEmitter.addListener("interactionAdded", load)
+    const noteSub = DeviceEventEmitter.addListener("noteAdded", load)
+    return () => {
+      interactionSub.remove()
+      noteSub.remove()
+    }
+  }, [load])
 
   const deletePerson = useCallback(async (): Promise<boolean> => {
     const { error: deleteError } = await supabase.from("people").delete().eq("id", id)
@@ -89,16 +102,16 @@ export function usePersonDetail(id: string) {
     [followUpUpdating, load],
   )
 
-  const snoozeFollowUp = useCallback(
+  // "Delete" permanently removes the follow-up from the interaction without
+  // removing the interaction itself from the timeline.
+  const deleteFollowUp = useCallback(
     async (interactionId: string) => {
       if (followUpUpdating) return
       setFollowUpUpdating(true)
       try {
-        const snoozeDate = new Date()
-        snoozeDate.setDate(snoozeDate.getDate() + 7)
         const { error: updateError } = await supabase
           .from("interactions")
-          .update({ follow_up_status: "snoozed", follow_up_snoozed_until: toLocalDateString(snoozeDate) })
+          .update({ follow_up_needed: false, follow_up_status: "open", follow_up_date: null })
           .eq("id", interactionId)
         if (updateError) {
           setError(updateError.message)
@@ -142,6 +155,11 @@ export function usePersonDetail(id: string) {
     [interactions],
   )
 
+  const completedFollowUps = useMemo(
+    () => interactions.filter((i) => isTouchPoint(i) && i.follow_up_needed && getFollowUpState(i) === "done"),
+    [interactions],
+  )
+
   const touchPointInteractions = useMemo(() => interactions.filter(isTouchPoint), [interactions])
 
   return {
@@ -152,11 +170,12 @@ export function usePersonDetail(id: string) {
     importantMoments,
     tags,
     openFollowUps,
+    completedFollowUps,
     touchPointInteractions,
     followUpUpdating,
     deletePerson,
     markFollowUpDone,
-    snoozeFollowUp,
+    deleteFollowUp,
     updatePersonNote,
     deletePersonNote,
   }

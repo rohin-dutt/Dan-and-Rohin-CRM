@@ -38,7 +38,10 @@ export function MetricCard({
           >
             <Ionicons name={icon} size={16} color={toneColors.icon} />
           </View>
-          <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-2xl leading-7">
+          <Text
+            style={{ fontFamily: fonts.bold, color: colors.forest }}
+            className="text-2xl leading-7"
+          >
             {value}
           </Text>
         </View>

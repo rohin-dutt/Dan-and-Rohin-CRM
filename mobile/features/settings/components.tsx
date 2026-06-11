@@ -40,13 +40,13 @@ export function SettingsRow({
   value?: string
   danger?: boolean
   disabled?: boolean
-  onPress: () => void
+  onPress?: () => void
 }) {
   return (
     <TouchableOpacity
-      accessibilityRole="button"
+      accessibilityRole={onPress ? "button" : "text"}
       accessibilityLabel={title}
-      disabled={disabled}
+      disabled={disabled || !onPress}
       onPress={onPress}
       activeOpacity={0.74}
       className={`min-h-16 flex-row items-center py-2 ${disabled ? "opacity-50" : ""}`}
@@ -75,7 +75,7 @@ export function SettingsRow({
           {value}
         </Text>
       ) : null}
-      <Ionicons name="chevron-forward" size={22} color={colors.muted} />
+      {onPress ? <Ionicons name="chevron-forward" size={22} color={colors.muted} /> : null}
     </TouchableOpacity>
   )
 }

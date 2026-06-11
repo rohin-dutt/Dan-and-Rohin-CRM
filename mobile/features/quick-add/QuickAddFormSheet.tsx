@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,17 +19,30 @@ import { formatFullDate, toLocalDateString, todayInputValue, updateStreakAfterAc
 
 export type QuickAddMode = "note" | "chat"
 
-type PersonOption = {
+export type QuickAddPerson = {
   id: string
   name: string
   company: string | null
 }
 
+type PersonOption = QuickAddPerson
+
 const QUICK_INTERACTION_TYPES = ["Text / Email", "Call", "In Person"] as const
 type QuickInteractionType = (typeof QUICK_INTERACTION_TYPES)[number]
 
-// Single-step "log a chat" / "add a note" sheet opened from the quick-add menu.
-export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null; onClose: () => void }) {
+// Single-step "log a chat" / "add a note" sheet. Opened from the quick-add
+// menu (person chosen via typeahead) and from the person detail screen
+// (person preselected via `initialPerson`) so both entry points share the
+// exact same form.
+export function QuickAddFormSheet({
+  mode,
+  onClose,
+  initialPerson,
+}: {
+  mode: QuickAddMode | null
+  onClose: () => void
+  initialPerson?: QuickAddPerson | null
+}) {
   const [people, setPeople] = useState<PersonOption[]>([])
   const [loadingPeople, setLoadingPeople] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -43,6 +57,9 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [interactionNotes, setInteractionNotes] = useState("")
+  const [followUpEnabled, setFollowUpEnabled] = useState(false)
+  const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
+  const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
 
   // Note fields
   const [noteText, setNoteText] = useState("")
@@ -56,7 +73,7 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
 
     // Reset per-open state, then load the people list for the typeahead.
     setPersonSearch("")
-    setSelectedPerson(null)
+    setSelectedPerson(initialPerson ?? null)
     setPersonInputFocused(false)
     setFormError(null)
     setSaving(false)
@@ -64,6 +81,9 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
     setSelectedDate(new Date())
     setShowDatePicker(false)
     setInteractionNotes("")
+    setFollowUpEnabled(false)
+    setFollowUpDate(null)
+    setShowFollowUpPicker(false)
     setNoteText("")
     setLoadingPeople(true)
     setFetchError(null)
@@ -97,7 +117,7 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
     return () => {
       cancelled = true
     }
-  }, [mode])
+  }, [mode, initialPerson])
 
   const filteredPeople = useMemo(() => {
     const normalized = personSearch.trim().toLowerCase()
@@ -119,6 +139,10 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
       setFormError("Please select a person first")
       return
     }
+    if (followUpEnabled && !followUpDate) {
+      setFormError("Follow-up date is required when a follow-up is set")
+      return
+    }
     setSaving(true)
     setFormError(null)
     try {
@@ -131,8 +155,8 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
         p_type: interactionType,
         p_date: toLocalDateString(selectedDate),
         p_notes: interactionNotes.trim() || null,
-        p_follow_up_needed: false,
-        p_follow_up_date: null,
+        p_follow_up_needed: followUpEnabled,
+        p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
       })
       if (rpcError) throw rpcError
       await updateStreakAfterAction(supabase)
@@ -475,6 +499,7 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
                   onChange={(_, date) => {
                     if (date) setSelectedDate(date)
                   }}
+                  minimumDate={new Date(new Date().getFullYear() - 100, 0, 1)}
                   maximumDate={new Date()}
                 />
                 <TouchableOpacity
@@ -517,9 +542,99 @@ export function QuickAddFormSheet({ mode, onClose }: { mode: QuickAddMode | null
                 backgroundColor: "white",
                 minHeight: 84,
                 textAlignVertical: "top",
-                marginBottom: 24,
+                marginBottom: 20,
               }}
             />
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: followUpEnabled ? 12 : 24,
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14 }}>
+                  Set a follow-up
+                </Text>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 2 }}>
+                  Remind yourself to follow up with this person
+                </Text>
+              </View>
+              <Switch
+                value={followUpEnabled}
+                onValueChange={(value) => {
+                  setFollowUpEnabled(value)
+                  if (!value) setShowFollowUpPicker(false)
+                }}
+                trackColor={{ false: "#E7E5E4", true: colors.sage }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+
+            {followUpEnabled ? (
+              <>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Select follow-up date"
+                  onPress={() => setShowFollowUpPicker((v) => !v)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    height: 44,
+                    borderWidth: 1,
+                    borderColor: showFollowUpPicker ? colors.forest : "#E7E5E4",
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    backgroundColor: "white",
+                    marginBottom: showFollowUpPicker ? 0 : 24,
+                  }}
+                >
+                  <Ionicons name="flag-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
+                  <Text style={{ fontFamily: fonts.body, color: followUpDate ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}>
+                    {followUpDate ? formatFullDate(followUpDate) : "Select follow-up date"}
+                  </Text>
+                  <Ionicons name={showFollowUpPicker ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                </TouchableOpacity>
+
+                {showFollowUpPicker ? (
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderTopWidth: 0,
+                      borderColor: colors.forest,
+                      borderBottomLeftRadius: 12,
+                      borderBottomRightRadius: 12,
+                      backgroundColor: "white",
+                      overflow: "hidden",
+                      marginBottom: 24,
+                    }}
+                  >
+                    <DateTimePicker
+                      value={followUpDate ?? new Date()}
+                      mode="date"
+                      display="spinner"
+                      onChange={(_, date) => {
+                        if (date) setFollowUpDate(date)
+                      }}
+                      minimumDate={new Date()}
+                    />
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Done selecting follow-up date"
+                      onPress={() => {
+                        if (!followUpDate) setFollowUpDate(new Date())
+                        setShowFollowUpPicker(false)
+                      }}
+                      style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
+                    >
+                      <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : (
           // ── Note-specific fields ──────────────────────

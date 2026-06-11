@@ -126,9 +126,16 @@ export function useDataManagement({
                 body: { confirm: "DELETE" },
               })
               await clearLocalPrivateData()
-              await supabase.auth.signOut()
+              // The auth user no longer exists, so a server-side sign-out can
+              // fail; a local sign-out is enough to drop the session.
+              await supabase.auth.signOut({ scope: "local" }).catch(() => null)
             } catch (e) {
-              onFailure(e instanceof Error ? e.message : "Failed to delete account.")
+              const message = e instanceof Error ? e.message : "Failed to delete account."
+              onFailure(message)
+              Alert.alert(
+                "Account deletion failed",
+                `${message}\n\nYour account was not deleted. Please try again or contact support.`,
+              )
             } finally {
               setDeletingAccount(false)
             }

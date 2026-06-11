@@ -9,7 +9,7 @@ export async function geocodePlace(query: string): Promise<MapboxFeature[]> {
   if (!MAPBOX_TOKEN || !query.trim()) return []
   try {
     const encoded = encodeURIComponent(query.trim())
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${MAPBOX_TOKEN}&types=place,locality,neighborhood`
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${MAPBOX_TOKEN}&types=place,locality,region,country&limit=5`
     const response = await fetch(url)
     if (!response.ok) return []
     const data = (await response.json()) as { features?: MapboxFeature[] }
