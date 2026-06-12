@@ -4,7 +4,7 @@
     "slug": "roots",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "scheme": "roots",
     "icon": "./assets/icon.png",
     "splash": {
