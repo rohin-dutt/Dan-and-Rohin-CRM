@@ -52,10 +52,15 @@ export function DatePickerModal({
           >
             {title}
           </Text>
+          {/* The card is always white, so pin the picker to light appearance
+              and dark text — otherwise system dark mode renders the wheel
+              values as white-on-white. textColor covers all three columns. */}
           <DateTimePicker
             value={draftDate}
             mode="date"
             display="spinner"
+            themeVariant="light"
+            textColor={colors.ink}
             onChange={(_, picked) => {
               if (picked) setDraftDate(picked)
             }}
