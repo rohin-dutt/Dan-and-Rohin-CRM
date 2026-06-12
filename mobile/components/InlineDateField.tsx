@@ -76,6 +76,8 @@ export function InlineDateField({
             value={date ?? new Date()}
             mode="date"
             display="spinner"
+            themeVariant="light"
+            textColor={colors.ink}
             onChange={(_, picked) => {
               if (picked) onChange(picked)
             }}

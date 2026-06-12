@@ -99,6 +99,8 @@ export function MomentDraftsEditor({
                   value={parseLocalDateString(moment.date) ?? new Date()}
                   mode="date"
                   display="spinner"
+                  themeVariant="light"
+                  textColor={colors.ink}
                   onChange={(_, picked) => {
                     if (picked) onChange(updateMomentDraft(moments, index, { date: toLocalDateString(picked) }))
                   }}

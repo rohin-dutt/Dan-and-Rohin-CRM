@@ -118,6 +118,8 @@ export function BirthdayField({
               value={draftDate}
               mode="date"
               display="spinner"
+              themeVariant="light"
+              textColor={colors.ink}
               onChange={(_, picked) => {
                 if (picked) setDraftDate(picked)
               }}

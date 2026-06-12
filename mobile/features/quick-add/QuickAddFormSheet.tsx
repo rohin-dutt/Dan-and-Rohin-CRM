@@ -508,6 +508,8 @@ export function QuickAddFormSheet({
                   value={selectedDate}
                   mode="date"
                   display="spinner"
+                  themeVariant="light"
+                  textColor={colors.ink}
                   onChange={(_, date) => {
                     if (date) setSelectedDate(date)
                   }}
