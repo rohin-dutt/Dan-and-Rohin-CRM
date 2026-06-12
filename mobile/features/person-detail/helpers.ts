@@ -18,8 +18,14 @@ export function formatNextAction(days: number | null): string {
   return `Due in ${days}d`
 }
 
+// Interaction type recorded when a follow-up is completed and the user opts
+// to count it as an interaction. Rendered without a type badge in the
+// timeline; the interactions.type check constraint only requires non-empty.
+export const FOLLOW_UP_COMPLETED_TYPE = "follow_up_completed"
+
 export function interactionIcon(type: string): keyof typeof Ionicons.glyphMap {
   const normalized = type.trim().toLowerCase()
+  if (normalized === FOLLOW_UP_COMPLETED_TYPE) return "checkmark-done-outline"
   if (normalized.includes("call") || normalized.includes("phone")) return "call-outline"
   if (normalized.includes("text") || normalized.includes("message")) return "chatbubble-outline"
   if (normalized.includes("coffee")) return "cafe-outline"

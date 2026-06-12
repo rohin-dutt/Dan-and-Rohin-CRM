@@ -9,7 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { personImageUrl } from "@/lib/person-display"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
-import { getNextDueDays } from "@roots/shared"
+import { getNextActionDays } from "@roots/shared"
 import { StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
 import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person-detail/tabs"
 import { formatNextAction } from "@/features/person-detail/helpers"
@@ -36,7 +36,7 @@ export default function PersonDetailScreen() {
     touchPointInteractions,
     followUpUpdating,
     deletePerson,
-    markFollowUpDone,
+    completeFollowUp,
     deleteFollowUp,
     updatePersonNote,
     deletePersonNote,
@@ -83,6 +83,18 @@ export default function PersonDetailScreen() {
     ])
   }
 
+  function confirmCompleteFollowUp(interactionId: string) {
+    Alert.alert(
+      "Mark as complete",
+      "Do you want this follow-up to count as an interaction?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "No", onPress: () => void completeFollowUp(interactionId, false) },
+        { text: "Yes", onPress: () => void completeFollowUp(interactionId, true) },
+      ],
+    )
+  }
+
   function confirmDeleteFollowUp(interactionId: string) {
     Alert.alert("Delete follow-up", "Remove this follow-up permanently?", [
       { text: "Cancel", style: "cancel" },
@@ -104,7 +116,14 @@ export default function PersonDetailScreen() {
     )
   }
 
-  const nextDueDays = getNextDueDays(person)
+  // Next action is whichever comes first: the earliest open follow-up or the
+  // cadence-based due date.
+  const earliestFollowUpDate = openFollowUps.reduce<string | null>((earliest, fu) => {
+    if (!fu.follow_up_date) return earliest
+    if (!earliest || fu.follow_up_date < earliest) return fu.follow_up_date
+    return earliest
+  }, null)
+  const nextActionDays = getNextActionDays(person, earliestFollowUpDate)
   const subtitle = [person.role, person.company].filter(Boolean).join(" at ")
   const topTags = tags.slice(0, 3)
 
@@ -168,7 +187,7 @@ export default function PersonDetailScreen() {
 
           <StatStrip
             lastTalked={formatDaysAgo(person.last_contacted_at)}
-            nextAction={formatNextAction(nextDueDays)}
+            nextAction={formatNextAction(nextActionDays)}
             interactionsCount={touchPointInteractions.length}
             openFollowUpsCount={openFollowUps.length}
           />
@@ -194,7 +213,7 @@ export default function PersonDetailScreen() {
               completedFollowUps={completedFollowUps}
               updating={followUpUpdating}
               onDelete={confirmDeleteFollowUp}
-              onComplete={(interactionId) => void markFollowUpDone(interactionId)}
+              onComplete={confirmCompleteFollowUp}
             />
           ) : null}
         </View>

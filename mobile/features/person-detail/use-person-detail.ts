@@ -4,8 +4,8 @@ import { useFocusEffect } from "expo-router"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import { loadPersonNotesForPerson } from "@/lib/person-notes"
-import { getFollowUpState, isTouchPoint } from "@roots/shared"
-import { getTagFromJoin, type PersonTagRow } from "./helpers"
+import { getFollowUpState, isTouchPoint, todayInputValue } from "@roots/shared"
+import { FOLLOW_UP_COMPLETED_TYPE, getTagFromJoin, type PersonTagRow } from "./helpers"
 import type { ImportantMoment, Interaction, Person, PersonNote, Tag } from "@/types"
 
 // Data loading and mutations for the person detail screen. Every mutation
@@ -81,8 +81,13 @@ export function usePersonDetail(id: string) {
     return true
   }, [id])
 
-  const markFollowUpDone = useCallback(
-    async (interactionId: string) => {
+  // Marks a follow-up done. When `countAsInteraction` is true, also logs a
+  // "follow up completed" interaction dated today via the shared RPC, which
+  // moves last_contacted_at to today (pushing the next cadence due date to
+  // today + contact_frequency_days). When false, last_contacted_at is left
+  // untouched so the cadence due date stays where it was.
+  const completeFollowUp = useCallback(
+    async (interactionId: string, countAsInteraction: boolean) => {
       if (followUpUpdating) return
       setFollowUpUpdating(true)
       try {
@@ -94,12 +99,28 @@ export function usePersonDetail(id: string) {
           setError(updateError.message)
           return
         }
+        if (countAsInteraction) {
+          const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
+            p_person_id: id,
+            p_type: FOLLOW_UP_COMPLETED_TYPE,
+            p_date: todayInputValue(),
+            p_notes: null,
+            p_follow_up_needed: false,
+            p_follow_up_date: null,
+          })
+          if (rpcError) {
+            setError(rpcError.message)
+            return
+          }
+        }
+        // Lets the dashboard and people list refresh their buckets right away.
+        DeviceEventEmitter.emit("interactionAdded")
         await load()
       } finally {
         setFollowUpUpdating(false)
       }
     },
-    [followUpUpdating, load],
+    [followUpUpdating, id, load],
   )
 
   // "Delete" permanently removes the follow-up from the interaction without
@@ -174,7 +195,7 @@ export function usePersonDetail(id: string) {
     touchPointInteractions,
     followUpUpdating,
     deletePerson,
-    markFollowUpDone,
+    completeFollowUp,
     deleteFollowUp,
     updatePersonNote,
     deletePersonNote,

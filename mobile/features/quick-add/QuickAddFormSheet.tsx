@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -67,6 +67,31 @@ export function QuickAddFormSheet({
   // Common
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+
+  // The follow-up picker sits at the bottom of the form, so opening it can
+  // push its Done button below the fold — scroll it into view.
+  function toggleFollowUpPicker() {
+    const next = !showFollowUpPicker
+    setShowFollowUpPicker(next)
+    if (next) {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120)
+    }
+  }
+
+  // Backdrop taps (and swipe-down) dismiss an open date picker first; only
+  // when no picker is open do they close the whole sheet.
+  function handleSheetDismiss() {
+    if (showFollowUpPicker) {
+      setShowFollowUpPicker(false)
+      return
+    }
+    if (showDatePicker) {
+      setShowDatePicker(false)
+      return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     if (mode == null) return
@@ -205,12 +230,13 @@ export function QuickAddFormSheet({
   return (
     <BottomSheetModal
       visible={mode != null}
-      onClose={onClose}
+      onClose={handleSheetDismiss}
       backdropOpacity={0.3}
       sheetStyle={{ maxHeight: "90%" }}
       accessibilityLabel="Dismiss quick add form"
     >
       <ScrollView
+        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 }}
@@ -578,7 +604,7 @@ export function QuickAddFormSheet({
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel="Select follow-up date"
-                  onPress={() => setShowFollowUpPicker((v) => !v)}
+                  onPress={toggleFollowUpPicker}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",

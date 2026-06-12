@@ -108,6 +108,36 @@ export function FilterSheet({
         <Text style={{ fontFamily: fonts.medium, color: colors.ink }} className="mb-2 mt-4 text-sm">
           Filter by location
         </Text>
+
+        {locationFilters.length > 0 ? (
+          <View className="mb-2 flex-row flex-wrap gap-2">
+            {locationFilters.map((loc) => (
+              <View
+                key={loc}
+                className="flex-row items-center rounded-full px-3 py-2"
+                style={{ backgroundColor: colors.mint }}
+              >
+                <Ionicons name="location-outline" size={14} color={colors.forest} />
+                <Text
+                  style={{ fontFamily: fonts.medium, color: colors.forest, fontSize: 13 }}
+                  className="ml-1.5 mr-2"
+                  numberOfLines={1}
+                >
+                  Location: {loc}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove location filter ${loc}`}
+                  onPress={() => onToggleLocation(loc)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={15} color={colors.forest} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View className="h-11 flex-row items-center rounded-xl border border-stone-200 bg-white px-3">
           <Ionicons name="location-outline" size={16} color="#60646D" />
           <TextInput

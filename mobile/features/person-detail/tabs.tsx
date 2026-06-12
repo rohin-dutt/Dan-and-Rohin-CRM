@@ -8,7 +8,7 @@ import { formatDate } from "@roots/shared"
 import { formatCompactDate, formatTimelineDate } from "@/lib/format-dates"
 import { formatFrequency } from "@/constants/frequencies"
 import { DetailEmptyState, InfoList, SectionCard, TagPill, type InfoRow } from "./components"
-import { interactionIcon } from "./helpers"
+import { FOLLOW_UP_COMPLETED_TYPE, interactionIcon } from "./helpers"
 import type { Interaction, Person, PersonNote, Tag } from "@/types"
 
 export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
@@ -27,28 +27,39 @@ export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
 
   return (
     <View className="mt-6">
-      {visible.map((interaction, index) => (
-        <View key={interaction.id} className="flex-row">
-          <View className="items-center">
-            <IconTile icon={interactionIcon(interaction.type)} size={44} />
-            {index < visible.length - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
-          </View>
-          <View className="ml-4 flex-1 pb-6">
-            <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
-              {formatTimelineDate(interaction.date)}  ·  {interaction.type}
-            </Text>
-            {interaction.notes ? (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
-                {interaction.notes}
+      {visible.map((interaction, index) => {
+        // Completed follow-ups are logged without a type badge; the timeline
+        // shows a fixed description instead.
+        const isFollowUpCompleted = interaction.type === FOLLOW_UP_COMPLETED_TYPE
+        return (
+          <View key={interaction.id} className="flex-row">
+            <View className="items-center">
+              <IconTile icon={interactionIcon(interaction.type)} size={44} />
+              {index < visible.length - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
+            </View>
+            <View className="ml-4 flex-1 pb-6">
+              <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
+                {isFollowUpCompleted
+                  ? formatTimelineDate(interaction.date)
+                  : `${formatTimelineDate(interaction.date)}  ·  ${interaction.type}`}
               </Text>
-            ) : (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                No notes for this interaction.
-              </Text>
-            )}
+              {isFollowUpCompleted ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
+                  Follow up completed
+                </Text>
+              ) : interaction.notes ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
+                  {interaction.notes}
+                </Text>
+              ) : (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
+                  No notes for this interaction.
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
-      ))}
+        )
+      })}
       {!expanded && extraCount > 0 ? (
         <TouchableOpacity
           accessibilityRole="button"

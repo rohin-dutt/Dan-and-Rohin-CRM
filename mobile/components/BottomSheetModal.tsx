@@ -49,6 +49,11 @@ export function BottomSheetModal({
     translateY.stopAnimation()
     translateY.setValue(0)
     onClose()
+    // onClose may keep the sheet open (e.g. it only closed an inner picker),
+    // so re-arm after this frame; the guard still blocks same-frame double-fires.
+    requestAnimationFrame(() => {
+      isDismissingRef.current = false
+    })
   }
 
   const panResponder = useRef(

@@ -7,13 +7,21 @@ export type SortKey = "last_contacted" | "name" | "most_contacted" | "recently_a
 export type CategoryFilter = "All" | "Friends" | "Family" | "Professional"
 
 // Subset of interaction columns the people list actually needs for counts,
-// latest-touch sorting, and touch-point checks.
+// latest-touch sorting, touch-point checks, and follow-up-aware status filters.
 export type InteractionSummary = Pick<
   Interaction,
-  "person_id" | "type" | "date" | "created_at" | "is_touch_point"
+  | "person_id"
+  | "type"
+  | "date"
+  | "created_at"
+  | "is_touch_point"
+  | "follow_up_needed"
+  | "follow_up_date"
+  | "follow_up_status"
 >
 
-export const INTERACTION_SUMMARY_COLUMNS = "person_id, type, date, created_at, is_touch_point"
+export const INTERACTION_SUMMARY_COLUMNS =
+  "person_id, type, date, created_at, is_touch_point, follow_up_needed, follow_up_date, follow_up_status"
 
 export const PEOPLE_CATEGORIES: Array<{ label: CategoryFilter; icon: keyof typeof Ionicons.glyphMap }> = [
   { label: "All", icon: "apps-outline" },
@@ -73,14 +81,35 @@ export function matchesCategory(person: Person, category: CategoryFilter) {
   )
 }
 
-export function matchesStatusFilter(person: Person, filters: string[]): boolean {
+// Earliest open follow-up date per person, mirroring categorizePeople's
+// rules so the People tab buckets match the home tab metric cards.
+export function buildOpenFollowUpByPerson(interactions: InteractionSummary[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const interaction of interactions) {
+    if (!isTouchPoint(interaction)) continue
+    if (!interaction.follow_up_needed || !interaction.follow_up_date) continue
+    const status = interaction.follow_up_status ?? "open"
+    if (status === "done" || status === "snoozed") continue
+    const existing = map.get(interaction.person_id)
+    if (!existing || interaction.follow_up_date < existing) {
+      map.set(interaction.person_id, interaction.follow_up_date)
+    }
+  }
+  return map
+}
+
+export function matchesStatusFilter(
+  person: Person,
+  filters: string[],
+  followUpDate: string | null = null,
+): boolean {
   if (filters.length === 0) return true
-  const days = getNextDueDays(person)
+  const status = getRelationshipStatus(person, new Date(), followUpDate)
   return filters.some((filter) => {
-    if (filter === "overdue") return days != null && days <= 0
-    if (filter === "due_this_week") return days != null && days >= 1 && days <= 7
-    if (filter === "follow_up") return days != null && days <= 7
-    if (filter === "coming_up") return days != null && days >= 8
+    if (filter === "overdue") return status === "overdue"
+    if (filter === "due_this_week") return status === "due_this_week"
+    if (filter === "follow_up") return status === "overdue" || status === "due_this_week"
+    if (filter === "coming_up") return status === "coming_up"
     if (filter === "not_contacted") return person.last_contacted_at == null
     return false
   })
@@ -168,6 +197,7 @@ export function filterAndSortPeople(input: {
   sort: SortKey
   interactionCounts: Map<string, number>
   latestTouchByPerson: Map<string, InteractionSummary>
+  followUpByPerson: Map<string, string>
 }): Person[] {
   const {
     people,
@@ -182,12 +212,13 @@ export function filterAndSortPeople(input: {
     sort,
     interactionCounts,
     latestTouchByPerson,
+    followUpByPerson,
   } = input
 
   const filtered = people.filter((person) => {
     if (!matchesSearch(person, search)) return false
     if (!matchesCategory(person, category)) return false
-    if (!matchesStatusFilter(person, statusFilters)) return false
+    if (!matchesStatusFilter(person, statusFilters, followUpByPerson.get(person.id) ?? null)) return false
     if (momentsUpcomingOnly && !upcomingMomentPersonIds.has(person.id)) return false
     if (tagFilters.length > 0) {
       const assignedTagIds = new Set((tagsByPerson.get(person.id) ?? []).map((tag) => tag.id))

@@ -15,6 +15,7 @@ import { getUpcomingMoments } from "@roots/shared"
 import {
   buildInteractionCounts,
   buildLatestTouchByPerson,
+  buildOpenFollowUpByPerson,
   filterAndSortPeople,
   INTERACTION_SUMMARY_COLUMNS,
   parseLocationParam,
@@ -135,6 +136,8 @@ export default function PeopleScreen() {
 
   const latestTouchByPerson = useMemo(() => buildLatestTouchByPerson(interactions), [interactions])
 
+  const followUpByPerson = useMemo(() => buildOpenFollowUpByPerson(interactions), [interactions])
+
   const upcomingMomentPersonIds = useMemo(
     () => new Set(getUpcomingMoments(people, importantMoments, new Date(), 14).map((moment) => moment.person.id)),
     [importantMoments, people],
@@ -155,8 +158,9 @@ export default function PeopleScreen() {
         sort,
         interactionCounts,
         latestTouchByPerson,
+        followUpByPerson,
       }),
-    [category, interactionCounts, latestTouchByPerson, locationFilters, params.moments, people, search, sort, statusFilters, tagFilters, tagsByPerson, upcomingMomentPersonIds],
+    [category, followUpByPerson, interactionCounts, latestTouchByPerson, locationFilters, params.moments, people, search, sort, statusFilters, tagFilters, tagsByPerson, upcomingMomentPersonIds],
   )
 
   const activeFilterCount =

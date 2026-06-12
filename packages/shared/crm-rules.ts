@@ -64,6 +64,21 @@ export function pluralize(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
+// Days until the person's next action: the earlier of the open follow-up
+// date and the cadence-based due date. Null when neither exists.
+export function getNextActionDays(
+  person: Person,
+  followUpDate: string | null = null,
+  todayValue: Date = new Date()
+): number | null {
+  const cadenceDays = getNextDueDays(person, todayValue);
+  const today = toDay(todayValue);
+  const fuDate = toDay(followUpDate);
+  if (!today || !fuDate) return cadenceDays;
+  const followUpDays = Math.ceil((fuDate.getTime() - today.getTime()) / MS_PER_DAY);
+  return cadenceDays != null ? Math.min(cadenceDays, followUpDays) : followUpDays;
+}
+
 export function getRelationshipStatus(
   person: Person,
   todayValue: Date = new Date(),
@@ -72,14 +87,13 @@ export function getRelationshipStatus(
   const today = toDay(todayValue);
   if (!today) return "coming_up";
 
-  if (followUpDate) {
-    const fuDate = toDay(followUpDate);
-    if (fuDate) {
-      const daysDiff = Math.ceil(
-        (fuDate.getTime() - today.getTime()) / MS_PER_DAY
-      );
-      if (daysDiff < 0) return "overdue";
-      if (daysDiff <= 7) return "due_this_week";
+  if (followUpDate && toDay(followUpDate)) {
+    // Bucket by whichever action comes first, so a cadence-overdue person
+    // stays overdue even when their follow-up is only due later this week.
+    const effectiveDays = getNextActionDays(person, followUpDate, todayValue);
+    if (effectiveDays != null) {
+      if (effectiveDays < 0) return "overdue";
+      if (effectiveDays <= 7) return "due_this_week";
       return "coming_up";
     }
   }
