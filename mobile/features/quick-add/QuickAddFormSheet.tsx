@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { colors, fonts } from "@/constants/theme"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
+import { DatePickerModal } from "@/components/DatePickerModal"
 import { PillButton } from "@/components/PillButton"
 import { formatFullDate, toLocalDateString, todayInputValue, updateStreakAfterAction } from "@roots/shared"
 
@@ -67,25 +68,11 @@ export function QuickAddFormSheet({
   // Common
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const scrollRef = useRef<ScrollView>(null)
 
-  // The follow-up picker sits at the bottom of the form, so opening it can
-  // push its Done button below the fold — scroll it into view.
-  function toggleFollowUpPicker() {
-    const next = !showFollowUpPicker
-    setShowFollowUpPicker(next)
-    if (next) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120)
-    }
-  }
-
-  // Backdrop taps (and swipe-down) dismiss an open date picker first; only
-  // when no picker is open do they close the whole sheet.
+  // Backdrop taps (and swipe-down) dismiss the open inline date picker
+  // first; only when it is closed do they close the whole sheet. The
+  // follow-up picker is a separate modal that handles its own backdrop.
   function handleSheetDismiss() {
-    if (showFollowUpPicker) {
-      setShowFollowUpPicker(false)
-      return
-    }
     if (showDatePicker) {
       setShowDatePicker(false)
       return
@@ -236,7 +223,6 @@ export function QuickAddFormSheet({
       accessibilityLabel="Dismiss quick add form"
     >
       <ScrollView
-        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 }}
@@ -572,95 +558,82 @@ export function QuickAddFormSheet({
               }}
             />
 
+            {/* Follow-up section: visually separated from the notes above and
+                the Save button below. */}
             <View
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: followUpEnabled ? 12 : 24,
+                borderTopWidth: 1,
+                borderTopColor: "#F5F4F2",
+                paddingTop: 16,
+                marginBottom: 24,
               }}
             >
-              <View style={{ flex: 1, marginRight: 16 }}>
-                <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14 }}>
-                  Set a follow-up
-                </Text>
-                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 2 }}>
-                  Remind yourself to follow up with this person
-                </Text>
-              </View>
-              <Switch
-                value={followUpEnabled}
-                onValueChange={(value) => {
-                  setFollowUpEnabled(value)
-                  if (!value) setShowFollowUpPicker(false)
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
-                trackColor={{ false: "#E7E5E4", true: colors.sage }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
+              >
+                <View style={{ flex: 1, marginRight: 16 }}>
+                  <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14 }}>
+                    Set a follow-up
+                  </Text>
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 2 }}>
+                    Remind yourself to follow up with this person
+                  </Text>
+                </View>
+                <Switch
+                  value={followUpEnabled}
+                  onValueChange={(value) => {
+                    setFollowUpEnabled(value)
+                    if (!value) setShowFollowUpPicker(false)
+                  }}
+                  trackColor={{ false: "#D6D3D1", true: colors.forest }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
 
-            {followUpEnabled ? (
-              <>
+              {followUpEnabled ? (
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel="Select follow-up date"
-                  onPress={toggleFollowUpPicker}
+                  onPress={() => setShowFollowUpPicker(true)}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
                     height: 44,
                     borderWidth: 1,
-                    borderColor: showFollowUpPicker ? colors.forest : "#E7E5E4",
+                    borderColor: "#E7E5E4",
                     borderRadius: 12,
                     paddingHorizontal: 14,
                     backgroundColor: "white",
-                    marginBottom: showFollowUpPicker ? 0 : 24,
+                    marginTop: 14,
                   }}
                 >
                   <Ionicons name="flag-outline" size={16} color={colors.forest} style={{ marginRight: 8 }} />
                   <Text style={{ fontFamily: fonts.body, color: followUpDate ? colors.ink : "#9CA3AF", fontSize: 14, flex: 1 }}>
                     {followUpDate ? formatFullDate(followUpDate) : "Select follow-up date"}
                   </Text>
-                  <Ionicons name={showFollowUpPicker ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </TouchableOpacity>
+              ) : null}
+            </View>
 
-                {showFollowUpPicker ? (
-                  <View
-                    style={{
-                      borderWidth: 1,
-                      borderTopWidth: 0,
-                      borderColor: colors.forest,
-                      borderBottomLeftRadius: 12,
-                      borderBottomRightRadius: 12,
-                      backgroundColor: "white",
-                      overflow: "hidden",
-                      marginBottom: 24,
-                    }}
-                  >
-                    <DateTimePicker
-                      value={followUpDate ?? new Date()}
-                      mode="date"
-                      display="spinner"
-                      onChange={(_, date) => {
-                        if (date) setFollowUpDate(date)
-                      }}
-                      minimumDate={new Date()}
-                    />
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityLabel="Done selecting follow-up date"
-                      onPress={() => {
-                        if (!followUpDate) setFollowUpDate(new Date())
-                        setShowFollowUpPicker(false)
-                      }}
-                      style={{ alignItems: "flex-end", paddingHorizontal: 16, paddingBottom: 12 }}
-                    >
-                      <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: 15 }}>Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </>
-            ) : null}
+            {/* Centered modal (same pattern as the birthday picker), so the
+                spinner and Done/Cancel are always fully on screen and a
+                backdrop tap only closes the picker, never the sheet. */}
+            <DatePickerModal
+              visible={showFollowUpPicker}
+              title="Select follow-up date"
+              date={followUpDate}
+              minimumDate={new Date()}
+              onConfirm={(picked) => {
+                setFollowUpDate(picked)
+                setShowFollowUpPicker(false)
+              }}
+              onCancel={() => setShowFollowUpPicker(false)}
+            />
           </>
         ) : (
           // ── Note-specific fields ──────────────────────

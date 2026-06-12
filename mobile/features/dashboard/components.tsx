@@ -30,8 +30,11 @@ export function MetricCard({
       accessibilityLabel={label}
       className="flex-1"
     >
-      <SoftCard className="flex-1 justify-center px-3 py-3">
-        <View className="flex-row items-center justify-center">
+      {/* Fixed height: the touchable sizes to this card, so the card must
+          never derive its height from the touchable (flex-1 here collapses
+          the whole card to its padding). */}
+      <SoftCard className="h-24 items-center justify-center px-2">
+        <View className="flex-row items-center">
           <View
             className="mr-2 h-8 w-8 items-center justify-center rounded-full"
             style={{ backgroundColor: toneColors.bg }}
@@ -47,7 +50,7 @@ export function MetricCard({
         </View>
         <Text
           style={{ fontFamily: fonts.body, color: colors.ink }}
-          className="mt-1 text-center text-[10px] leading-3"
+          className="mt-1.5 text-center text-[11px] leading-[14px]"
           numberOfLines={2}
         >
           {label}
