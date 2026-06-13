@@ -18,7 +18,10 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://useroots.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://useroots.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ojebeswabngvcktqsduc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZWJlc3dhYm5ndmNrdHFzZHVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjgwNzIsImV4cCI6MjA5Mzc0NDA3Mn0.QR_2nLN6jSzuQFeuTci-whXuEyWibs0pHxDwOZr6Q-k",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiZGFucm9oaW5jcm0iLCJhIjoiY21wbzh2NmM3MDEwajJ3b2loa3R6Z2U2YSJ9.6-_FebSmSasE4_GgLLI3cQ"
       }
     },
     "production": {
@@ -27,7 +30,10 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://useroots.app"
+        "EXPO_PUBLIC_API_BASE_URL": "https://useroots.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ojebeswabngvcktqsduc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZWJlc3dhYm5ndmNrdHFzZHVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNjgwNzIsImV4cCI6MjA5Mzc0NDA3Mn0.QR_2nLN6jSzuQFeuTci-whXuEyWibs0pHxDwOZr6Q-k",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiZGFucm9oaW5jcm0iLCJhIjoiY21wbzh2NmM3MDEwajJ3b2loa3R6Z2U2YSJ9.6-_FebSmSasE4_GgLLI3cQ"
       }
     }
   },
