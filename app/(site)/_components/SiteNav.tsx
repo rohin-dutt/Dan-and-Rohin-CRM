@@ -5,7 +5,7 @@ export function SiteNav() {
     <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
       <Link
         href="/"
-        className="flex items-center gap-2 font-heading text-lg font-semibold text-foreground"
+        className="flex items-center gap-2 font-heading text-2xl font-bold text-primary"
       >
         <img src="/logo.svg" alt="" aria-hidden="true" width="28" height="28" />
         Roots
