@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Lora, DM_Sans } from "next/font/google";
+import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
 
-const lora = Lora({
+const cormorantGaramond = Cormorant_Garamond({
   subsets: ["latin"],
+  weight: ["600", "700"],
   variable: "--font-heading",
   display: "swap",
 });
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
@@ -39,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${lora.variable} ${dmSans.variable} font-sans`}
+      className={`h-full antialiased ${cormorantGaramond.variable} ${inter.variable} font-sans`}
     >
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
