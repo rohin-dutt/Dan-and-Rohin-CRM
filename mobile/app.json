@@ -9,13 +9,13 @@
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F0EBE1"
+      "resizeMode": "cover",
+      "backgroundColor": "#0F4A24"
     },
     "ios": {
       "bundleIdentifier": "com.useroots.app",
       "supportsTablet": false,
-      "buildNumber": "2026061301",
+      "buildNumber": "2026061401",
       "infoPlist": {
         "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
         "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up, birthday, and important moment reminders.",
