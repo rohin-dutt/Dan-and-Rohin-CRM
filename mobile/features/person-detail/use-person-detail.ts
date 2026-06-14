@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import { loadPersonNotesForPerson } from "@/lib/person-notes"
+import { PEOPLE_CHANGED_EVENT } from "@/lib/onboarding-status"
 import { getFollowUpState, isTouchPoint, todayInputValue } from "@roots/shared"
 import { FOLLOW_UP_COMPLETED_TYPE, getTagFromJoin, type PersonTagRow } from "./helpers"
 import type { ImportantMoment, Interaction, Person, PersonNote, Tag } from "@/types"
@@ -78,6 +79,7 @@ export function usePersonDetail(id: string) {
       setError(deleteError.message)
       return false
     }
+    DeviceEventEmitter.emit(PEOPLE_CHANGED_EVENT)
     return true
   }, [id])
 

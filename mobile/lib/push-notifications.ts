@@ -146,6 +146,8 @@ export function routeForNotificationData(data: Record<string, unknown>) {
 }
 
 export function installNotificationResponseHandler(router: NotificationRouter) {
+  if (Platform.OS === "web") return () => undefined
+
   function handleResponse(response: Notifications.NotificationResponse | null) {
     const data = response?.notification.request.content.data
     if (!data) return

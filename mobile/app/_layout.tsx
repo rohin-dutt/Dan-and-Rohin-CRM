@@ -1,7 +1,7 @@
 import { Slot, useRouter, useSegments } from "expo-router"
 import { useFonts } from "expo-font"
 import { useEffect, useState } from "react"
-import { Linking } from "react-native"
+import { DeviceEventEmitter, Linking } from "react-native"
 import {
   CormorantGaramond_700Bold,
 } from "@expo-google-fonts/cormorant-garamond"
@@ -14,11 +14,19 @@ import {
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import { handlePasswordRecoveryUrl } from "@/lib/auth-links"
+import {
+  FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
+  hasCompletedFirstDownloadIntro,
+} from "@/lib/first-download-intro"
+import { PEOPLE_CHANGED_EVENT, userHasPeople } from "@/lib/onboarding-status"
 import { installNotificationResponseHandler } from "@/lib/push-notifications"
 import "../global.css"
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
+  const [introComplete, setIntroComplete] = useState<boolean | null>(null)
+  const [hasPeople, setHasPeople] = useState<boolean | null>(null)
+  const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_700Bold,
@@ -31,17 +39,64 @@ export default function RootLayout() {
   const segments = useSegments()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    Promise.all([
+      supabase.auth.getSession(),
+      hasCompletedFirstDownloadIntro(),
+    ]).then(([{ data: { session } }, completedIntro]) => {
       setSession(session)
+      setIntroComplete(completedIntro)
       setLoading(false)
     })
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      setHasPeople(null)
     })
+
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const introSub = DeviceEventEmitter.addListener(
+      FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
+      () => setIntroComplete(true),
+    )
+    const peopleSub = DeviceEventEmitter.addListener(
+      PEOPLE_CHANGED_EVENT,
+      () => setPeopleStatusVersion((version) => version + 1),
+    )
+
+    return () => {
+      introSub.remove()
+      peopleSub.remove()
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPeopleStatus() {
+      if (!session) {
+        setHasPeople(null)
+        return
+      }
+
+      setHasPeople(null)
+      try {
+        const nextHasPeople = await userHasPeople(session.user.id)
+        if (!cancelled) setHasPeople(nextHasPeople)
+      } catch {
+        if (!cancelled) setHasPeople(false)
+      }
+    }
+
+    loadPeopleStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [session, peopleStatusVersion])
 
   useEffect(() => {
     async function handleUrl(url: string | null) {
@@ -63,16 +118,33 @@ export default function RootLayout() {
   useEffect(() => installNotificationResponseHandler(router), [router])
 
   useEffect(() => {
-    if (loading) return
+    if (loading || introComplete == null) return
+
     const inAuthGroup = segments[0] === "(auth)"
+    const inIntro = segments[0] === "intro"
     const inUpdatePassword = inAuthGroup && segments.join("/") === "(auth)/update-password"
-    if (!session && !inAuthGroup) {
-      router.replace("/(auth)/login")
-    } else if (session && inAuthGroup && !inUpdatePassword) {
+    const inOnboarding = segments.join("/") === "(app)/onboarding"
+
+    if (!session) {
+      if (!introComplete && !inIntro) {
+        router.replace("/intro")
+      } else if (introComplete && !inAuthGroup && !inIntro) {
+        router.replace("/(auth)/login")
+      }
+      return
+    }
+
+    if (inUpdatePassword) return
+    if (hasPeople == null) return
+
+    if (!hasPeople && !inOnboarding) {
+      router.replace("/(app)/onboarding")
+    } else if (hasPeople && (inAuthGroup || inIntro)) {
       router.replace("/(app)/(tabs)/dashboard")
     }
-  }, [session, loading, segments])
+  }, [session, loading, introComplete, hasPeople, segments])
 
   if (loading || (!fontsLoaded && !fontError)) return null
+  if (introComplete == null || (session && hasPeople == null)) return null
   return <Slot />
 }

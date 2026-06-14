@@ -149,7 +149,6 @@ export default function OnboardingScreen() {
     return (
       <Screen scrollable={false}>
         <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-xs text-gray-400 tracking-widest mb-10">STEP 1 OF 3</Text>
           <Text className="text-3xl font-bold text-warm-black text-center mb-3">
             Stay close to the people who matter.
           </Text>
@@ -177,7 +176,6 @@ export default function OnboardingScreen() {
     return (
       <Screen>
         <View className="px-6 py-8">
-          <Text className="text-xs text-gray-400 tracking-widest mb-6">STEP 2 OF 3</Text>
           <Text className="text-2xl font-bold text-warm-black mb-1">
             Who's someone you want to stay close to?
           </Text>
@@ -303,7 +301,6 @@ export default function OnboardingScreen() {
   return (
     <Screen>
       <View className="px-6 py-8">
-        <Text className="text-xs text-gray-400 tracking-widest mb-6">STEP 3 OF 3</Text>
         <Text className="text-2xl font-bold text-warm-black mb-1">
           When did you last talk to {lastSavedFirstName}?
         </Text>
