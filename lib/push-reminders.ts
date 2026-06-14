@@ -1,3 +1,5 @@
+import { type SupabaseClient } from "@supabase/supabase-js";
+
 import {
   getFollowUpState,
   getNextDueDate,
@@ -60,29 +62,6 @@ type ExpoPushReceipt =
 
 type FetchLike = typeof fetch;
 
-type SupabaseError = {
-  code?: string;
-  message: string;
-};
-
-type SupabaseResult<T> = {
-  data: T | null;
-  error: SupabaseError | null;
-};
-
-type SupabaseQueryBuilder<T = unknown> = PromiseLike<SupabaseResult<T>> & {
-  select: (columns?: string) => SupabaseQueryBuilder<T>;
-  eq: (column: string, value: unknown) => SupabaseQueryBuilder<T>;
-  in: (column: string, values: unknown[]) => SupabaseQueryBuilder<T>;
-  insert: (values: unknown) => SupabaseQueryBuilder<T>;
-  update: (values: unknown) => SupabaseQueryBuilder<T>;
-  single: () => Promise<SupabaseResult<T>>;
-  maybeSingle: () => Promise<SupabaseResult<T>>;
-};
-
-type SupabaseLike = {
-  from: <T = unknown>(table: string) => SupabaseQueryBuilder<T>;
-};
 
 const EXPO_PUSH_SEND_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_PUSH_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
@@ -451,7 +430,7 @@ export async function runPushReminderJob({
   now = new Date(),
   fetchImpl = fetch,
 }: {
-  supabase: SupabaseLike;
+  supabase: SupabaseClient;
   now?: Date;
   fetchImpl?: FetchLike;
 }) {
