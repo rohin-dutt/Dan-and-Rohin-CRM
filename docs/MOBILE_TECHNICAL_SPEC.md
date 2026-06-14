@@ -426,8 +426,9 @@ Vercel Cron, when scheduled delivery is implemented.
 Implemented code-ready sender:
 
 - Route: `/api/mobile/send-push-reminders`.
-- Scheduler: `vercel.json` cron invokes the route during a conservative UTC
-  daytime range; the route also enforces a 9:00-18:00 local user send window.
+- Scheduler: `vercel.json` cron invokes the route once daily at 13:00 UTC,
+  which is compatible with Vercel Hobby limits; the route also enforces a
+  9:00-18:00 local user send window.
 - Auth: route requires `Authorization: Bearer $CRON_SECRET`.
 - Privilege: route uses `SUPABASE_SERVICE_ROLE_KEY` server-side only.
 - Sender: stored active Expo push tokens are sent through the Expo Push API.
