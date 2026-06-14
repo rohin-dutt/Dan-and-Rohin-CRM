@@ -7,6 +7,19 @@ import { callTrustedApi } from "@/lib/trusted-api"
 const INSTALL_ID_KEY = "roots:app-install-id"
 const PUSH_TOKEN_KEY = "roots:push-token"
 
+type NotificationRouter = {
+  push: (href: string) => void
+}
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+})
+
 function randomInstallId() {
   return `install-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
@@ -21,6 +34,10 @@ async function getInstallId() {
 
 async function getExistingInstallId() {
   return AsyncStorage.getItem(INSTALL_ID_KEY)
+}
+
+function getDeviceTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null
 }
 
 function getProjectId() {
@@ -63,11 +80,31 @@ export async function registerPushToken() {
       app_version: Constants.expoConfig?.version ?? null,
       build_number: Constants.expoConfig?.ios?.buildNumber ?? null,
       environment: process.env.EXPO_PUBLIC_APP_ENV ?? "development",
+      notification_timezone: getDeviceTimezone(),
     },
   })
 
   await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
   return token
+}
+
+export async function getPushRegistrationStatus() {
+  const [token, appInstallId] = await Promise.all([
+    AsyncStorage.getItem(PUSH_TOKEN_KEY),
+    getExistingInstallId(),
+  ])
+
+  if (!token && !appInstallId) return false
+
+  const params = new URLSearchParams()
+  if (token) params.set("token", token)
+  if (appInstallId) params.set("app_install_id", appInstallId)
+
+  const result = await callTrustedApi(`/api/mobile/push-token?${params.toString()}`, {
+    method: "GET",
+  })
+
+  return Boolean(result?.active)
 }
 
 export async function revokePushToken() {
@@ -87,4 +124,40 @@ export async function revokePushToken() {
   }
 
   await AsyncStorage.removeItem(PUSH_TOKEN_KEY)
+}
+
+function stringFromData(data: Record<string, unknown>, key: string) {
+  const value = data[key]
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+export function routeForNotificationData(data: Record<string, unknown>) {
+  if (stringFromData(data, "type") !== "roots_notification") return null
+
+  const personId = stringFromData(data, "personId")
+  if (personId) return `/people/${encodeURIComponent(personId)}`
+
+  const kind = stringFromData(data, "kind")
+  if (kind === "follow_up_due" || kind === "follow_up_overdue") {
+    return "/people?status=overdue&status=due_this_week"
+  }
+
+  return "/(app)/(tabs)/dashboard"
+}
+
+export function installNotificationResponseHandler(router: NotificationRouter) {
+  function handleResponse(response: Notifications.NotificationResponse | null) {
+    const data = response?.notification.request.content.data
+    if (!data) return
+    const route = routeForNotificationData(data)
+    if (route) {
+      router.push(route)
+      Notifications.clearLastNotificationResponse()
+    }
+  }
+
+  handleResponse(Notifications.getLastNotificationResponse())
+  const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse)
+
+  return () => subscription.remove()
 }

@@ -6,6 +6,21 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] `npm.cmd run lint` fails on existing public website copy lint errors.
+      Command: `npm.cmd run lint`. Failure summary: ESLint reports
+      `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
+      `app/(site)/contact/ContactForm.tsx`, `app/(site)/page.tsx`, and
+      `app/(site)/terms/page.tsx`. Likely owner: public website/content lint
+      cleanup. This was confirmed during the June 14, 2026 mobile push
+      readiness pass; the introduced push helper lint issue was fixed before
+      re-running.
+- [ ] `npm.cmd run build` fails before page-data collection completes because
+      `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
+      module evaluation. Command: `npm.cmd run build`. Failure summary:
+      `Missing API key. Pass it to the constructor new Resend("re_123")` while
+      collecting page data for `/api/contact`. Likely owner: contact API/env
+      handling; move Resend initialization behind the request-time env check or
+      provide the required build env.
 - [ ] `npm test` fails on `tests/date-utils.test.mjs` with
       `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
       TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.
@@ -442,9 +457,16 @@ Do not start until stabilization milestones are complete.
   - Current implementation: mobile can register push tokens, store
     important moments, and the schema supports privacy-safe
     `notification_deliveries.kind = 'important_moment'`.
-  - Remaining external/backend work: extend the trusted sender and scheduler
-    (for example Vercel Cron) to select due important moments, send Expo/APNs
-    notifications, and write delivery audit rows.
+  - June 14, 2026 code-ready slice added a protected
+    `/api/mobile/send-push-reminders` Next.js route, Vercel Cron config,
+    Expo Push API sending, immediate ticket/receipt handling, local send-window
+    checks, privacy-safe payloads, stable idempotency keys, delivery logging,
+    and invalid-token marking for permanent Expo failures such as
+    `DeviceNotRegistered`.
+  - Remaining external work: configure production `CRON_SECRET`,
+    `SUPABASE_SERVICE_ROLE_KEY`, and Expo/APNs credentials on Vercel/EAS,
+    deploy the cron route, and verify delivery/tap routing on a TestFlight or
+    App Store iPhone install.
 - [ ] Push the repository to GitHub.
   - Remote readiness inspected on May 14, 2026: `origin` is configured for
     fetch and push at `https://github.com/rohin-dutt/Dan-and-Rohin-CRM`, and

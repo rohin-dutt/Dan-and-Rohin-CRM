@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import { handlePasswordRecoveryUrl } from "@/lib/auth-links"
+import { installNotificationResponseHandler } from "@/lib/push-notifications"
 import "../global.css"
 
 export default function RootLayout() {
@@ -58,6 +59,8 @@ export default function RootLayout() {
 
     return () => subscription.remove()
   }, [router])
+
+  useEffect(() => installNotificationResponseHandler(router), [router])
 
   useEffect(() => {
     if (loading) return

@@ -8,7 +8,11 @@ import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { clearLocalPrivateData } from "@/lib/private-data"
-import { registerPushToken, revokePushToken } from "@/lib/push-notifications"
+import {
+  getPushRegistrationStatus,
+  registerPushToken,
+  revokePushToken,
+} from "@/lib/push-notifications"
 import { displayNameFromMetadata } from "@/lib/user-metadata"
 import { fonts } from "@/constants/theme"
 import { InlineForm, SettingsRow, SettingsSection } from "@/features/settings/components"
@@ -28,6 +32,7 @@ export default function SettingsScreen() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
+  const [pushRegistered, setPushRegistered] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [togglingDigest, setTogglingDigest] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -70,6 +75,7 @@ export default function SettingsScreen() {
           if (createError) throw createError
           setSettings(created)
         }
+        setPushRegistered(await getPushRegistrationStatus().catch(() => false))
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load settings.")
       } finally {
@@ -171,14 +177,17 @@ export default function SettingsScreen() {
     if (!settings || toggling) return
     setToggling(true)
     try {
-      const currentlyOn =
+      const pushPreferenceOn =
         settings.push_followups_enabled ||
         settings.push_birthdays_enabled ||
         settings.push_important_moments_enabled
+      const currentlyOn = pushPreferenceOn && pushRegistered
       if (currentlyOn) {
         await revokePushToken()
+        setPushRegistered(false)
       } else {
         await registerPushToken()
+        setPushRegistered(true)
       }
       await updateSettingsPatch({
         push_followups_enabled: !currentlyOn,
@@ -195,11 +204,17 @@ export default function SettingsScreen() {
 
   if (loading) return <LoadingState />
 
-  const pushOn = Boolean(
+  const pushPreferenceOn = Boolean(
     settings?.push_followups_enabled ||
       settings?.push_birthdays_enabled ||
       settings?.push_important_moments_enabled,
   )
+  const pushOn = pushPreferenceOn && pushRegistered
+  const pushDescription = pushOn
+    ? "Reminder notifications are enabled and this device is registered."
+    : pushPreferenceOn
+      ? "Reminder notifications are enabled for your account, but this device is not registered. Tap to enable this device."
+      : "Enable reminder notifications and register this device."
 
   return (
     <Screen>
@@ -284,7 +299,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="notifications-outline"
             title="Push notifications"
-            description="Saves your reminder preference and registers this device. Reminder delivery is still in development and not live yet."
+            description={pushDescription}
             value={pushOn ? "On" : "Off"}
             disabled={toggling || !settings}
             onPress={togglePushNotifications}
