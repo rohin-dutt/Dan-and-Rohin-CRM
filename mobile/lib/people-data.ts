@@ -1,7 +1,9 @@
+import { DeviceEventEmitter } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { buildMomentInsertRows, type ImportantMomentDraft } from "@roots/shared"
 import { findRelationshipCategory } from "@/constants/categories"
 import { getOrCreateTag } from "@/lib/tags"
+import { PEOPLE_CHANGED_EVENT } from "@/lib/onboarding-status"
 import type { Person } from "@/types"
 
 // Column values written to the `people` table by add/edit/onboarding flows.
@@ -83,6 +85,7 @@ export async function createPersonWithRelations(input: {
   if (insertError) throw insertError
 
   const personId = created.id as string
+  DeviceEventEmitter.emit(PEOPLE_CHANGED_EVENT)
 
   try {
     const tagId = await assignRelationshipTag(userId, personId, categoryLabel)
