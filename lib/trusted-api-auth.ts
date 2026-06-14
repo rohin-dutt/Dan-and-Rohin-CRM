@@ -6,7 +6,7 @@ import {
 } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-import { apiError } from "@/lib/api-errors";
+import { apiError } from "./api-errors.ts";
 
 type TrustedAuthSuccess = {
   ok: true;

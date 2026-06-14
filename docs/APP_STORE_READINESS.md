@@ -152,13 +152,15 @@ Push Notifications:
   - Mobile Settings exposes one push notification toggle backed by follow-up,
     birthday, and important-moment push preference columns.
 - [x] Notification payloads avoid private notes/details.
-  - No sender is active yet. Token registration and delivery logging store only
-    privacy-safe metadata.
+  - The code-ready sender uses generic copy only and includes routing metadata,
+    not notes, raw contact payloads, contact names, or detailed relationship
+    context.
 - [x] Notification preferences, token cleanup, and delivery logging match the
       privacy policy.
-  - Settings preferences, trusted token registration, logout cleanup, and
-    server-side account deletion cleanup are implemented. Delivery sending and
-    physical-device validation remain open.
+  - Settings preferences, trusted token registration, logout cleanup,
+    server-side account deletion cleanup, protected scheduled sending,
+    idempotent delivery rows, and invalid-token marking are implemented.
+    Physical-device validation remains open.
 
 ## Accessibility And Device QA
 
@@ -220,6 +222,9 @@ Screenshot rules:
 - [ ] Contacts import.
 - [ ] Push notification delivery.
 - [ ] Notification deep link.
+  - Code-ready tap handling is implemented for person detail, People
+    follow-up filters, and Dashboard fallback. TestFlight/App Store iPhone QA
+    is still required.
 - [ ] Offline app launch with cached data.
 - [ ] Export.
 - [ ] Import/update.

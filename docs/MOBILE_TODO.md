@@ -322,23 +322,42 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [x] Add notification preferences to Settings.
   - Mobile Settings now exposes one push notification preference toggle backed
     by follow-up, birthday, and important-moment push columns.
-- [ ] Build trusted sender for due follow-ups, birthdays, and important
+- [x] Build trusted sender for due follow-ups, birthdays, and important
       moments.
-  - Schema now supports `notification_deliveries.kind = 'important_moment'`
-    and mobile can store important moments. Scheduled delivery still requires
-    trusted sender/cron implementation and deployment configuration.
-- [ ] Add delivery logging or idempotency protection.
-- [ ] Add timezone handling.
-- [ ] Add quiet-hours or send-window behavior if approved.
-- [ ] Add notification deep links.
+  - Added protected Next.js route `/api/mobile/send-push-reminders` using
+    `CRON_SECRET`, server-only `SUPABASE_SERVICE_ROLE_KEY`, stored Expo push
+    tokens, privacy-safe notification payloads, and the Expo Push API.
+  - The code selects due/overdue explicit follow-ups, conservative cadence
+    check-ins when no explicit open follow-up owns the person, upcoming
+    birthdays, and important moments.
+  - Deployment, credentials, and real-device delivery remain open below.
+- [x] Add delivery logging or idempotency protection.
+  - `notification_deliveries` is used with stable per-token idempotency keys,
+    `sent`, `failed`, `skipped`, and `invalid_token` states, attempt counts,
+    last-attempt timestamps, provider message ids, and permanent Expo token
+    invalidation for errors such as `DeviceNotRegistered`.
+- [x] Add timezone handling.
+  - Mobile registration sends the device timezone to the trusted token route,
+    which stores it on `settings.notification_timezone` when valid.
+- [x] Add quiet-hours or send-window behavior if approved.
+  - The sender uses a conservative 9:00-18:00 local send window and falls back
+    to UTC when no valid notification timezone is stored. No quiet-hours UI was
+    added.
+- [x] Add notification deep links.
+  - Mobile installs a foreground notification handler and tap/response handler
+    at app startup. Taps route to person detail when `personId` is available,
+    otherwise to the filtered People follow-up view for follow-up reminders or
+    the Dashboard fallback for birthday/important moment reminders.
 - [x] Clean token on logout/account deletion where appropriate.
   - Mobile logout calls trusted token revocation before sign-out; account
     deletion marks the user's push tokens revoked before deleting the auth user.
 - [x] Verify notification payloads avoid notes and sensitive relationship
       details.
-  - No push sender payload is implemented yet. The stored token route does not
-    persist notification body text, notes, raw contact payloads, or relationship
-    details; `notification_deliveries` is privacy-safe metadata only.
+  - Push payloads use generic copy and include only routing metadata such as
+    kind, subject id, person id, and interaction/important-moment id. They do
+    not include notes, raw contact payloads, contact names, or detailed
+    relationship context; `notification_deliveries` remains privacy-safe
+    metadata only.
 - [ ] Verify notification delivery on physical iPhone.
 
 ## Phase 10: Offline Read Cache

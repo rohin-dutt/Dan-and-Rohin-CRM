@@ -13,10 +13,22 @@ type PushTokenBody = {
   app_version?: unknown;
   build_number?: unknown;
   environment?: unknown;
+  notification_timezone?: unknown;
 };
 
 function stringOrNull(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function validTimezoneOrNull(value: unknown) {
+  const timezone = stringOrNull(value);
+  if (!timezone) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return null;
+  }
 }
 
 async function readBody(request: Request): Promise<PushTokenBody | Response> {
@@ -58,6 +70,7 @@ export async function POST(request: Request) {
   }
 
   const adminClient = createServiceRoleClient();
+  const now = new Date().toISOString();
   const { data, error } = await adminClient
     .from("push_tokens")
     .upsert(
@@ -72,7 +85,7 @@ export async function POST(request: Request) {
         build_number: stringOrNull(body.build_number),
         environment: stringOrNull(body.environment) ?? "development",
         status: "active",
-        last_seen_at: new Date().toISOString(),
+        last_seen_at: now,
         revoked_at: null,
       },
       { onConflict: "token" }
@@ -84,7 +97,55 @@ export async function POST(request: Request) {
     return apiError(error.message, 400);
   }
 
+  const timezone = validTimezoneOrNull(body.notification_timezone);
+  if (timezone) {
+    const { error: timezoneError } = await adminClient
+      .from("settings")
+      .upsert(
+        {
+          user_id: auth.user.id,
+          notification_timezone: timezone,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (timezoneError) {
+      return apiError(timezoneError.message, 400);
+    }
+  }
+
   return Response.json({ ok: true, push_token: data });
+}
+
+export async function GET(request: Request) {
+  const auth = await authenticateTrustedRequest(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const token = stringOrNull(searchParams.get("token"));
+  const appInstallId = stringOrNull(searchParams.get("app_install_id"));
+
+  if (!token && !appInstallId) {
+    return Response.json({ ok: true, active: false, push_token: null });
+  }
+
+  const adminClient = createServiceRoleClient();
+  let query = adminClient
+    .from("push_tokens")
+    .select("id, status, last_seen_at")
+    .eq("user_id", auth.user.id)
+    .eq("status", "active");
+
+  query = token ? query.eq("token", token) : query.eq("app_install_id", appInstallId);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    return apiError(error.message, 400);
+  }
+
+  return Response.json({ ok: true, active: Boolean(data), push_token: data ?? null });
 }
 
 export async function DELETE(request: Request) {
@@ -110,6 +171,7 @@ export async function DELETE(request: Request) {
     .update({
       status: "revoked",
       revoked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     })
     .eq("user_id", auth.user.id);
 

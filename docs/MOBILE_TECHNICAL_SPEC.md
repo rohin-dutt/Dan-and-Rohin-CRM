@@ -423,11 +423,31 @@ Push backend decision: scheduled push sending starts in the existing
 Next.js/Vercel backend. Use a protected route plus a trusted scheduler, such as
 Vercel Cron, when scheduled delivery is implemented.
 
+Implemented code-ready sender:
+
+- Route: `/api/mobile/send-push-reminders`.
+- Scheduler: `vercel.json` cron invokes the route during a conservative UTC
+  daytime range; the route also enforces a 9:00-18:00 local user send window.
+- Auth: route requires `Authorization: Bearer $CRON_SECRET`.
+- Privilege: route uses `SUPABASE_SERVICE_ROLE_KEY` server-side only.
+- Sender: stored active Expo push tokens are sent through the Expo Push API.
+- Selection: explicit due-today follow-ups, explicit overdue follow-ups,
+  conservative cadence check-ins where no open explicit follow-up owns the
+  person, upcoming birthdays, and important moments.
+- Idempotency/logging: `notification_deliveries` records stable per-token
+  idempotency keys, attempts, provider ids, and `sent`, `failed`, `skipped`,
+  or `invalid_token` status without storing notification body text.
+- Receipts: immediate Expo ticket/receipt failures are recorded, and permanent
+  token failures such as `DeviceNotRegistered` mark the token invalid.
+- Payload privacy: notification copy is generic and payload data contains only
+  routing metadata. Private notes, raw contacts, names, and detailed
+  relationship context are not sent.
+
 Important moments use the user-owned `important_moments` table. Mobile can
 create, edit, delete, and display those rows now. The schema also supports
 privacy-safe `notification_deliveries.kind = 'important_moment'`, but actual
-scheduled delivery still requires the trusted sender/cron job to include that
-kind.
+scheduled delivery still requires deployment, credentials, and real-device
+verification after this code-ready sender is shipped.
 
 ## Notes And Touch Points
 
