@@ -3,14 +3,14 @@ import { Alert, Linking, Share, Text, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
-import { BrandHeader, Divider } from "@/components/RootsUI"
+import { Divider } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
 import { clearLocalPrivateData } from "@/lib/private-data"
 import { registerPushToken, revokePushToken } from "@/lib/push-notifications"
 import { displayNameFromMetadata } from "@/lib/user-metadata"
-import { fonts } from "@/constants/theme"
+import { colors, fonts } from "@/constants/theme"
 import { InlineForm, SettingsRow, SettingsSection } from "@/features/settings/components"
 import { useDataManagement } from "@/features/settings/use-data-management"
 import type { Settings } from "@/types"
@@ -203,13 +203,22 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <BrandHeader
-        title="Settings"
-        subtitle="Manage your account and preferences."
-        actionIcon="person-outline"
-        actionLabel="Profile settings"
-        onAction={() => setExpanded((current) => current === "profile" ? null : "profile")}
-      />
+      <View className="px-5 pt-4 pb-3">
+        <Text
+          style={{ fontFamily: fonts.heading, color: colors.forest }}
+          className="text-[32px] leading-[38px]"
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
+          Settings
+        </Text>
+        <Text
+          style={{ fontFamily: fonts.body, color: colors.ink }}
+          className="mt-1 text-[15px] leading-5"
+        >
+          Manage your account and preferences.
+        </Text>
+      </View>
 
       <View className="px-5 pb-8">
         {error ? <ErrorBanner message={error} /> : null}
