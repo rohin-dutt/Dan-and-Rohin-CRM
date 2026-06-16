@@ -32,11 +32,13 @@ type LocationGroup = {
   people: MapPerson[]
 }
 
-// The floating tab bar overlays the bottom ~100px of the screen, so the
-// collapsed peek must be tall enough that the "Locations" header and the
-// people/locations subtext are fully visible above it.
 const SHEET_EXPANDED_HEIGHT = 460
-const SHEET_COLLAPSED_HEIGHT = 208
+// The floating tab bar visually covers the bottom of this sheet. Keep the
+// collapsed state to a header-sized peek above that tab bar instead of exposing
+// blank list space.
+const SHEET_TAB_BAR_OVERLAP_HEIGHT = 92
+const SHEET_COLLAPSED_PEEK_HEIGHT = 84
+const SHEET_COLLAPSED_HEIGHT = SHEET_TAB_BAR_OVERLAP_HEIGHT + SHEET_COLLAPSED_PEEK_HEIGHT
 const SHEET_TRAVEL = SHEET_EXPANDED_HEIGHT - SHEET_COLLAPSED_HEIGHT
 
 function clampSheetOffset(value: number) {

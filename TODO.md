@@ -16,6 +16,8 @@ the roadmap or architecture direction changes.
       Reconfirmed during cadence-anchor work with `npm run lint`: same
       site `react/no-unescaped-entities` errors blocked verification before
       `npm run build` could be run.
+      Reconfirmed during mobile Roots map collapsed-sheet work with
+      `npm run lint`: same unrelated site errors blocked verification.
 - [ ] `npm.cmd run build` fails without `RESEND_API_KEY` during `/api/contact`
       page-data collection. Command: `npm.cmd run build`. Failure summary:
       build compiles and type-checks, then throws `Missing API key. Pass it to
