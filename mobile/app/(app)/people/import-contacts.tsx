@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { DeviceEventEmitter, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import * as Contacts from "expo-contacts"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
@@ -9,19 +9,12 @@ import { EmptyState } from "@/components/EmptyState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
 import { Screen } from "@/components/Screen"
-import { callTrustedApi } from "@/lib/trusted-api"
 import { supabase } from "@/lib/supabase"
-import { mapDeviceContact, toContactImportPayload, type ImportCandidate } from "@/lib/contact-import"
+import { mapDeviceContact, toContactImportDraft, type ImportCandidate } from "@/lib/contact-import"
 import type { Person } from "@/types"
 import { colors } from "@/constants/theme"
 
 type PermissionState = "unknown" | "denied" | "limited" | "granted"
-
-type ImportResponse = {
-  ok: boolean
-  imported: number
-  errors: string[]
-}
 
 function matchesCandidate(candidate: ImportCandidate, rawQuery: string) {
   const query = rawQuery.trim().toLowerCase()
@@ -37,14 +30,12 @@ export default function ImportContactsScreen() {
   const router = useRouter()
   const [permissionState, setPermissionState] = useState<PermissionState>("unknown")
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<ImportCandidate[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [hiddenDuplicateIds, setHiddenDuplicateIds] = useState<Set<string>>(new Set())
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [search, setSearch] = useState("")
-  const [result, setResult] = useState<string | null>(null)
 
   const visibleCandidates = useMemo(
     () =>
@@ -57,9 +48,9 @@ export default function ImportContactsScreen() {
     [candidates, hiddenDuplicateIds, search, showDuplicates],
   )
 
-  const selectedCandidates = useMemo(
-    () => candidates.filter((candidate) => selectedIds.has(candidate.id)),
-    [candidates, selectedIds],
+  const selectedCandidate = useMemo(
+    () => candidates.find((candidate) => candidate.id === selectedId) ?? null,
+    [candidates, selectedId],
   )
   const duplicateCount = candidates.filter((candidate) => candidate.duplicateReason != null).length
   const visibleDuplicateCount = visibleCandidates.filter((candidate) => candidate.duplicateReason != null).length
@@ -82,7 +73,6 @@ export default function ImportContactsScreen() {
   async function requestAndLoadContacts() {
     setLoading(true)
     setError(null)
-    setResult(null)
     setSearch("")
 
     try {
@@ -90,7 +80,7 @@ export default function ImportContactsScreen() {
       if (!permission.granted) {
         setPermissionState("denied")
         setCandidates([])
-        setSelectedIds(new Set())
+        setSelectedId(null)
         return
       }
 
@@ -101,8 +91,13 @@ export default function ImportContactsScreen() {
         Contacts.getContactsAsync({
           fields: [
             Contacts.Fields.Name,
+            Contacts.Fields.FirstName,
+            Contacts.Fields.LastName,
             Contacts.Fields.Emails,
             Contacts.Fields.PhoneNumbers,
+            Contacts.Fields.Birthday,
+            Contacts.Fields.Company,
+            Contacts.Fields.JobTitle,
           ],
         }),
       ])
@@ -115,7 +110,7 @@ export default function ImportContactsScreen() {
       setCandidates(mapped)
       setHiddenDuplicateIds(new Set())
       setShowDuplicates(false)
-      setSelectedIds(new Set(mapped.filter((candidate) => candidate.duplicateReason == null).map((candidate) => candidate.id)))
+      setSelectedId(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load contacts.")
     } finally {
@@ -123,13 +118,8 @@ export default function ImportContactsScreen() {
     }
   }
 
-  function toggleContact(id: string) {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function selectContact(id: string) {
+    setSelectedId((current) => (current === id ? null : id))
   }
 
   function removeDuplicates() {
@@ -137,68 +127,22 @@ export default function ImportContactsScreen() {
       .filter((candidate) => candidate.duplicateReason != null)
       .map((candidate) => candidate.id)
     setHiddenDuplicateIds(new Set(duplicateIds))
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      duplicateIds.forEach((id) => next.delete(id))
-      return next
-    })
+    if (selectedId && duplicateIds.includes(selectedId)) setSelectedId(null)
   }
 
   function clearSelection() {
-    setSelectedIds(new Set())
+    setSelectedId(null)
   }
 
-  async function importSelectedContacts() {
-    if (selectedCandidates.length === 0) {
-      setError("Select at least one contact to import.")
+  function useSelectedContact() {
+    if (!selectedCandidate) {
+      setError("Select one contact to import.")
       return
     }
 
-    const duplicateSelections = selectedCandidates.filter((candidate) => candidate.duplicateReason != null).length
-    if (duplicateSelections > 0) {
-      Alert.alert(
-        "Import possible duplicates?",
-        `${duplicateSelections} selected contact${duplicateSelections === 1 ? "" : "s"} may already exist. Roots will create new people for this import.`,
-        [
-          { text: "Review", style: "cancel" },
-          { text: "Import", style: "destructive", onPress: () => void submitImport() },
-        ],
-      )
-      return
-    }
-
-    await submitImport()
-  }
-
-  async function submitImport() {
-    setSaving(true)
     setError(null)
-    setResult(null)
-    const submittedIds = new Set(selectedCandidates.map((candidate) => candidate.id))
-
-    try {
-      const response = await callTrustedApi("/api/import/contacts", {
-        body: {
-          contacts: selectedCandidates.map(toContactImportPayload),
-        },
-      }) as ImportResponse
-
-      const failures = response.errors.length
-      setResult(`Imported ${response.imported} contact${response.imported === 1 ? "" : "s"}${failures ? ` with ${failures} warning${failures === 1 ? "" : "s"}` : ""}.`)
-      if (failures === 0) {
-        setCandidates((current) => current.filter((candidate) => !submittedIds.has(candidate.id)))
-        setSelectedIds(new Set())
-        setHiddenDuplicateIds((current) => {
-          const next = new Set(current)
-          submittedIds.forEach((id) => next.delete(id))
-          return next
-        })
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to import contacts.")
-    } finally {
-      setSaving(false)
-    }
+    DeviceEventEmitter.emit("contactImportDraft", toContactImportDraft(selectedCandidate))
+    router.back()
   }
 
   if (loading) return <LoadingState />
@@ -215,19 +159,13 @@ export default function ImportContactsScreen() {
         </View>
 
         {error && <ErrorBanner message={error} />}
-        {result && (
-          <View className="rounded-xl bg-green-50 border border-green-100 px-3 py-2 mb-3">
-            <Text className="text-sm text-green-700">{result}</Text>
-          </View>
-        )}
-
         {candidates.length === 0 ? (
           <Card>
             <Text className="text-base font-semibold text-warm-black mb-2">
               Choose contacts to add to Roots
             </Text>
             <Text className="text-sm text-gray-600 mb-4">
-              Roots imports only the selected names and contact details you approve.
+              Roots only fills the Add Person form with the contact you choose.
             </Text>
             {permissionState === "denied" && (
               <Text className="text-sm text-red-600 mb-4">
@@ -250,7 +188,7 @@ export default function ImportContactsScreen() {
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-1 pr-3">
                 <Text className="text-sm font-semibold text-warm-black">
-                  {selectedCandidates.length} selected of {visibleCandidates.length} shown
+                  {selectedCandidate ? "1 selected" : "Select one contact"} of {visibleCandidates.length} shown
                 </Text>
                 <Text className="text-xs text-gray-500">
                   {permissionState === "limited" ? "Limited Contacts access. " : ""}
@@ -292,10 +230,9 @@ export default function ImportContactsScreen() {
             )}
 
             <Button
-              title={`Import ${selectedCandidates.length} selected`}
-              onPress={importSelectedContacts}
-              loading={saving}
-              disabled={selectedCandidates.length === 0}
+              title={selectedCandidate ? "Use selected contact" : "Select a contact"}
+              onPress={useSelectedContact}
+              disabled={!selectedCandidate}
             />
           </>
         )}
@@ -308,15 +245,20 @@ export default function ImportContactsScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 32 }}
           renderItem={({ item }) => {
-            const selected = selectedIds.has(item.id)
+            const selected = selectedId === item.id
             return (
-              <TouchableOpacity onPress={() => toggleContact(item.id)} activeOpacity={0.75}>
+              <TouchableOpacity onPress={() => selectContact(item.id)} activeOpacity={0.75}>
                 <Card className={`mb-3 ${selected ? "border-sage" : ""}`}>
                   <View className="flex-row items-start justify-between gap-3">
                     <View className="flex-1">
                       <Text className="text-sm font-semibold text-warm-black">{item.name}</Text>
                       {item.email && <Text className="text-xs text-gray-500 mt-1">{item.email}</Text>}
                       {item.displayPhone && <Text className="text-xs text-gray-500 mt-1">{item.displayPhone}</Text>}
+                      {(item.company || item.role) && (
+                        <Text className="text-xs text-gray-500 mt-1">
+                          {[item.role, item.company].filter(Boolean).join(" at ")}
+                        </Text>
+                      )}
                       {item.duplicateReason && (
                         <Text className="text-xs text-amber-700 mt-2">{item.duplicateReason}</Text>
                       )}

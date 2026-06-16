@@ -5,7 +5,12 @@ import {
   findDuplicateContacts,
   getFollowUpState,
   getFollowUpQueue,
+  getBirthdayReminders,
   getTotalInteractions,
+  getNextActionDays,
+  getNextDueDays,
+  getRelationshipStatus,
+  getUpcomingMoments,
   isTouchPoint,
   shouldTouchLastContacted,
 } from "../packages/shared/index.ts";
@@ -67,6 +72,131 @@ test("historical interactions do not replace newer last-contacted dates", () => 
   assert.equal(shouldTouchLastContacted(null, "2026-05-01"), true);
   assert.equal(shouldTouchLastContacted("2026-05-10", "2026-05-11"), true);
   assert.equal(shouldTouchLastContacted("2026-05-10", "2026-04-30"), false);
+});
+
+test("cadence starts from created date before the first interaction", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+
+  assert.equal(
+    getNextDueDays(
+      {
+        id: "created-today",
+        created_at: "2026-05-11T09:00:00Z",
+        last_contacted_at: null,
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    30
+  );
+
+  assert.equal(
+    getNextDueDays(
+      {
+        id: "created-29-days-ago",
+        created_at: "2026-04-12T09:00:00Z",
+        last_contacted_at: null,
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    1
+  );
+  assert.equal(
+    getRelationshipStatus(
+      {
+        id: "created-29-days-ago",
+        created_at: "2026-04-12T09:00:00Z",
+        last_contacted_at: null,
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    "due_this_week"
+  );
+
+  assert.equal(
+    getNextDueDays(
+      {
+        id: "created-31-days-ago",
+        created_at: "2026-04-10T09:00:00Z",
+        last_contacted_at: null,
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    -1
+  );
+  assert.equal(
+    getRelationshipStatus(
+      {
+        id: "created-31-days-ago",
+        created_at: "2026-04-10T09:00:00Z",
+        last_contacted_at: null,
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    "overdue"
+  );
+});
+
+test("cadence uses last-contacted date when an interaction exists", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+
+  assert.equal(
+    getNextDueDays(
+      {
+        id: "contacted",
+        created_at: "2026-01-01T09:00:00Z",
+        last_contacted_at: "2026-05-01",
+        contact_frequency_days: 30,
+      },
+      today
+    ),
+    20
+  );
+});
+
+test("new contacts without interactions are not categorized as recently contacted", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+  const person = {
+    id: "created-today",
+    created_at: "2026-05-11T09:00:00Z",
+    last_contacted_at: null,
+    contact_frequency_days: 30,
+  };
+
+  const sections = categorizePeople([person], today);
+
+  assert.deepEqual(sections.recentlyContacted, []);
+  assert.deepEqual(sections.comingUp.map((item) => item.id), ["created-today"]);
+});
+
+test("open follow-up dates still take precedence over later cadence dates", () => {
+  const today = new Date("2026-05-11T12:00:00Z");
+  const person = {
+    id: "follow-up-first",
+    created_at: "2026-05-11T09:00:00Z",
+    last_contacted_at: null,
+    contact_frequency_days: 30,
+  };
+  const interactions = [
+    {
+      id: "open-follow-up",
+      person_id: "follow-up-first",
+      type: "Call",
+      is_touch_point: true,
+      follow_up_needed: true,
+      follow_up_date: "2026-05-14",
+      follow_up_status: "open",
+    },
+  ];
+
+  assert.equal(getNextActionDays(person, "2026-05-14", today), 3);
+
+  const sections = categorizePeople([person], today, interactions);
+  assert.deepEqual(sections.dueThisWeek.map((item) => item.id), ["follow-up-first"]);
 });
 
 test("follow-up queue separates overdue, due, done, and snoozed states", () => {
@@ -180,4 +310,32 @@ test("duplicate detection normalizes email, names, accents, and punctuation", ()
   assert.match(warnings.get("name-a"), /name/);
   assert.match(warnings.get("name-b"), /name/);
   assert.equal(warnings.has("unique"), false);
+});
+
+test("birthday reminders use month and day without requiring a year", () => {
+  const today = new Date("2026-06-01T12:00:00Z");
+  const people = [
+    {
+      id: "unknown-year",
+      name: "No Year",
+      birthday_month: 6,
+      birthday_day: 10,
+      birthday_year: null,
+      birthday: null,
+    },
+    {
+      id: "known-year",
+      name: "Known Year",
+      birthday_month: 6,
+      birthday_day: 11,
+      birthday_year: 1990,
+      birthday: "1990-06-11",
+    },
+  ];
+
+  const reminders = getBirthdayReminders(people, today, 14);
+  assert.deepEqual(reminders.map(({ person }) => person.id), ["unknown-year", "known-year"]);
+
+  const moments = getUpcomingMoments(people, [], today, 14);
+  assert.deepEqual(moments.map((moment) => moment.sourceDate), ["Jun 10", "Jun 11, 1990"]);
 });

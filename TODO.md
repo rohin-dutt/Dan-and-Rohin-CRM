@@ -6,6 +6,23 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] `npm.cmd run lint` fails on unrelated existing website lint errors.
+      Command: `npm.cmd run lint`. Failure summary:
+      `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
+      `app/(site)/contact/ContactForm.tsx`, `app/(site)/page.tsx`, and
+      `app/(site)/terms/page.tsx`; warnings also remain for existing `<img>`
+      usage and an unused `onStreakUpdate` prop in dashboard sections. Likely
+      owner: website lint cleanup / existing baseline.
+      Reconfirmed during cadence-anchor work with `npm run lint`: same
+      site `react/no-unescaped-entities` errors blocked verification before
+      `npm run build` could be run.
+- [ ] `npm.cmd run build` fails without `RESEND_API_KEY` during `/api/contact`
+      page-data collection. Command: `npm.cmd run build`. Failure summary:
+      build compiles and type-checks, then throws `Missing API key. Pass it to
+      the constructor new Resend("re_123")` while collecting page data for
+      `/api/contact`. Likely owner: contact API environment handling / build
+      configuration.
+
 - [ ] `npm test` fails on `tests/date-utils.test.mjs` with
       `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
       TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.

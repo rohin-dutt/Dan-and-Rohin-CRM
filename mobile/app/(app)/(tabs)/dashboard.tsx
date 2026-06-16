@@ -276,7 +276,7 @@ export default function DashboardScreen() {
                       {moment.person.name}
                     </Text>
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                      {moment.label} - {formatShortMonthDay(moment.sourceDate)}
+                      {moment.label} - {moment.kind === "birthday" ? moment.sourceDate : formatShortMonthDay(moment.sourceDate)}
                     </Text>
                   </View>
                 </TouchableOpacity>

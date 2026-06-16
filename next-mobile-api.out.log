@@ -1,0 +1,12 @@
+
+> personal-crm@0.1.0 dev
+> next dev -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+- Environments: .env.local
+✓ Ready in 872ms
+
+ GET / 200 in 556ms (next.js: 103ms, proxy.ts: 210ms, application-code: 242ms)
+ GET / 200 in 351ms (next.js: 275ms, proxy.ts: 8ms, application-code: 68ms)

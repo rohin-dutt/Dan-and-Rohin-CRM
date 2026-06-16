@@ -1,3 +1,5 @@
+import { formatBirthdayParts, getBirthdayParts } from "../packages/shared/index.ts";
+
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function parseDisplayDate(value: string | Date): Date {
@@ -46,16 +48,20 @@ export function formatShortDate(value: string | Date | null | undefined): string
 }
 
 export function formatBirthdayDate(
-  value: string | Date | null | undefined
+  value: string | Date | { birthday_month?: number | null; birthday_day?: number | null; birthday_year?: number | null; birthday?: string | Date | null } | null | undefined
 ): string {
   if (!value) return "Not set";
+  if (typeof value === "object" && !(value instanceof Date)) {
+    return formatBirthdayParts(getBirthdayParts(value));
+  }
   const normalized =
     typeof value === "string" && value.includes("T") ? value.slice(0, 10) : value;
   const date = parseDisplayDate(normalized);
   if (Number.isNaN(date.getTime())) return "Unknown";
   return date.toLocaleDateString("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
+    year: "numeric",
   });
 }
 

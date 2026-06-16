@@ -14,7 +14,10 @@ The reproducible schema lives in `supabase/migrations`. Row-Level Security (RLS)
 | company | text | no |
 | role | text | no |
 | location | text | no |
-| birthday | date | no |
+| birthday_month | integer | no; 1-12 when birthday is set |
+| birthday_day | integer | no; valid day for the month when birthday is set |
+| birthday_year | integer | no; nullable for unknown-year birthdays |
+| birthday | date | no; legacy compatibility date only when a birth year is known |
 | how_met | text | no |
 | relationship_type | text | no |
 | relationship_strength | text | no |
@@ -197,6 +200,12 @@ bodies, or raw contact payloads.
 ## Migration Notes
 
 - Cascading deletes are defined in migrations for user-owned people, interactions, tags, person tags, settings, push tokens, person notes, important moments, and notification deliveries.
+- The local migration `20260616090000_birthday_parts.sql` adds
+  `people.birthday_month`, `people.birthday_day`, and nullable
+  `people.birthday_year`, backfills them from legacy `people.birthday`, and
+  updates restore/import to round-trip both new birthday parts and older
+  full-date exports. The legacy `birthday` date remains for compatibility and
+  is written only when a year is known.
 - The target Supabase project `ojebeswabngvcktqsduc` has the follow-up helper migration, person-tag ownership hardening migration, and restored user-owned cascade constraints applied.
 - The local migration `20260514171147_reconcile_target_schema_drift.sql` reconciles older target-project drift in nullability, defaults, `people.last_contacted_at`, check constraints, and tag-name uniqueness. Apply it to the linked project only as an intentional database release step after reviewing existing data.
 - The local migration `20260516170000_mobile_notification_readiness.sql` adds mobile push token storage, push notification settings fields, and privacy-safe notification delivery logging/idempotency records for the Roots iOS app.

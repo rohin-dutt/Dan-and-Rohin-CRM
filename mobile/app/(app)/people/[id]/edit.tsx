@@ -15,9 +15,11 @@ import { colors, fonts } from "@/constants/theme"
 import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
 import {
+  birthdayPartsToLegacyDate,
+  getBirthdayParts,
+  isValidBirthdayParts,
   normalizeMomentDrafts,
-  parseLocalDateString,
-  toLocalDateString,
+  type BirthdayParts,
   type ImportantMomentDraft,
 } from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
@@ -45,7 +47,7 @@ export default function EditPersonScreen() {
   const [category, setCategory] = useState<RelationshipCategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
+  const [birthday, setBirthday] = useState<BirthdayParts>({ month: null, day: null, year: null })
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [notes, setNotes] = useState("")
@@ -90,9 +92,7 @@ export default function EditPersonScreen() {
         resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
         setNotes(p.notes ?? "")
 
-        if (p.birthday) {
-          setBirthdayDate(parseLocalDateString(p.birthday))
-        }
+        setBirthday(getBirthdayParts(p))
 
         const cat = findRelationshipCategory(p.relationship_type)
         if (cat) setCategory(cat.label)
@@ -129,6 +129,10 @@ export default function EditPersonScreen() {
       setCategoryError("Please select a relationship type.")
       return
     }
+    if (!isValidBirthdayParts(birthday)) {
+      setError("Enter a valid birthday or clear the birthday fields.")
+      return
+    }
     const cleanName = `${firstName.trim()} ${lastName.trim()}`
     const { moments: cleanMoments, valid } = normalizeMomentDrafts(importantMoments)
     if (!valid) {
@@ -157,7 +161,10 @@ export default function EditPersonScreen() {
           notes: notes.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
-          birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
+          birthday_month: birthday.month,
+          birthday_day: birthday.day,
+          birthday_year: birthday.year,
+          birthday: birthdayPartsToLegacyDate(birthday),
           how_met: howMet.trim() || null,
           location: trimmedLocation || null,
           latitude: trimmedLocation ? locationField.latitude : null,
@@ -404,7 +411,7 @@ export default function EditPersonScreen() {
 
           {/* Conditional: Birthday for Friend/Family */}
           {(category === "Friend" || category === "Family") ? (
-            <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+            <BirthdayField value={birthday} onChange={setBirthday} />
           ) : null}
 
           {/* Conditional: Email + Company for Professional */}
@@ -484,7 +491,7 @@ export default function EditPersonScreen() {
               ) : null}
 
               {category === "Professional" ? (
-                <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+                <BirthdayField value={birthday} onChange={setBirthday} />
               ) : null}
 
               <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />

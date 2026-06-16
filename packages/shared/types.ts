@@ -9,6 +9,9 @@ export type Person = {
   location: string | null;
   latitude: number | null;
   longitude: number | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
+  birthday_year: number | null;
   birthday: string | null;
   how_met: string | null;
   relationship_type: string | null;

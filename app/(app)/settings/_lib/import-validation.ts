@@ -98,6 +98,11 @@ function validatePerson(value: unknown, index: number): asserts value is Person 
   optionalString(value, "company", label);
   optionalString(value, "role", label);
   optionalString(value, "location", label);
+  optionalNumber(value, "latitude", label);
+  optionalNumber(value, "longitude", label);
+  optionalNumber(value, "birthday_month", label);
+  optionalNumber(value, "birthday_day", label);
+  optionalNumber(value, "birthday_year", label);
   optionalString(value, "birthday", label);
   optionalString(value, "how_met", label);
   optionalString(value, "relationship_type", label);
@@ -251,5 +256,19 @@ function optionalString(
     typeof record[key] !== "string"
   ) {
     throw new Error(`${label}.${key} must be a string or null.`);
+  }
+}
+
+function optionalNumber(
+  record: Record<string, unknown>,
+  key: string,
+  label: string
+) {
+  if (
+    record[key] !== undefined &&
+    record[key] !== null &&
+    (typeof record[key] !== "number" || !Number.isFinite(record[key]))
+  ) {
+    throw new Error(`${label}.${key} must be a number or null.`);
   }
 }

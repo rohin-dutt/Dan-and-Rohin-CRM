@@ -524,11 +524,9 @@ export function DashboardSections({
             {birthdays.map(
               ({
                 person,
-                nextBirthday,
                 daysUntil,
               }: {
                 person: Person;
-                nextBirthday: Date;
                 daysUntil: number;
               }) => (
                 <PersonCard
@@ -540,7 +538,7 @@ export function DashboardSections({
                       : `In ${pluralize(daysUntil, "day")}`
                   }
                   badgeStyle="bg-fuchsia-100 text-fuchsia-700"
-                  subtext={`Birthday: ${formatBirthdayDate(nextBirthday)}`}
+                  subtext={`Birthday: ${formatBirthdayDate(person)}`}
                 />
               )
             )}

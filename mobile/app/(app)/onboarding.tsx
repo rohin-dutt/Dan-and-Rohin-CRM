@@ -10,7 +10,7 @@ import { InlineDateField } from "@/components/InlineDateField"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
 import { RELATIONSHIP_CATEGORIES } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS } from "@/constants/frequencies"
-import { INTERACTION_TYPES, toLocalDateString } from "@roots/shared"
+import { birthdayPartsToLegacyDate, INTERACTION_TYPES, parseBirthdayDate, toLocalDateString } from "@roots/shared"
 
 export default function OnboardingScreen() {
   const router = useRouter()
@@ -94,7 +94,10 @@ export default function OnboardingScreen() {
           contact_frequency_days: selectedFreq,
           company: isProfessional && company.trim() ? company.trim() : null,
           role: isProfessional && role.trim() ? role.trim() : null,
-          birthday: hasBirthday && birthday ? toLocalDateString(birthday) : null,
+          birthday_month: hasBirthday && birthday ? parseBirthdayDate(birthday).month : null,
+          birthday_day: hasBirthday && birthday ? parseBirthdayDate(birthday).day : null,
+          birthday_year: hasBirthday && birthday ? parseBirthdayDate(birthday).year : null,
+          birthday: hasBirthday && birthday ? birthdayPartsToLegacyDate(parseBirthdayDate(birthday)) : null,
           relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
         },
         categoryLabel: selectedCategory || null,

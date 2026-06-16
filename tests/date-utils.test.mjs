@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   formatDate,
+  formatBirthdayDate,
   formatShortDate,
 } from "../lib/date-utils.ts";
 
@@ -34,4 +35,16 @@ test("invalid strings return unknown", () => {
 
 test("date objects keep existing formatting behavior", () => {
   assert.equal(formatDate(new Date(2026, 4, 11)), "May 11, 2026");
+});
+
+test("birthday formatting supports unknown and known years", () => {
+  assert.equal(
+    formatBirthdayDate({ birthday_month: 6, birthday_day: 10, birthday_year: null, birthday: null }),
+    "June 10"
+  );
+  assert.equal(
+    formatBirthdayDate({ birthday_month: 6, birthday_day: 10, birthday_year: 1990, birthday: null }),
+    "June 10, 1990"
+  );
+  assert.equal(formatBirthdayDate("1990-06-10"), "June 10, 1990");
 });

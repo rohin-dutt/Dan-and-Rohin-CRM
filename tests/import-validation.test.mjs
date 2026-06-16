@@ -22,6 +22,9 @@ test("import validation accepts exported people, tags, interactions, and person 
           id: "person-1",
           user_id: "source-user",
           name: "Imported Person",
+          birthday_month: 6,
+          birthday_day: 10,
+          birthday_year: null,
           contact_frequency_days: 30,
           created_at: "2026-05-13T00:00:00.000Z",
         },
@@ -65,6 +68,8 @@ test("import validation accepts exported people, tags, interactions, and person 
   );
 
   assert.equal(payload.people?.[0]?.name, "Imported Person");
+  assert.equal(payload.people?.[0]?.birthday_month, 6);
+  assert.equal(payload.people?.[0]?.birthday_year, null);
   assert.equal(payload.tags?.[0]?.name, "Imported Tag");
   assert.equal(payload.interactions?.[0]?.person_id, "person-1");
   assert.equal(payload.person_notes?.[0]?.body, "Imported note");

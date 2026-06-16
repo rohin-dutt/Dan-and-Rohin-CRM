@@ -1,19 +1,29 @@
 import type * as Contacts from "expo-contacts"
 import type { Person } from "@/types"
+import type { BirthdayParts } from "@roots/shared"
 
 export type ImportCandidate = {
   id: string
   name: string
+  firstName: string
+  lastName: string
   email: string | null
   phone: string | null
   displayPhone: string | null
+  birthday: BirthdayParts
+  company: string | null
+  role: string | null
   duplicateReason: string | null
 }
 
-export type ContactImportPayload = {
-  name: string
-  email?: string
-  tel?: string
+export type ContactImportDraft = {
+  firstName: string
+  lastName: string
+  email: string | null
+  phone: string | null
+  birthday: BirthdayParts
+  company: string | null
+  role: string | null
 }
 
 function normalize(value: string | null | undefined) {
@@ -53,7 +63,39 @@ function formatPhoneForDisplay(entry: Contacts.PhoneNumber | null): string | nul
   return raw
 }
 
-function getDuplicateReason(candidate: ContactImportPayload, people: Person[]) {
+function splitName(contact: Contacts.ExistingContact): { name: string; firstName: string; lastName: string } | null {
+  const firstName = contact.firstName?.trim() ?? ""
+  const lastName = contact.lastName?.trim() ?? ""
+  const joined = [firstName, lastName].filter(Boolean).join(" ").trim()
+  const fallback = contact.name?.trim() ?? joined
+  if (!fallback) return null
+
+  if (firstName || lastName) {
+    return {
+      name: joined || fallback,
+      firstName: firstName || fallback,
+      lastName,
+    }
+  }
+
+  const parts = fallback.split(/\s+/)
+  return {
+    name: fallback,
+    firstName: parts[0] ?? fallback,
+    lastName: parts.slice(1).join(" "),
+  }
+}
+
+function mapBirthday(value: Contacts.Date | undefined): BirthdayParts {
+  if (!value) return { month: null, day: null, year: null }
+  return {
+    month: Number.isInteger(value.month) ? value.month + 1 : null,
+    day: Number.isInteger(value.day) ? value.day : null,
+    year: Number.isInteger(value.year) ? value.year ?? null : null,
+  }
+}
+
+function getDuplicateReason(candidate: { name: string; email?: string; tel?: string }, people: Person[]) {
   const candidateName = normalize(candidate.name)
   const candidateEmail = normalize(candidate.email)
   const candidatePhone = normalizePhone(candidate.tel)
@@ -71,12 +113,12 @@ function getDuplicateReason(candidate: ContactImportPayload, people: Person[]) {
 }
 
 export function mapDeviceContact(contact: Contacts.ExistingContact, people: Person[]): ImportCandidate | null {
-  const name = contact.name?.trim()
-  if (!name) return null
+  const nameParts = splitName(contact)
+  if (!nameParts) return null
 
   const phoneEntry = firstPhoneEntry(contact.phoneNumbers)
   const payload = {
-    name,
+    name: nameParts.name,
     email: firstEmail(contact.emails) ?? undefined,
     tel: firstPhone(contact.phoneNumbers) ?? undefined,
   }
@@ -84,17 +126,26 @@ export function mapDeviceContact(contact: Contacts.ExistingContact, people: Pers
   return {
     id: contact.id,
     name: payload.name,
+    firstName: nameParts.firstName,
+    lastName: nameParts.lastName,
     email: payload.email ?? null,
     phone: payload.tel ?? null,
     displayPhone: formatPhoneForDisplay(phoneEntry),
+    birthday: mapBirthday(contact.birthday),
+    company: contact.company?.trim() || null,
+    role: contact.jobTitle?.trim() || null,
     duplicateReason: getDuplicateReason(payload, people),
   }
 }
 
-export function toContactImportPayload(candidate: ImportCandidate): ContactImportPayload {
+export function toContactImportDraft(candidate: ImportCandidate): ContactImportDraft {
   return {
-    name: candidate.name,
-    email: candidate.email ?? undefined,
-    tel: candidate.phone ?? undefined,
+    firstName: candidate.firstName,
+    lastName: candidate.lastName,
+    email: candidate.email,
+    phone: candidate.phone,
+    birthday: candidate.birthday,
+    company: candidate.company,
+    role: candidate.role,
   }
 }

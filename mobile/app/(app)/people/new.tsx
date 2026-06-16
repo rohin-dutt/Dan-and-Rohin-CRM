@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { useEffect, useState } from "react"
+import { Alert, DeviceEventEmitter, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
@@ -11,12 +11,19 @@ import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-da
 import { colors, fonts } from "@/constants/theme"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
-import { normalizeMomentDrafts, toLocalDateString, type ImportantMomentDraft } from "@roots/shared"
+import {
+  birthdayPartsToLegacyDate,
+  isValidBirthdayParts,
+  normalizeMomentDrafts,
+  type BirthdayParts,
+  type ImportantMomentDraft,
+} from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
 import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
+import type { ContactImportDraft } from "@/lib/contact-import"
 
 export default function NewPersonScreen() {
   const router = useRouter()
@@ -30,7 +37,7 @@ export default function NewPersonScreen() {
   const [category, setCategory] = useState<RelationshipCategoryLabel | null>(null)
   const [company, setCompany] = useState("")
   const [role, setRole] = useState("")
-  const [birthdayDate, setBirthdayDate] = useState<Date | null>(null)
+  const [birthday, setBirthday] = useState<BirthdayParts>({ month: null, day: null, year: null })
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [notes, setNotes] = useState("")
@@ -40,6 +47,22 @@ export default function NewPersonScreen() {
 
   const freqMenu = useAnchoredMenu()
   const locationField = useLocationAutocomplete()
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener("contactImportDraft", (draft: ContactImportDraft) => {
+      setFirstName(draft.firstName)
+      setLastName(draft.lastName)
+      setEmail(draft.email ?? "")
+      setPhone(draft.phone ?? "")
+      setCompany(draft.company ?? "")
+      setRole(draft.role ?? "")
+      setBirthday(draft.birthday)
+      if (draft.email || draft.company || draft.role || draft.birthday.month != null) {
+        setDetailsExpanded(true)
+      }
+    })
+    return () => subscription.remove()
+  }, [])
 
   async function handleSave() {
     if (saving) return
@@ -53,6 +76,10 @@ export default function NewPersonScreen() {
     }
     if (!category) {
       setCategoryError("Please select a relationship type.")
+      return
+    }
+    if (!isValidBirthdayParts(birthday)) {
+      setError("Enter a valid birthday or clear the birthday fields.")
       return
     }
     const cleanName = `${firstName.trim()} ${lastName.trim()}`
@@ -81,7 +108,10 @@ export default function NewPersonScreen() {
           notes: notes.trim() || null,
           company: company.trim() || null,
           role: role.trim() || null,
-          birthday: birthdayDate ? toLocalDateString(birthdayDate) : null,
+          birthday_month: birthday.month,
+          birthday_day: birthday.day,
+          birthday_year: birthday.year,
+          birthday: birthdayPartsToLegacyDate(birthday),
           how_met: howMet.trim() || null,
           location: locationField.location.trim() || null,
           latitude: locationField.latitude ?? null,
@@ -159,7 +189,7 @@ export default function NewPersonScreen() {
                 Import from Contacts
               </Text>
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-xs leading-4">
-                Pull in name, phone, and email from your contacts.
+                Pull in name, contact info, birthday, and work details.
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.muted} />
@@ -334,7 +364,7 @@ export default function NewPersonScreen() {
 
           {/* Conditional: Birthday for Friend/Family */}
           {(category === "Friend" || category === "Family") ? (
-            <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+            <BirthdayField value={birthday} onChange={setBirthday} />
           ) : null}
 
           {/* Conditional: Email + Company for Professional */}
@@ -414,7 +444,7 @@ export default function NewPersonScreen() {
               ) : null}
 
               {category === "Professional" ? (
-                <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
+                <BirthdayField value={birthday} onChange={setBirthday} />
               ) : null}
 
               <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />

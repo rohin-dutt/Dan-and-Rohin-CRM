@@ -12,7 +12,7 @@ import {
   getOptionalFormValue,
   getTrimmedFormValue,
 } from "@/lib/form-utils";
-import { updateStreakAfterAction } from "@roots/shared";
+import { birthdayPartsToLegacyDate, isValidBirthdayParts, updateStreakAfterAction } from "@roots/shared";
 import { todayInputValue } from "@/lib/date-utils";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
@@ -190,9 +190,19 @@ export default function NewPersonPage() {
     const firstName = getTrimmedFormValue(formData, "first_name");
     const lastName = getTrimmedFormValue(formData, "last_name");
     const name = [firstName, lastName].filter(Boolean).join(" ");
+    const birthdayParts = {
+      month: Number(formData.get("birthday_month")) || null,
+      day: Number(formData.get("birthday_day")) || null,
+      year: Number(formData.get("birthday_year")) || null,
+    };
 
     if (!firstName) {
       setError("First name is required.");
+      setSaving(false);
+      return;
+    }
+    if (!isValidBirthdayParts(birthdayParts)) {
+      setError("Enter a valid birthday or clear the birthday fields.");
       setSaving(false);
       return;
     }
@@ -209,7 +219,10 @@ export default function NewPersonPage() {
         location: getOptionalFormValue(formData, "location"),
         latitude: (() => { const v = formData.get("latitude"); return v ? Number(v) : null; })(),
         longitude: (() => { const v = formData.get("longitude"); return v ? Number(v) : null; })(),
-        birthday: getOptionalFormValue(formData, "birthday"),
+        birthday_month: birthdayParts.month,
+        birthday_day: birthdayParts.day,
+        birthday_year: birthdayParts.year,
+        birthday: birthdayPartsToLegacyDate(birthdayParts),
         how_met: getOptionalFormValue(formData, "how_met"),
         relationship_type: getOptionalFormValue(formData, "relationship_type"),
         relationship_strength: getOptionalFormValue(

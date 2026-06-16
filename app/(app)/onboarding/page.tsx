@@ -6,7 +6,7 @@ import type { User } from '@supabase/supabase-js'
 
 import { todayInputValue } from '@/lib/date-utils'
 import { INTERACTION_TYPES } from '@/lib/form-utils'
-import { updateStreakAfterAction } from '@roots/shared'
+import { birthdayPartsToLegacyDate, parseBirthdayDate, updateStreakAfterAction } from '@roots/shared'
 import { supabase } from '@/lib/supabase'
 
 const ONBOARDING_CATEGORY_PILLS = [
@@ -98,6 +98,7 @@ export default function OnboardingPage() {
     const hasBirthday = selectedCategory === 'Friend' || isFamily
 
     const name = [trimmedFirst, lastName.trim()].filter(Boolean).join(' ')
+    const birthdayParts = hasBirthday && birthday ? parseBirthdayDate(birthday) : { month: null, day: null, year: null }
 
     const { data, error: insertError } = await supabase
       .from('people')
@@ -108,7 +109,10 @@ export default function OnboardingPage() {
         contact_frequency_days: selectedFreq,
         company: isProfessional && company.trim() ? company.trim() : null,
         role: isProfessional && role.trim() ? role.trim() : null,
-        birthday: hasBirthday && birthday ? birthday : null,
+        birthday_month: birthdayParts.month,
+        birthday_day: birthdayParts.day,
+        birthday_year: birthdayParts.year,
+        birthday: birthdayPartsToLegacyDate(birthdayParts),
         relationship_type: isFamily && relationship.trim() ? relationship.trim() : null,
       })
       .select()

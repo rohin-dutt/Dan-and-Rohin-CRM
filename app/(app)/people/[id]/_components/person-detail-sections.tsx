@@ -345,7 +345,7 @@ export function PersonSummary({
           ["Email", person.email],
           ["Phone", person.phone],
           ["Location", person.location],
-          ["Birthday", person.birthday ? formatBirthdayDate(person.birthday) : null],
+          ["Birthday", formatBirthdayDate(person) === "Not set" ? null : formatBirthdayDate(person)],
           ["Relationship Strength", person.relationship_strength],
           ["Preferred Contact", person.preferred_contact_method],
           ["How often you connect", person.contact_frequency_days ? `Every ${person.contact_frequency_days} days` : null],

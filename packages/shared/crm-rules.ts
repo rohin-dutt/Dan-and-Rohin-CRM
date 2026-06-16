@@ -1,4 +1,5 @@
 import type { ImportantMoment, Person, Interaction } from "./types.ts";
+import { getBirthdayParts, getNextBirthdayDate, formatBirthdayParts } from "./birthday.ts";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -27,9 +28,9 @@ export function getDaysSince(
 }
 
 export function getNextDueDate(person: Person): Date | null {
-  const lastContacted = toDay(person.last_contacted_at);
-  if (!lastContacted) return null;
-  const nextDue = new Date(lastContacted);
+  const cadenceAnchor = toDay(person.last_contacted_at) ?? toDay(person.created_at);
+  if (!cadenceAnchor) return null;
+  const nextDue = new Date(cadenceAnchor);
   nextDue.setDate(nextDue.getDate() + person.contact_frequency_days);
   return nextDue;
 }
@@ -104,7 +105,7 @@ export function getRelationshipStatus(
   if (daysSince !== null && daysSince <= 7) return "recent";
   if (nextDueDays !== null && nextDueDays < 0) return "overdue";
   if (nextDueDays !== null && nextDueDays <= 7) return "due_this_week";
-  if (!person.last_contacted_at) return "neglected";
+  if (nextDueDays === null && !person.last_contacted_at) return "neglected";
   return "coming_up";
 }
 
@@ -240,16 +241,10 @@ export function getBirthdayReminders(
   if (!today) return [];
 
   return people
-    .filter((person) => person.birthday)
     .map((person) => {
-      const birthday = toDay(person.birthday);
-      if (!birthday) return null;
-      let nextBirthday = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
-      if (nextBirthday < today) {
-        nextBirthday = new Date(today.getFullYear() + 1, birthday.getMonth(), birthday.getDate());
-      }
-      const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / MS_PER_DAY);
-      return { person, nextBirthday, daysUntil };
+      const next = getNextBirthdayDate(getBirthdayParts(person), today);
+      if (!next) return null;
+      return { person, nextBirthday: next.nextDate, daysUntil: next.daysUntil };
     })
     .filter((item): item is { person: Person; nextBirthday: Date; daysUntil: number } =>
       item !== null && item.daysUntil <= windowDays
@@ -308,16 +303,16 @@ export function getUpcomingMoments(
 ): UpcomingMomentItem[] {
   const peopleById = new Map(people.map((person) => [person.id, person]));
   const birthdayItems = people
-    .filter((person) => person.birthday)
     .map((person) => {
-      const next = nextMomentDate(person.birthday, todayValue, true);
+      const birthday = getBirthdayParts(person);
+      const next = getNextBirthdayDate(birthday, todayValue);
       if (!next || next.daysUntil > windowDays) return null;
       return {
         id: `birthday-${person.id}`,
         kind: "birthday" as const,
         person,
         label: "Birthday" as const,
-        sourceDate: person.birthday ?? "",
+        sourceDate: formatBirthdayParts(birthday, { shortMonth: true }),
         nextDate: next.nextDate,
         daysUntil: next.daysUntil,
       };

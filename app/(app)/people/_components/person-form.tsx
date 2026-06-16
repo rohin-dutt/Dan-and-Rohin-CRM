@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 
+import { getBirthdayParts } from "@roots/shared";
 import type { Person, Tag } from "@/types/index";
 
 const CATEGORY_PILLS = [
@@ -107,6 +108,7 @@ export function PersonForm(props: PersonFormProps) {
   const [selectedFreq, setSelectedFreq] = useState(() =>
     getClosestFreq(person?.contact_frequency_days ?? 30)
   );
+  const birthday = getBirthdayParts(person ?? {});
 
   const [locationName, setLocationName] = useState(person?.location ?? "");
   const [latitude, setLatitude] = useState<number | null>(person?.latitude ?? null);
@@ -288,16 +290,40 @@ export function PersonForm(props: PersonFormProps) {
 
         {/* FIX 3: Friend or Family — Birthday (hidden when neither selected) */}
         <div className={showBirthday ? "" : "hidden"}>
-          <label htmlFor="birthday" className={labelClass}>
+          <label htmlFor="birthday_month" className={labelClass}>
             Birthday
           </label>
-          <input
-            id="birthday"
-            name="birthday"
-            type="date"
-            defaultValue={person?.birthday ?? ""}
-            className={inputClass}
-          />
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              id="birthday_month"
+              name="birthday_month"
+              type="number"
+              min="1"
+              max="12"
+              placeholder="MM"
+              defaultValue={birthday.month ?? ""}
+              className={inputClass}
+            />
+            <input
+              id="birthday_day"
+              name="birthday_day"
+              type="number"
+              min="1"
+              max="31"
+              placeholder="DD"
+              defaultValue={birthday.day ?? ""}
+              className={inputClass}
+            />
+            <input
+              id="birthday_year"
+              name="birthday_year"
+              type="number"
+              min="1"
+              placeholder="YYYY optional"
+              defaultValue={birthday.year ?? ""}
+              className={inputClass}
+            />
+          </div>
         </div>
 
         {/* FIX 3: Family — Relationship label (hidden when not selected) */}
