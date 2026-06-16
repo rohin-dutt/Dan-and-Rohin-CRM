@@ -1,8 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+
+type RecoveryState = 'checking' | 'ready' | 'invalid' | 'saved'
+
+function getAuthParams() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+
+  return {
+    code: searchParams.get('code'),
+    accessToken:
+      searchParams.get('access_token') ?? hashParams.get('access_token'),
+    refreshToken:
+      searchParams.get('refresh_token') ?? hashParams.get('refresh_token'),
+  }
+}
+
+function cleanRecoveryUrl() {
+  window.history.replaceState(null, '', window.location.pathname)
+}
 
 export default function UpdatePasswordPage() {
   const router = useRouter()
@@ -10,11 +30,63 @@ export default function UpdatePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [recoveryState, setRecoveryState] =
+    useState<RecoveryState>('checking')
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function prepareRecoverySession() {
+      const { code, accessToken, refreshToken } = getAuthParams()
+      let hasSession = false
+
+      try {
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+          hasSession = !error && Boolean(data.session)
+        } else if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+          hasSession = !error && Boolean(data.session)
+        } else {
+          const { data } = await supabase.auth.getSession()
+          hasSession = Boolean(data.session)
+        }
+      } catch {
+        hasSession = false
+      } finally {
+        if (code || accessToken || refreshToken) {
+          cleanRecoveryUrl()
+        }
+      }
+
+      if (!cancelled) {
+        setRecoveryState(hasSession ? 'ready' : 'invalid')
+      }
+    }
+
+    prepareRecoverySession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (recoveryState !== 'ready') {
+      setError('This password reset link is invalid or has expired.')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
@@ -26,16 +98,17 @@ export default function UpdatePasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError(error.message)
+      setError('Unable to update your password. Request a new reset link and try again.')
       setLoading(false)
       return
     }
 
-    setSuccess(true)
+    await supabase.auth.signOut()
+    setRecoveryState('saved')
     setLoading(false)
 
     setTimeout(() => {
-      router.push('/dashboard')
+      router.push('/auth/login')
     }, 1500)
   }
 
@@ -46,9 +119,26 @@ export default function UpdatePasswordPage() {
           Choose a new password
         </h1>
 
-        {success ? (
+        {recoveryState === 'checking' ? (
+          <div className="mt-6 rounded-md bg-gray-50 p-4 text-sm text-muted-foreground">
+            Checking your reset link...
+          </div>
+        ) : recoveryState === 'invalid' ? (
+          <div className="mt-6 space-y-4">
+            <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+              This password reset link is invalid or has expired. Request a new
+              link to choose a new password.
+            </div>
+            <Link
+              href="/auth/forgot-password"
+              className="inline-flex w-full justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+            >
+              Request a new reset link
+            </Link>
+          </div>
+        ) : recoveryState === 'saved' ? (
           <div className="mt-6 rounded-md bg-green-50 p-4 text-sm text-green-700">
-            Password updated successfully. Redirecting…
+            Password updated successfully. Redirecting to sign in...
           </div>
         ) : (
           <>
@@ -98,7 +188,7 @@ export default function UpdatePasswordPage() {
                 disabled={loading}
                 className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
               >
-                {loading ? 'Updating…' : 'Update password'}
+                {loading ? 'Updating...' : 'Update password'}
               </button>
             </form>
           </>

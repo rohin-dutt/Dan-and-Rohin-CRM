@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { getSiteUrl } from '@/lib/site-url'
+
+const PASSWORD_RESET_REDIRECT_URL = 'https://useroots.app/auth/update-password'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -17,7 +18,7 @@ export default function ForgotPasswordPage() {
     setLoading(true)
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getSiteUrl()}/auth/callback?type=recovery`,
+      redirectTo: PASSWORD_RESET_REDIRECT_URL,
     })
 
     if (error) {

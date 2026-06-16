@@ -1,0 +1,17 @@
+
+> personal-crm@0.1.0 dev
+> next dev -H 0.0.0.0 -p 3000
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://0.0.0.0:3000
+- Environments: .env.local
+✓ Ready in 872ms
+
+ GET / 200 in 556ms (next.js: 103ms, proxy.ts: 210ms, application-code: 242ms)
+ GET / 200 in 351ms (next.js: 275ms, proxy.ts: 8ms, application-code: 68ms)
+○ Compiling /auth/update-password ...
+ GET /auth/update-password 200 in 17.2s (next.js: 15.1s, proxy.ts: 460ms, application-code: 1560ms)
+ GET /auth/update-password 200 in 1384ms (next.js: 136ms, proxy.ts: 31ms, application-code: 1217ms)
+ GET /auth/update-password 200 in 597ms (next.js: 40ms, proxy.ts: 19ms, application-code: 537ms)
+ GET /auth/update-password 200 in 1517ms (next.js: 68ms, proxy.ts: 21ms, application-code: 1428ms)

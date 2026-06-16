@@ -7,6 +7,8 @@ import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { ErrorBanner } from "@/components/ErrorBanner"
 
+const PASSWORD_RESET_REDIRECT_URL = "https://useroots.app/auth/update-password"
+
 export default function ForgotPasswordScreen() {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -22,7 +24,7 @@ export default function ForgotPasswordScreen() {
     }
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "roots://update-password",
+      redirectTo: PASSWORD_RESET_REDIRECT_URL,
     })
     setLoading(false)
     if (error) {

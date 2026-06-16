@@ -6,6 +6,21 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] `npm.cmd run lint` fails on unrelated site/app lint issues outside the
+      password reset changes. Command: `npm.cmd run lint`. Errors:
+      `react/no-unescaped-entities` in `app/(site)/about/page.tsx`,
+      `app/(site)/contact/ContactForm.tsx`, `app/(site)/page.tsx`, and
+      `app/(site)/terms/page.tsx`; warnings include existing `<img>` usage and
+      an unused `onStreakUpdate` prop in dashboard components. Owner: website
+      lint cleanup.
+
+- [ ] `npm.cmd run build` fails locally because `/api/contact` evaluates
+      Resend without an API key. Command: `npm.cmd run build`. Summary:
+      compilation and TypeScript completed, then page-data collection failed
+      for `/api/contact` with `Missing API key. Pass it to the constructor
+      new Resend("re_123")`. Owner: local environment/configuration for contact
+      email.
+
 - [ ] `npm test` fails on `tests/date-utils.test.mjs` with
       `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
       TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.
