@@ -115,7 +115,10 @@ export default function RootLayout() {
     return () => subscription.remove()
   }, [router])
 
-  useEffect(() => installNotificationResponseHandler(router), [router])
+  useEffect(() => {
+    if (loading || !fontsLoaded) return
+    return installNotificationResponseHandler(router)
+  }, [router, loading, fontsLoaded])
 
   useEffect(() => {
     if (loading || introComplete == null) return
