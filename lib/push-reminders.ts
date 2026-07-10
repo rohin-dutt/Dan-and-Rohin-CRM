@@ -52,14 +52,6 @@ type DeliveryRecord = {
   status: "pending" | "sent" | "failed" | "skipped" | "invalid_token";
 };
 
-type PushMessage = {
-  to: string;
-  title: string;
-  body: string;
-  sound: "default";
-  data: Record<string, unknown>;
-};
-
 type ExpoPushTicket =
   | { status: "ok"; id: string }
   | { status: "error"; message?: string; details?: { error?: string } };
@@ -76,8 +68,6 @@ const EXPO_PUSH_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 const FALLBACK_TIMEZONE = "UTC";
 const SEND_WINDOW_START_HOUR = 9;
 const SEND_WINDOW_END_HOUR = 18;
-const EARLY_SEND_WINDOW_START_HOUR = 8;
-const EARLY_SEND_WINDOW_END_HOUR = 9;
 
 export function isAuthorizedPushReminderRequest(
   authorizationHeader: string | null,
@@ -130,11 +120,6 @@ export function isInNotificationSendWindow(value: Date, timeZone: string | null 
   return hour >= SEND_WINDOW_START_HOUR && hour < SEND_WINDOW_END_HOUR;
 }
 
-export function isInEarlyNotificationSendWindow(value: Date, timeZone: string | null | undefined) {
-  const { hour } = readLocalParts(value, resolveNotificationTimezone(timeZone));
-  return hour >= EARLY_SEND_WINDOW_START_HOUR && hour < EARLY_SEND_WINDOW_END_HOUR;
-}
-
 export function buildPushIdempotencyKey(candidate: NotificationCandidate, tokenId: string) {
   return [
     "expo",
@@ -145,15 +130,6 @@ export function buildPushIdempotencyKey(candidate: NotificationCandidate, tokenI
     candidate.subjectId,
     candidate.scheduledFor,
   ].join(":");
-}
-
-export function buildGroupedPushIdempotencyKey(
-  tokenId: string,
-  userId: string,
-  groupKind: string,
-  scheduledFor: string
-) {
-  return `expo:${tokenId}:${userId}:${groupKind}:${scheduledFor}`;
 }
 
 function nextDueDateString(person: Person) {
@@ -268,7 +244,6 @@ export function selectNotificationCandidates({
   });
 }
 
-// Kept for backward compatibility — returns generic privacy-safe messages.
 export function buildPrivacySafePushMessage(candidate: NotificationCandidate, token: string) {
   const bodyBySource: Record<NotificationCandidate["source"], string> = {
     explicit_follow_up:
@@ -295,134 +270,6 @@ export function buildPrivacySafePushMessage(candidate: NotificationCandidate, to
       subjectId: candidate.subjectId,
       personId: candidate.personId,
       interactionId: candidate.interactionId,
-      importantMomentId: candidate.importantMomentId,
-    },
-  };
-}
-
-function resolveFirstNames(
-  candidates: NotificationCandidate[],
-  peopleById: Map<string, Person>
-): string[] {
-  return candidates.flatMap((c) => {
-    const name = c.personId ? (peopleById.get(c.personId)?.name ?? null) : null;
-    if (!name) return [];
-    const first = name.trim().split(/\s+/)[0];
-    return first ? [first] : [];
-  });
-}
-
-export function buildOverduePushMessage(
-  candidates: NotificationCandidate[],
-  token: string,
-  peopleById: Map<string, Person>
-): PushMessage {
-  const count = candidates.length;
-  const names = resolveFirstNames(candidates, peopleById);
-  let body: string;
-  if (count === 1 && names.length >= 1) {
-    body = `It's been a while since you talked to ${names[0]} 🌱`;
-  } else if (count === 2 && names.length >= 2) {
-    body = `It's been a while since you talked to ${names[0]} and ${names[1]} 🌱`;
-  } else {
-    body = `You have ${count} overdue connections to catch up on 🌱`;
-  }
-  return {
-    to: token,
-    title: "Roots",
-    body,
-    sound: "default",
-    data: {
-      type: "roots_notification",
-      kind: "follow_up_overdue",
-      personIds: candidates.map((c) => c.personId).filter(Boolean),
-    },
-  };
-}
-
-export function buildDueTodayPushMessage(
-  candidates: NotificationCandidate[],
-  token: string,
-  peopleById: Map<string, Person>
-): PushMessage {
-  const count = candidates.length;
-  const names = resolveFirstNames(candidates, peopleById);
-  let body: string;
-  if (count === 1 && names.length >= 1) {
-    body = `Today's a good day to reach out to ${names[0]} 👋`;
-  } else if (count === 2 && names.length >= 2) {
-    body = `Don't forget to reach out to ${names[0]} and ${names[1]} today 👋`;
-  } else {
-    body = `You have ${count} people to reach out to today 👋`;
-  }
-  return {
-    to: token,
-    title: "Roots",
-    body,
-    sound: "default",
-    data: {
-      type: "roots_notification",
-      kind: "follow_up_due",
-      personIds: candidates.map((c) => c.personId).filter(Boolean),
-    },
-  };
-}
-
-export function buildBirthdayPushMessage(
-  candidates: NotificationCandidate[],
-  token: string,
-  peopleById: Map<string, Person>
-): PushMessage {
-  const count = candidates.length;
-  const names = resolveFirstNames(candidates, peopleById);
-  let body: string;
-  if (count === 1 && names.length >= 1) {
-    body = `🎂 It's ${names[0]}'s birthday today — reach out!`;
-  } else if (count === 2 && names.length >= 2) {
-    body = `🎂 It's ${names[0]} and ${names[1]}'s birthday today!`;
-  } else {
-    body = `🎂 ${count} of your people have birthdays today!`;
-  }
-  return {
-    to: token,
-    title: "Roots",
-    body,
-    sound: "default",
-    data: {
-      type: "roots_notification",
-      kind: "birthday",
-      personIds: candidates.map((c) => c.personId).filter(Boolean),
-    },
-  };
-}
-
-export function buildImportantMomentPushMessage(
-  candidate: NotificationCandidate,
-  token: string,
-  peopleById: Map<string, Person>,
-  importantMomentsById: Map<string, ImportantMoment>
-): PushMessage {
-  const firstName = candidate.personId
-    ? (peopleById.get(candidate.personId)?.name?.trim().split(/\s+/)[0] ?? null)
-    : null;
-  const momentLabel = candidate.importantMomentId
-    ? (importantMomentsById.get(candidate.importantMomentId)?.label ?? null)
-    : null;
-  const body =
-    firstName && momentLabel
-      ? `📅 ${momentLabel} for ${firstName} is today`
-      : "An important date is coming up.";
-  return {
-    to: token,
-    title: "Roots",
-    body,
-    sound: "default",
-    data: {
-      type: "roots_notification",
-      kind: candidate.kind,
-      subjectType: candidate.subjectType,
-      subjectId: candidate.subjectId,
-      personId: candidate.personId,
       importantMomentId: candidate.importantMomentId,
     },
   };
@@ -475,7 +322,6 @@ export async function sendPushDelivery({
   delivery,
   pushToken,
   candidate,
-  message: prebuiltMessage,
   now,
   fetchImpl = fetch,
   updateDelivery,
@@ -483,8 +329,7 @@ export async function sendPushDelivery({
 }: {
   delivery: DeliveryRecord;
   pushToken: PushToken;
-  candidate?: NotificationCandidate;
-  message?: PushMessage;
+  candidate: NotificationCandidate;
   now: Date;
   fetchImpl?: FetchLike;
   updateDelivery: (
@@ -513,20 +358,11 @@ export async function sendPushDelivery({
     return "invalid_token" as const;
   }
 
-  const message =
-    prebuiltMessage ?? (candidate ? buildPrivacySafePushMessage(candidate, pushToken.token) : null);
-
-  if (!message) {
-    await updateDelivery({
-      ...attemptUpdate,
-      status: "failed",
-      error_code: "MissingPushMessage",
-    });
-    return "failed" as const;
-  }
-
   try {
-    const [ticket] = await sendExpoPushMessages([message], fetchImpl);
+    const [ticket] = await sendExpoPushMessages(
+      [buildPrivacySafePushMessage(candidate, pushToken.token)],
+      fetchImpl
+    );
 
     if (!ticket) {
       await updateDelivery({
@@ -645,6 +481,10 @@ export async function runPushReminderJob({
       continue;
     }
 
+    if (!isInNotificationSendWindow(now, settings.notification_timezone)) {
+      continue;
+    }
+
     results.users++;
     const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
     const today = toDay(localDate) ?? now;
@@ -666,205 +506,113 @@ export async function runPushReminderJob({
       .eq("follow_up_needed", true);
     if (interactionsError) throw new Error(interactionsError.message);
 
-    const { data: importantMomentsData, error: importantMomentsError } = await supabase
+    const { data: importantMoments, error: importantMomentsError } = await supabase
       .from("important_moments")
       .select("*")
       .eq("user_id", settings.user_id);
     if (importantMomentsError) throw new Error(importantMomentsError.message);
 
-    const importantMomentRows = (importantMomentsData ?? []) as ImportantMoment[];
-
     const candidates = selectNotificationCandidates({
       settings,
       people: personRows,
       interactions: (interactions ?? []) as Interaction[],
-      importantMoments: importantMomentRows,
+      importantMoments: (importantMoments ?? []) as ImportantMoment[],
       today,
     });
     results.candidates += candidates.length;
 
-    const peopleById = new Map(personRows.map((p) => [p.id, p]));
-    const importantMomentsById = new Map(importantMomentRows.map((m) => [m.id, m]));
-
-    const overdueCandidates = candidates.filter(
-      (c) =>
-        (c.source === "explicit_follow_up" || c.source === "cadence_check_in") &&
-        c.kind === "follow_up_overdue"
-    );
-    const dueTodayCandidates = candidates.filter(
-      (c) =>
-        (c.source === "explicit_follow_up" || c.source === "cadence_check_in") &&
-        c.kind === "follow_up_due"
-    );
-    const birthdayCandidates = candidates.filter((c) => c.source === "birthday");
-    const importantMomentCandidates = candidates.filter((c) => c.source === "important_moment");
-
-    async function processDelivery(
-      token: PushToken,
-      opts: {
-        idempotencyKey: string;
-        kind: PushNotificationKind;
-        subjectType: PushSubjectType;
-        subjectId: string;
-        scheduledFor: string;
-        message: PushMessage;
-      }
-    ) {
-      const { idempotencyKey, kind, subjectType, subjectId, scheduledFor, message } = opts;
-
-      const { data: insertedDelivery, error: insertError } = await supabase
-        .from("notification_deliveries")
-        .insert({
-          user_id: settings.user_id,
-          push_token_id: token.id,
-          kind,
-          subject_type: subjectType,
-          subject_id: subjectId,
-          scheduled_for: scheduledFor,
-          send_after: now.toISOString(),
-          idempotency_key: idempotencyKey,
-          status: "pending",
-        })
-        .select("id, attempt_count, status")
-        .single();
-
-      let delivery = insertedDelivery as DeliveryRecord | null;
-      if (insertError) {
-        if (!isDuplicateDeliveryError(insertError)) throw new Error(insertError.message);
-
-        const { data: existingDelivery, error: existingError } = await supabase
+    for (const candidate of candidates) {
+      for (const token of userTokens) {
+        const idempotencyKey = buildPushIdempotencyKey(candidate, token.id);
+        const { data: insertedDelivery, error: insertError } = await supabase
           .from("notification_deliveries")
+          .insert({
+            user_id: settings.user_id,
+            push_token_id: token.id,
+            kind: candidate.kind,
+            subject_type: candidate.subjectType,
+            subject_id: candidate.subjectId,
+            scheduled_for: candidate.scheduledFor,
+            send_after: now.toISOString(),
+            idempotency_key: idempotencyKey,
+            status: "pending",
+          })
           .select("id, attempt_count, status")
-          .eq("idempotency_key", idempotencyKey)
           .single();
-        if (existingError) throw new Error(existingError.message);
-        delivery = existingDelivery as DeliveryRecord;
-        if (delivery.status !== "failed" && delivery.status !== "pending") {
-          results.skipped++;
-          return;
+
+        let delivery = insertedDelivery as DeliveryRecord | null;
+        if (insertError) {
+          if (!isDuplicateDeliveryError(insertError)) {
+            throw new Error(insertError.message);
+          }
+
+          const { data: existingDelivery, error: existingError } = await supabase
+            .from("notification_deliveries")
+            .select("id, attempt_count, status")
+            .eq("idempotency_key", idempotencyKey)
+            .single();
+          if (existingError) throw new Error(existingError.message);
+          delivery = existingDelivery as DeliveryRecord;
+          if (delivery.status !== "failed" && delivery.status !== "pending") {
+            results.skipped++;
+            continue;
+          }
+
+          if (delivery.attempt_count >= 3) {
+            const { error } = await supabase
+              .from("notification_deliveries")
+              .update({
+                status: "skipped",
+                error_code: "MaxAttemptsExceeded",
+                updated_at: now.toISOString(),
+              })
+              .eq("id", delivery.id);
+            if (error) throw new Error(error.message);
+            results.skipped++;
+            continue;
+          }
         }
 
-        if (delivery.attempt_count >= 3) {
-          const { error } = await supabase
-            .from("notification_deliveries")
-            .update({
-              status: "skipped",
-              error_code: "MaxAttemptsExceeded",
-              updated_at: now.toISOString(),
-            })
-            .eq("id", delivery.id);
-          if (error) throw new Error(error.message);
+        if (!delivery) {
           results.skipped++;
-          return;
+          continue;
         }
-      }
 
-      if (!delivery) {
-        results.skipped++;
-        return;
-      }
+        const status = await sendPushDelivery({
+          delivery,
+          pushToken: token,
+          candidate,
+          now,
+          fetchImpl,
+          updateDelivery: async (update) => {
+            const { error } = await supabase
+              .from("notification_deliveries")
+              .update(update)
+              .eq("id", delivery.id);
+            if (error) throw new Error(error.message);
+          },
+          markTokenInvalid: async (errorCode) => {
+            const { error } = await supabase
+              .from("push_tokens")
+              .update({
+                status: "invalid",
+                revoked_at: now.toISOString(),
+                updated_at: now.toISOString(),
+              })
+              .eq("id", token.id);
+            if (error) throw new Error(error.message);
 
-      const resolvedDelivery = delivery;
-      const status = await sendPushDelivery({
-        delivery: resolvedDelivery,
-        pushToken: token,
-        message,
-        now,
-        fetchImpl,
-        updateDelivery: async (update) => {
-          const { error } = await supabase
-            .from("notification_deliveries")
-            .update(update)
-            .eq("id", resolvedDelivery.id);
-          if (error) throw new Error(error.message);
-        },
-        markTokenInvalid: async (errorCode) => {
-          const { error } = await supabase
-            .from("push_tokens")
-            .update({
-              status: "invalid",
-              revoked_at: now.toISOString(),
-              updated_at: now.toISOString(),
-            })
-            .eq("id", token.id);
-          if (error) throw new Error(error.message);
-
-          await supabase
-            .from("notification_deliveries")
-            .update({
-              error_code: errorCode,
-              updated_at: now.toISOString(),
-            })
-            .eq("id", resolvedDelivery.id);
-        },
-      });
-
-      results[status]++;
-    }
-
-    for (const token of userTokens) {
-      if (birthdayCandidates.length > 0) {
-        await processDelivery(token, {
-          idempotencyKey: buildGroupedPushIdempotencyKey(
-            token.id,
-            settings.user_id,
-            "grouped_birthday",
-            localDate
-          ),
-          kind: "birthday",
-          subjectType: "person",
-          subjectId: localDate,
-          scheduledFor: localDate,
-          message: buildBirthdayPushMessage(birthdayCandidates, token.token, peopleById),
+            await supabase
+              .from("notification_deliveries")
+              .update({
+                error_code: errorCode,
+                updated_at: now.toISOString(),
+              })
+              .eq("id", delivery.id);
+          },
         });
-      }
 
-      for (const candidate of importantMomentCandidates) {
-        await processDelivery(token, {
-          idempotencyKey: buildPushIdempotencyKey(candidate, token.id),
-          kind: candidate.kind,
-          subjectType: candidate.subjectType,
-          subjectId: candidate.subjectId,
-          scheduledFor: candidate.scheduledFor,
-          message: buildImportantMomentPushMessage(
-            candidate,
-            token.token,
-            peopleById,
-            importantMomentsById
-          ),
-        });
-      }
-
-      if (overdueCandidates.length > 0) {
-        await processDelivery(token, {
-          idempotencyKey: buildGroupedPushIdempotencyKey(
-            token.id,
-            settings.user_id,
-            "grouped_overdue",
-            localDate
-          ),
-          kind: "follow_up_overdue",
-          subjectType: "person",
-          subjectId: localDate,
-          scheduledFor: localDate,
-          message: buildOverduePushMessage(overdueCandidates, token.token, peopleById),
-        });
-      }
-
-      if (dueTodayCandidates.length > 0) {
-        await processDelivery(token, {
-          idempotencyKey: buildGroupedPushIdempotencyKey(
-            token.id,
-            settings.user_id,
-            "grouped_due_today",
-            localDate
-          ),
-          kind: "follow_up_due",
-          subjectType: "person",
-          subjectId: localDate,
-          scheduledFor: localDate,
-          message: buildDueTodayPushMessage(dueTodayCandidates, token.token, peopleById),
-        });
+        results[status]++;
       }
     }
   }

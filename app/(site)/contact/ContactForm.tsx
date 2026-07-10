@@ -36,7 +36,7 @@ export function ContactForm() {
   if (status === "success") {
     return (
       <p className="mt-6 max-w-prose text-sm leading-6 text-muted-foreground">
-        Thanks for reaching out — we&apos;ll get back to you within a day or two.
+        Thanks for reaching out — we'll get back to you within a day or two.
       </p>
     );
   }
