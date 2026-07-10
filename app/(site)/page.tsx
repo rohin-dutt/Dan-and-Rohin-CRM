@@ -28,7 +28,7 @@ export default function Home() {
             Stay close to the people<br className="hidden sm:block" /> who matter most.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-            Life gets busy. Roots makes sure the people who matter don't slip away.
+            Life gets busy. Roots makes sure the people who matter don&apos;t slip away.
           </p>
           <div className="mt-8 flex justify-center">
             <Link

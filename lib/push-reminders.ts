@@ -645,11 +645,6 @@ export async function runPushReminderJob({
       continue;
     }
 
-    const inMainWindow = isInNotificationSendWindow(now, settings.notification_timezone);
-    const inEarlyWindow = isInEarlyNotificationSendWindow(now, settings.notification_timezone);
-
-    if (!inMainWindow && !inEarlyWindow) continue;
-
     results.users++;
     const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
     const today = toDay(localDate) ?? now;
@@ -808,74 +803,68 @@ export async function runPushReminderJob({
     }
 
     for (const token of userTokens) {
-      // 8am–9am window: birthdays and individual important moment notifications
-      if (inEarlyWindow) {
-        if (birthdayCandidates.length > 0) {
-          await processDelivery(token, {
-            idempotencyKey: buildGroupedPushIdempotencyKey(
-              token.id,
-              settings.user_id,
-              "grouped_birthday",
-              localDate
-            ),
-            kind: "birthday",
-            subjectType: "person",
-            subjectId: localDate,
-            scheduledFor: localDate,
-            message: buildBirthdayPushMessage(birthdayCandidates, token.token, peopleById),
-          });
-        }
-
-        for (const candidate of importantMomentCandidates) {
-          await processDelivery(token, {
-            idempotencyKey: buildPushIdempotencyKey(candidate, token.id),
-            kind: candidate.kind,
-            subjectType: candidate.subjectType,
-            subjectId: candidate.subjectId,
-            scheduledFor: candidate.scheduledFor,
-            message: buildImportantMomentPushMessage(
-              candidate,
-              token.token,
-              peopleById,
-              importantMomentsById
-            ),
-          });
-        }
+      if (birthdayCandidates.length > 0) {
+        await processDelivery(token, {
+          idempotencyKey: buildGroupedPushIdempotencyKey(
+            token.id,
+            settings.user_id,
+            "grouped_birthday",
+            localDate
+          ),
+          kind: "birthday",
+          subjectType: "person",
+          subjectId: localDate,
+          scheduledFor: localDate,
+          message: buildBirthdayPushMessage(birthdayCandidates, token.token, peopleById),
+        });
       }
 
-      // 9am–6pm window: grouped overdue and due-today notifications
-      if (inMainWindow) {
-        if (overdueCandidates.length > 0) {
-          await processDelivery(token, {
-            idempotencyKey: buildGroupedPushIdempotencyKey(
-              token.id,
-              settings.user_id,
-              "grouped_overdue",
-              localDate
-            ),
-            kind: "follow_up_overdue",
-            subjectType: "person",
-            subjectId: localDate,
-            scheduledFor: localDate,
-            message: buildOverduePushMessage(overdueCandidates, token.token, peopleById),
-          });
-        }
+      for (const candidate of importantMomentCandidates) {
+        await processDelivery(token, {
+          idempotencyKey: buildPushIdempotencyKey(candidate, token.id),
+          kind: candidate.kind,
+          subjectType: candidate.subjectType,
+          subjectId: candidate.subjectId,
+          scheduledFor: candidate.scheduledFor,
+          message: buildImportantMomentPushMessage(
+            candidate,
+            token.token,
+            peopleById,
+            importantMomentsById
+          ),
+        });
+      }
 
-        if (dueTodayCandidates.length > 0) {
-          await processDelivery(token, {
-            idempotencyKey: buildGroupedPushIdempotencyKey(
-              token.id,
-              settings.user_id,
-              "grouped_due_today",
-              localDate
-            ),
-            kind: "follow_up_due",
-            subjectType: "person",
-            subjectId: localDate,
-            scheduledFor: localDate,
-            message: buildDueTodayPushMessage(dueTodayCandidates, token.token, peopleById),
-          });
-        }
+      if (overdueCandidates.length > 0) {
+        await processDelivery(token, {
+          idempotencyKey: buildGroupedPushIdempotencyKey(
+            token.id,
+            settings.user_id,
+            "grouped_overdue",
+            localDate
+          ),
+          kind: "follow_up_overdue",
+          subjectType: "person",
+          subjectId: localDate,
+          scheduledFor: localDate,
+          message: buildOverduePushMessage(overdueCandidates, token.token, peopleById),
+        });
+      }
+
+      if (dueTodayCandidates.length > 0) {
+        await processDelivery(token, {
+          idempotencyKey: buildGroupedPushIdempotencyKey(
+            token.id,
+            settings.user_id,
+            "grouped_due_today",
+            localDate
+          ),
+          kind: "follow_up_due",
+          subjectType: "person",
+          subjectId: localDate,
+          scheduledFor: localDate,
+          message: buildDueTodayPushMessage(dueTodayCandidates, token.token, peopleById),
+        });
       }
     }
   }

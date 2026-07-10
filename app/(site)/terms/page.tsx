@@ -26,7 +26,7 @@ export default function TermsPage() {
           <section>
             <h2 className="font-medium text-foreground">The service</h2>
             <p className="mt-2">
-              Roots is an app that helps you stay close to the people who matter most. It surfaces who you haven't talked to in a while, reminds you of important moments, and helps you follow through on the connections that matter. We
+              Roots is an app that helps you stay close to the people who matter most. It surfaces who you haven&apos;t talked to in a while, reminds you of important moments, and helps you follow through on the connections that matter. We
               reserve the right to modify or discontinue the service at any
               time with reasonable notice.
             </p>
