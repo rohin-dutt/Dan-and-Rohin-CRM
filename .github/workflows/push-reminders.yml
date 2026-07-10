@@ -10,6 +10,6 @@ jobs:
     steps:
       - name: Call push reminders API
         run: |
-          curl -X POST https://useroots.app/api/mobile/send-push-reminders \
+          curl -v -X POST https://useroots.app/api/mobile/send-push-reminders \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"
