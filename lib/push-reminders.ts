@@ -275,6 +275,44 @@ export function buildPrivacySafePushMessage(candidate: NotificationCandidate, to
   };
 }
 
+function getFirstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0];
+}
+
+function buildPersonalizedPushMessage(
+  candidate: NotificationCandidate,
+  token: string,
+  firstName: string
+) {
+  let body: string;
+  if (candidate.source === "explicit_follow_up" || candidate.source === "cadence_check_in") {
+    body =
+      candidate.kind === "follow_up_overdue"
+        ? `It's been a while since you talked to ${firstName} 🌱`
+        : `Today's a good day to reach out to ${firstName} 👋`;
+  } else if (candidate.source === "birthday") {
+    body = `🎂 It's ${firstName}'s birthday today — reach out!`;
+  } else {
+    body = `📅 An important date for ${firstName} is today`;
+  }
+
+  return {
+    to: token,
+    title: "Roots",
+    body,
+    sound: "default" as const,
+    data: {
+      type: "roots_notification",
+      kind: candidate.kind,
+      subjectType: candidate.subjectType,
+      subjectId: candidate.subjectId,
+      personId: candidate.personId,
+      interactionId: candidate.interactionId,
+      importantMomentId: candidate.importantMomentId,
+    },
+  };
+}
+
 export function isExpoPushToken(token: string) {
   return /^Expo(nent)?PushToken\[[^\]]+\]$/.test(token);
 }
@@ -494,6 +532,8 @@ export async function runPushReminderJob({
     const personRows = (people ?? []) as Person[];
     if (personRows.length === 0) continue;
 
+    const personsById = new Map(personRows.map((person) => [person.id, person]));
+
     const personIds = personRows.map((person) => person.id);
     const { data: interactions, error: interactionsError } = await supabase
       .from("interactions")
@@ -518,6 +558,9 @@ export async function runPushReminderJob({
     results.candidates += candidates.length;
 
     for (const candidate of candidates) {
+      const person = candidate.personId ? personsById.get(candidate.personId) : undefined;
+      const firstName = person ? getFirstName(person.name) : null;
+
       for (const token of userTokens) {
         if (!isExpoPushToken(token.token)) {
           results.invalid_token++;
@@ -525,10 +568,10 @@ export async function runPushReminderJob({
         }
 
         try {
-          const [ticket] = await sendExpoPushMessages(
-            [buildPrivacySafePushMessage(candidate, token.token)],
-            fetchImpl
-          );
+          const message = firstName
+            ? buildPersonalizedPushMessage(candidate, token.token, firstName)
+            : buildPrivacySafePushMessage(candidate, token.token);
+          const [ticket] = await sendExpoPushMessages([message], fetchImpl);
 
           if (!ticket || ticket.status === "error") {
             results.failed++;
