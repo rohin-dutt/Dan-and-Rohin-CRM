@@ -421,10 +421,6 @@ export async function sendPushDelivery({
   }
 }
 
-function isDuplicateDeliveryError(error: { code?: string; message?: string } | null) {
-  return error?.code === "23505" || /duplicate key/i.test(error?.message ?? "");
-}
-
 export async function runPushReminderJob({
   supabase,
   now = new Date(),
@@ -523,99 +519,31 @@ export async function runPushReminderJob({
 
     for (const candidate of candidates) {
       for (const token of userTokens) {
-        const idempotencyKey = buildPushIdempotencyKey(candidate, token.id);
-        const { data: insertedDelivery, error: insertError } = await supabase
-          .from("notification_deliveries")
-          .insert({
-            user_id: settings.user_id,
-            push_token_id: token.id,
-            kind: candidate.kind,
-            subject_type: candidate.subjectType,
-            subject_id: candidate.subjectId,
-            scheduled_for: candidate.scheduledFor,
-            send_after: now.toISOString(),
-            idempotency_key: idempotencyKey,
-            status: "pending",
-          })
-          .select("id, attempt_count, status")
-          .single();
-
-        let delivery = insertedDelivery as DeliveryRecord | null;
-        if (insertError) {
-          if (!isDuplicateDeliveryError(insertError)) {
-            throw new Error(insertError.message);
-          }
-
-          const { data: existingDelivery, error: existingError } = await supabase
-            .from("notification_deliveries")
-            .select("id, attempt_count, status")
-            .eq("idempotency_key", idempotencyKey)
-            .single();
-          if (existingError) throw new Error(existingError.message);
-          delivery = existingDelivery as DeliveryRecord;
-          if (delivery.status !== "failed" && delivery.status !== "pending") {
-            results.skipped++;
-            continue;
-          }
-
-          if (delivery.attempt_count >= 3) {
-            const { error } = await supabase
-              .from("notification_deliveries")
-              .update({
-                status: "skipped",
-                error_code: "MaxAttemptsExceeded",
-                updated_at: now.toISOString(),
-              })
-              .eq("id", delivery.id);
-            if (error) throw new Error(error.message);
-            results.skipped++;
-            continue;
-          }
-        }
-
-        if (!delivery) {
-          results.skipped++;
+        if (!isExpoPushToken(token.token)) {
+          results.invalid_token++;
           continue;
         }
 
-        const status = await sendPushDelivery({
-          delivery,
-          pushToken: token,
-          candidate,
-          now,
-          fetchImpl,
-          updateDelivery: async (update) => {
-            const { error } = await supabase
-              .from("notification_deliveries")
-              .update(update)
-              .eq("id", delivery.id);
-            if (error) throw new Error(error.message);
-          },
-          markTokenInvalid: async (errorCode) => {
-            const { error } = await supabase
-              .from("push_tokens")
-              .update({
-                status: "invalid",
-                revoked_at: now.toISOString(),
-                updated_at: now.toISOString(),
-              })
-              .eq("id", token.id);
-            if (error) throw new Error(error.message);
+        try {
+          const [ticket] = await sendExpoPushMessages(
+            [buildPrivacySafePushMessage(candidate, token.token)],
+            fetchImpl
+          );
 
-            await supabase
-              .from("notification_deliveries")
-              .update({
-                error_code: errorCode,
-                updated_at: now.toISOString(),
-              })
-              .eq("id", delivery.id);
-          },
-        });
-
-        results[status]++;
+          if (!ticket || ticket.status === "error") {
+            results.failed++;
+          } else {
+            results.sent++;
+          }
+        } catch {
+          results.failed++;
+        }
       }
     }
   }
 
+  console.log(
+    `Push job complete: users=${results.users} candidates=${results.candidates} sent=${results.sent} failed=${results.failed} invalid_token=${results.invalid_token}`
+  );
   return results;
 }
