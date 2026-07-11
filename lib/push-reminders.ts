@@ -515,10 +515,6 @@ export async function runPushReminderJob({
       continue;
     }
 
-    if (!isInNotificationSendWindow(now, settings.notification_timezone)) {
-      continue;
-    }
-
     results.users++;
     const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
     const today = toDay(localDate) ?? now;
