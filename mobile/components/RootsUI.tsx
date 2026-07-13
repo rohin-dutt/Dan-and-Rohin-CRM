@@ -1,4 +1,4 @@
-import { Image, Text, TouchableOpacity, View, type ImageSourcePropType } from "react-native"
+import { Image, Text, TouchableOpacity, View, type ImageSourcePropType, type ViewStyle } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 import logoMarkAsset from "../assets/roots-logo-mark.png"
@@ -85,12 +85,14 @@ export function BrandHeader({
 export function SoftCard({
   children,
   className = "",
+  style,
 }: {
   children: React.ReactNode
   className?: string
+  style?: ViewStyle
 }) {
   return (
-    <View className={`rounded-2xl border border-stone-200 bg-white shadow-sm ${className}`}>
+    <View className={`rounded-2xl border border-stone-200 bg-white shadow-sm ${className}`} style={style}>
       {children}
     </View>
   )

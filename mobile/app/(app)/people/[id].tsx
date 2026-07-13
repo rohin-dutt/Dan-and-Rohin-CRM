@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { PersonAvatar } from "@/components/RootsUI"
+import { ConfirmModal } from "@/components/ConfirmModal"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { personImageUrl } from "@/lib/person-display"
@@ -24,6 +25,9 @@ export default function PersonDetailScreen() {
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
   const [sheetMode, setSheetMode] = useState<QuickAddMode | null>(null)
   const menuButtonRef = useRef<View>(null)
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { type: "person" } | { type: "note"; noteId: string } | { type: "followup"; interactionId: string } | null
+  >(null)
 
   const {
     loading,
@@ -59,28 +63,25 @@ export default function PersonDetailScreen() {
   }
 
   function confirmDeletePerson() {
-    Alert.alert("Delete person", `Delete ${person?.name}? This cannot be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          const deleted = await deletePerson()
-          if (deleted) router.back()
-        },
-      },
-    ])
+    setPendingConfirm({ type: "person" })
   }
 
   function confirmDeleteNote(noteId: string) {
-    Alert.alert("Delete note", "Delete this note? This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => void deletePersonNote(noteId),
-      },
-    ])
+    setPendingConfirm({ type: "note", noteId })
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingConfirm) return
+    const confirm = pendingConfirm
+    setPendingConfirm(null)
+    if (confirm.type === "person") {
+      const deleted = await deletePerson()
+      if (deleted) router.back()
+    } else if (confirm.type === "note") {
+      void deletePersonNote(confirm.noteId)
+    } else {
+      void deleteFollowUp(confirm.interactionId)
+    }
   }
 
   function confirmCompleteFollowUp(interactionId: string) {
@@ -96,14 +97,7 @@ export default function PersonDetailScreen() {
   }
 
   function confirmDeleteFollowUp(interactionId: string) {
-    Alert.alert("Delete follow-up", "Remove this follow-up permanently?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => void deleteFollowUp(interactionId),
-      },
-    ])
+    setPendingConfirm({ type: "followup", interactionId })
   }
 
   if (loading) return <LoadingState />
@@ -330,6 +324,26 @@ export default function PersonDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ConfirmModal
+        visible={pendingConfirm !== null}
+        title={
+          pendingConfirm?.type === "person"
+            ? `Delete ${person?.name}?`
+            : pendingConfirm?.type === "followup"
+              ? "Remove follow-up?"
+              : "Delete note?"
+        }
+        message={
+          pendingConfirm?.type === "followup"
+            ? "This follow-up will be permanently removed."
+            : "This cannot be undone."
+        }
+        confirmLabel={pendingConfirm?.type === "followup" ? "Remove" : "Delete"}
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </Screen>
   )
 }

@@ -1,9 +1,10 @@
 import { useState } from "react"
-import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { Screen } from "@/components/Screen"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { ConfirmModal } from "@/components/ConfirmModal"
 import { IconTile, SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
@@ -24,6 +25,7 @@ export default function NewPersonScreen() {
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
   const [detailsExpanded, setDetailsExpanded] = useState(false)
+  const [partlySavedMessage, setPartlySavedMessage] = useState<string | null>(null)
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -98,17 +100,18 @@ export default function NewPersonScreen() {
       if (e instanceof PersonRelationsError) {
         // The person row was created; only tag/moment assignment failed.
         // Going back avoids a duplicate person on retry.
-        Alert.alert(
-          "Partly saved",
-          `${cleanName} was added, but some details could not be saved: ${e.message}`,
-        )
-        router.back()
+        setPartlySavedMessage(`${cleanName} was added, but some details could not be saved: ${e.message}`)
       } else {
         setError(e instanceof Error ? e.message : "Failed to save person")
       }
     } finally {
       setSaving(false)
     }
+  }
+
+  function dismissPartlySaved() {
+    setPartlySavedMessage(null)
+    router.back()
   }
 
   return (
@@ -430,6 +433,17 @@ export default function NewPersonScreen() {
         selectedKey={frequencyDays}
         onSelect={setFrequencyDays}
         onClose={freqMenu.close}
+      />
+
+      <ConfirmModal
+        visible={partlySavedMessage !== null}
+        title="Partly saved"
+        message={partlySavedMessage ?? ""}
+        confirmLabel="OK"
+        showCancelButton={false}
+        destructive={false}
+        onConfirm={dismissPartlySaved}
+        onCancel={dismissPartlySaved}
       />
     </Screen>
   )

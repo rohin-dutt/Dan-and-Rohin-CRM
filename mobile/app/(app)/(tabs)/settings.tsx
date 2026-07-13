@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { Alert, Linking, Share, Text, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
+import { ConfirmModal } from "@/components/ConfirmModal"
 import { TextField } from "@/components/TextField"
 import { Divider } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
   const [togglingDigest, setTogglingDigest] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function setOk(message: string) {
     setStatus({ ok: true, message })
@@ -85,21 +87,17 @@ export default function SettingsScreen() {
     load()
   }, [])
 
-  async function handleSignOut() {
-    Alert.alert("Log out", "Sign out of your Roots account?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Log out",
-        style: "destructive",
-        onPress: async () => {
-          // Token revocation is best-effort; sign-out must not be blocked by it.
-          await revokePushToken().catch(() => null)
-          await clearLocalPrivateData()
-          const { error: signOutError } = await supabase.auth.signOut()
-          if (signOutError) setFailure(signOutError.message)
-        },
-      },
-    ])
+  function handleSignOut() {
+    setShowLogoutConfirm(true)
+  }
+
+  async function performSignOut() {
+    setShowLogoutConfirm(false)
+    // Token revocation is best-effort; sign-out must not be blocked by it.
+    await revokePushToken().catch(() => null)
+    await clearLocalPrivateData()
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) setFailure(signOutError.message)
   }
 
   async function saveDisplayName() {
@@ -383,6 +381,16 @@ export default function SettingsScreen() {
           </View>
         </SettingsSection>
       </View>
+
+      <ConfirmModal
+        visible={showLogoutConfirm}
+        title="Log out?"
+        message="Sign out of your Roots account?"
+        confirmLabel="Log out"
+        destructive={false}
+        onConfirm={performSignOut}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </Screen>
   )
 }
