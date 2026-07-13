@@ -10,7 +10,7 @@ import { personImageUrl } from "@/lib/person-display"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getNextActionDays } from "@roots/shared"
-import { StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
+import { PhoneActionButtons, StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
 import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person-detail/tabs"
 import { formatNextAction } from "@/features/person-detail/helpers"
 import { usePersonDetail } from "@/features/person-detail/use-person-detail"
@@ -175,11 +175,12 @@ export default function PersonDetailScreen() {
                   {subtitle}
                 </Text>
               ) : null}
-              {topTags.length > 0 ? (
-                <View className="mt-3 flex-row flex-wrap gap-2">
+              {topTags.length > 0 || person.phone ? (
+                <View className="mt-3 flex-row flex-wrap items-center gap-2">
                   {topTags.map((tag, index) => (
                     <TagPill key={tag.id} tag={tag} highlighted={index === 0} />
                   ))}
+                  {person.phone ? <PhoneActionButtons phone={person.phone} /> : null}
                 </View>
               ) : null}
             </View>

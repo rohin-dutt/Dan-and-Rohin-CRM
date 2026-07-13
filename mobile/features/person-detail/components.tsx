@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View } from "react-native"
+import { Linking, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { IconTile, SoftCard } from "@/components/RootsUI"
 import { colors, fonts } from "@/constants/theme"
@@ -14,6 +14,7 @@ export type InfoRow = {
   value: string
   actionIcon?: keyof typeof Ionicons.glyphMap
   tone?: "green" | "purple" | "amber" | "red"
+  phoneActions?: boolean
 }
 
 const toneColors = {
@@ -62,6 +63,29 @@ export function TabBar({
           )
         })}
       </View>
+    </View>
+  )
+}
+
+export function PhoneActionButtons({ phone }: { phone: string }) {
+  return (
+    <View className="flex-row items-center" style={{ gap: 6 }}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Call"
+        onPress={() => Linking.openURL(`tel:${phone}`)}
+        style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+      >
+        <Ionicons name="call-outline" size={18} color={colors.forest} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Text"
+        onPress={() => Linking.openURL(`sms:${phone}`)}
+        style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+      >
+        <Ionicons name="chatbubble-outline" size={18} color={colors.forest} />
+      </TouchableOpacity>
     </View>
   )
 }
@@ -164,9 +188,18 @@ export function InfoList({ rows }: { rows: InfoRow[] }) {
                 <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
                   {row.label}
                 </Text>
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
-                  {row.value}
-                </Text>
+                {row.phoneActions ? (
+                  <View className="mt-0.5 flex-row items-center">
+                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="flex-1 text-sm">
+                      {row.value}
+                    </Text>
+                    <PhoneActionButtons phone={row.value} />
+                  </View>
+                ) : (
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                    {row.value}
+                  </Text>
+                )}
               </View>
               {row.actionIcon ? <Ionicons name={row.actionIcon} size={22} color={colors.forest} /> : null}
             </View>
