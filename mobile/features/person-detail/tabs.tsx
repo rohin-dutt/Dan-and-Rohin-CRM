@@ -76,11 +76,26 @@ export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
   )
 }
 
-export function AboutTab({ person, tags }: { person: Person; tags: Tag[] }) {
+export function AboutTab({
+  person,
+  tags,
+  onLogInteraction,
+}: {
+  person: Person
+  tags: Tag[]
+  onLogInteraction: () => void
+}) {
   const overview = person.notes?.trim()
 
   const contactRows: InfoRow[] = []
-  if (person.phone) contactRows.push({ icon: "call-outline", label: "Phone", value: person.phone, phoneActions: true })
+  if (person.phone) {
+    contactRows.push({
+      icon: "call-outline",
+      label: "Phone",
+      value: person.phone,
+      contactActions: { phone: person.phone, email: person.email, personName: person.name, onLogInteraction },
+    })
+  }
   if (person.location) contactRows.push({ icon: "location-outline", label: "Location", value: person.location })
 
   const personalRows: InfoRow[] = []

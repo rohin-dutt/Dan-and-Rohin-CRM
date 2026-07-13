@@ -1,8 +1,12 @@
-import { Linking, Text, TouchableOpacity, View } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import { AppState, Linking, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { IconTile, SoftCard } from "@/components/RootsUI"
+import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { colors, fonts } from "@/constants/theme"
 import type { Tag } from "@/types"
+
+const POST_ACTION_RESET_MS = 30000
 
 export type ProfileTab = "Timeline" | "About" | "Notes" | "Follow-ups"
 
@@ -14,7 +18,12 @@ export type InfoRow = {
   value: string
   actionIcon?: keyof typeof Ionicons.glyphMap
   tone?: "green" | "purple" | "amber" | "red"
-  phoneActions?: boolean
+  contactActions?: {
+    phone?: string | null
+    email?: string | null
+    personName: string
+    onLogInteraction: () => void
+  }
 }
 
 const toneColors = {
@@ -67,26 +76,150 @@ export function TabBar({
   )
 }
 
-export function PhoneActionButtons({ phone }: { phone: string }) {
+export function ContactActionButtons({
+  phone,
+  email,
+  personName,
+  onLogInteraction,
+}: {
+  phone?: string | null
+  email?: string | null
+  personName: string
+  onLogInteraction: () => void
+}) {
+  const [promptVisible, setPromptVisible] = useState(false)
+  const awaitingReturnRef = useRef(false)
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const appStateRef = useRef(AppState.currentState)
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const previousState = appStateRef.current
+      appStateRef.current = nextState
+      if (previousState !== "active" && nextState === "active" && awaitingReturnRef.current) {
+        awaitingReturnRef.current = false
+        clearResetTimeout()
+        setPromptVisible(true)
+      }
+    })
+    return () => {
+      subscription.remove()
+      clearResetTimeout()
+    }
+  }, [])
+
+  function clearResetTimeout() {
+    if (resetTimeoutRef.current) {
+      clearTimeout(resetTimeoutRef.current)
+      resetTimeoutRef.current = null
+    }
+  }
+
+  function handleAction(url: string) {
+    awaitingReturnRef.current = true
+    clearResetTimeout()
+    resetTimeoutRef.current = setTimeout(() => {
+      awaitingReturnRef.current = false
+    }, POST_ACTION_RESET_MS)
+    void Linking.openURL(url)
+  }
+
+  function dismissPrompt() {
+    setPromptVisible(false)
+  }
+
+  function confirmLogInteraction() {
+    setPromptVisible(false)
+    onLogInteraction()
+  }
+
+  const firstName = personName.trim().split(/\s+/)[0] || personName
+
   return (
-    <View className="flex-row items-center" style={{ gap: 6 }}>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Call"
-        onPress={() => Linking.openURL(`tel:${phone}`)}
-        style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+    <>
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        {phone ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Call"
+            onPress={() => handleAction(`tel:${phone}`)}
+            style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+          >
+            <Ionicons name="call-outline" size={18} color={colors.forest} />
+          </TouchableOpacity>
+        ) : null}
+        {phone ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Text"
+            onPress={() => handleAction(`sms:${phone}`)}
+            style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color={colors.forest} />
+          </TouchableOpacity>
+        ) : null}
+        {email ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Email"
+            onPress={() => handleAction(`mailto:${email}`)}
+            style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
+          >
+            <Ionicons name="mail-outline" size={18} color={colors.forest} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <BottomSheetModal
+        visible={promptVisible}
+        onClose={dismissPrompt}
+        accessibilityLabel="Dismiss log interaction prompt"
       >
-        <Ionicons name="call-outline" size={18} color={colors.forest} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Text"
-        onPress={() => Linking.openURL(`sms:${phone}`)}
-        style={{ backgroundColor: colors.mint, paddingHorizontal: 6, paddingVertical: 5, borderRadius: 20 }}
-      >
-        <Ionicons name="chatbubble-outline" size={18} color={colors.forest} />
-      </TouchableOpacity>
-    </View>
+        <View style={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 8 }}>
+          <View style={{ alignItems: "center", marginBottom: 20 }}>
+            <View style={{ height: 6, width: 96, borderRadius: 3, backgroundColor: "#E7E5E4" }} />
+          </View>
+          <Text
+            style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 18, textAlign: "center", marginBottom: 20 }}
+          >
+            Did you connect with {firstName}?
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Yes, log it"
+            onPress={confirmLogInteraction}
+            activeOpacity={0.8}
+            style={{
+              minHeight: 48,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 16,
+              backgroundColor: colors.forest,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 16 }}>Yes, log it</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Not now"
+            onPress={dismissPrompt}
+            activeOpacity={0.8}
+            style={{
+              minHeight: 48,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: "#E7E5E4",
+              backgroundColor: "white",
+            }}
+          >
+            <Text style={{ fontFamily: fonts.semibold, color: colors.muted, fontSize: 16 }}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
+    </>
   )
 }
 
@@ -188,12 +321,17 @@ export function InfoList({ rows }: { rows: InfoRow[] }) {
                 <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
                   {row.label}
                 </Text>
-                {row.phoneActions ? (
+                {row.contactActions ? (
                   <View className="mt-0.5 flex-row items-center">
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="flex-1 text-sm">
                       {row.value}
                     </Text>
-                    <PhoneActionButtons phone={row.value} />
+                    <ContactActionButtons
+                      phone={row.contactActions.phone}
+                      email={row.contactActions.email}
+                      personName={row.contactActions.personName}
+                      onLogInteraction={row.contactActions.onLogInteraction}
+                    />
                   </View>
                 ) : (
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">

@@ -10,7 +10,7 @@ import { personImageUrl } from "@/lib/person-display"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getNextActionDays } from "@roots/shared"
-import { PhoneActionButtons, StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
+import { ContactActionButtons, StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
 import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person-detail/tabs"
 import { formatNextAction } from "@/features/person-detail/helpers"
 import { usePersonDetail } from "@/features/person-detail/use-person-detail"
@@ -180,7 +180,14 @@ export default function PersonDetailScreen() {
                   {topTags.map((tag, index) => (
                     <TagPill key={tag.id} tag={tag} highlighted={index === 0} />
                   ))}
-                  {person.phone ? <PhoneActionButtons phone={person.phone} /> : null}
+                  {person.phone ? (
+                    <ContactActionButtons
+                      phone={person.phone}
+                      email={person.email}
+                      personName={person.name}
+                      onLogInteraction={() => setSheetMode("chat")}
+                    />
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -197,7 +204,9 @@ export default function PersonDetailScreen() {
 
           {activeTab === "Timeline" ? <TimelineTab interactions={touchPointInteractions} /> : null}
 
-          {activeTab === "About" ? <AboutTab person={person} tags={tags} /> : null}
+          {activeTab === "About" ? (
+            <AboutTab person={person} tags={tags} onLogInteraction={() => setSheetMode("chat")} />
+          ) : null}
 
           {activeTab === "Notes" ? (
             <NotesTab
