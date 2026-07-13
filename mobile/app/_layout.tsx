@@ -1,7 +1,7 @@
 import { Slot, useRouter, useSegments } from "expo-router"
 import { useFonts } from "expo-font"
 import { useEffect, useState } from "react"
-import { DeviceEventEmitter, Linking } from "react-native"
+import { ActivityIndicator, DeviceEventEmitter, Linking, View } from "react-native"
 import {
   CormorantGaramond_700Bold,
 } from "@expo-google-fonts/cormorant-garamond"
@@ -20,6 +20,7 @@ import {
 } from "@/lib/first-download-intro"
 import { PEOPLE_CHANGED_EVENT, userHasPeople } from "@/lib/onboarding-status"
 import { installNotificationResponseHandler } from "@/lib/push-notifications"
+import { colors } from "@/constants/theme"
 import "../global.css"
 
 export default function RootLayout() {
@@ -83,7 +84,10 @@ export default function RootLayout() {
         return
       }
 
-      setHasPeople(null)
+      // Keep the previous value while refetching (PEOPLE_CHANGED_EVENT fires
+      // mid-onboarding); resetting to null here would unmount the onboarding
+      // screens during categorize saves. Session changes reset it via
+      // onAuthStateChange instead.
       try {
         const nextHasPeople = await userHasPeople(session.user.id)
         if (!cancelled) setHasPeople(nextHasPeople)
@@ -126,7 +130,7 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === "(auth)"
     const inIntro = segments[0] === "intro"
     const inUpdatePassword = inAuthGroup && segments.join("/") === "(auth)/update-password"
-    const inOnboarding = segments.join("/") === "(app)/onboarding"
+    const inOnboarding = segments.join("/").startsWith("(app)/onboarding")
 
     if (!session) {
       if (!introComplete && !inIntro) {
@@ -147,7 +151,24 @@ export default function RootLayout() {
     }
   }, [session, loading, introComplete, hasPeople, segments])
 
-  if (loading || (!fontsLoaded && !fontError)) return null
-  if (introComplete == null || (session && hasPeople == null)) return null
+  if (
+    loading ||
+    (!fontsLoaded && !fontError) ||
+    introComplete == null ||
+    (session && hasPeople == null)
+  ) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.cream,
+        }}
+      >
+        <ActivityIndicator color={colors.forest} />
+      </View>
+    )
+  }
   return <Slot />
 }

@@ -21,13 +21,14 @@ import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
 
-export default function OnboardingScreen() {
+export default function OnboardingManualScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
-  // Flow
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  // Flow — the welcome step lives at /(app)/onboarding, so this fallback
+  // starts directly on the add-person form.
+  const [step, setStep] = useState<2 | 3>(2)
   const [savedPersonId, setSavedPersonId] = useState<string | null>(null)
   const [lastSavedFirstName, setLastSavedFirstName] = useState("")
 
@@ -182,29 +183,6 @@ export default function OnboardingScreen() {
   }
 
   if (loading) return null
-
-  // ── Step 1 ────────────────────────────────────────────────────────────────
-  if (step === 1) {
-    return (
-      <Screen scrollable={false}>
-        <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="text-3xl font-bold text-warm-black text-center mb-3">
-            Stay close to the people who matter.
-          </Text>
-          <Text className="text-base text-gray-500 text-center mb-8">
-            Roots reminds you to reach out, tracks your interactions, and makes sure no one
-            important slips away.
-          </Text>
-          <Text className="text-xs text-gray-400 text-center mb-8">
-            We'll send you reminders about who to reach out to. You can turn this off anytime
-            in Settings.
-          </Text>
-          <Button title="Let's get started →" onPress={() => setStep(2)} />
-          <Text className="text-xs text-gray-400 mt-3">Takes about 2 minutes.</Text>
-        </View>
-      </Screen>
-    )
-  }
 
   // ── Step 2 ────────────────────────────────────────────────────────────────
   if (step === 2) {

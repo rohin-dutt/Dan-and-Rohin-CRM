@@ -5,7 +5,7 @@ import { colors, fonts } from "@/constants/theme"
 import { Button } from "@/components/Button"
 import { IconTile, SoftCard } from "@/components/RootsUI"
 import { formatDate } from "@roots/shared"
-import { formatCompactDate, formatTimelineDate } from "@/lib/format-dates"
+import { formatBirthday, formatTimelineDate } from "@/lib/format-dates"
 import { formatFrequency } from "@/constants/frequencies"
 import { DetailEmptyState, InfoList, SectionCard, TagPill, type InfoRow } from "./components"
 import { FOLLOW_UP_COMPLETED_TYPE, interactionIcon } from "./helpers"
@@ -100,7 +100,7 @@ export function AboutTab({
 
   const personalRows: InfoRow[] = []
   if (person.birthday) {
-    personalRows.push({ icon: "calendar-outline", label: "Birthday", value: formatCompactDate(person.birthday), tone: "purple" })
+    personalRows.push({ icon: "calendar-outline", label: "Birthday", value: formatBirthday(person.birthday), tone: "purple" })
   }
   if (person.how_met) {
     personalRows.push({

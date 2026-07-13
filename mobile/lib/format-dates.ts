@@ -2,6 +2,22 @@
 // Keep these UI-oriented helpers separate from the portable date logic in
 // @roots/shared so screens share one implementation.
 
+// Birthdays saved without a known year use this placeholder year; display
+// code must render those as month + day only.
+export const YEARLESS_BIRTHDAY_YEAR = 1900
+
+export function formatBirthday(value: string | null | undefined): string {
+  if (!value) return "Not set"
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  const withYear = date.getFullYear() !== YEARLESS_BIRTHDAY_YEAR
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(withYear ? { year: "numeric" } : {}),
+  }).format(date)
+}
+
 export function formatCompactDate(value: string | null | undefined): string {
   if (!value) return "Not set"
   const date = new Date(`${value}T12:00:00`)

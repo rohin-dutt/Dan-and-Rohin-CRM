@@ -4,6 +4,16 @@ import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 import { formatFullDate } from "@roots/shared"
+import { YEARLESS_BIRTHDAY_YEAR } from "@/lib/format-dates"
+
+// Dates stored with the placeholder year mean "year unknown" and render as
+// month + day only.
+function birthdayLabel(date: Date): string {
+  if (date.getFullYear() === YEARLESS_BIRTHDAY_YEAR) {
+    return date.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+  }
+  return formatFullDate(date)
+}
 
 // Birthday field shared by add/edit person forms. Opens a modal spinner
 // picker that only commits the date when the user confirms, so scrolling
@@ -17,14 +27,31 @@ export function BirthdayField({
 }) {
   const [pickerVisible, setPickerVisible] = useState(false)
   const [draftDate, setDraftDate] = useState<Date>(date ?? new Date(1990, 0, 1))
+  const [draftNoYear, setDraftNoYear] = useState(false)
 
   function openPicker() {
     setDraftDate(date ?? new Date(1990, 0, 1))
+    setDraftNoYear(date?.getFullYear() === YEARLESS_BIRTHDAY_YEAR)
     setPickerVisible(true)
   }
 
+  function toggleNoYear() {
+    setDraftNoYear((current) => {
+      const next = !current
+      setDraftDate(
+        (draft) =>
+          new Date(next ? YEARLESS_BIRTHDAY_YEAR : 1990, draft.getMonth(), draft.getDate()),
+      )
+      return next
+    })
+  }
+
   function confirmDraft() {
-    onChange(draftDate)
+    onChange(
+      draftNoYear
+        ? new Date(YEARLESS_BIRTHDAY_YEAR, draftDate.getMonth(), draftDate.getDate())
+        : draftDate,
+    )
     setPickerVisible(false)
   }
 
@@ -52,7 +79,7 @@ export function BirthdayField({
             style={{ flex: 1 }}
           >
             <Text style={{ fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}>
-              {formatFullDate(date)}
+              {birthdayLabel(date)}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -123,9 +150,32 @@ export function BirthdayField({
               onChange={(_, picked) => {
                 if (picked) setDraftDate(picked)
               }}
-              minimumDate={new Date(1900, 0, 1)}
+              minimumDate={new Date(YEARLESS_BIRTHDAY_YEAR, 0, 1)}
               maximumDate={new Date()}
             />
+            <TouchableOpacity
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: draftNoYear }}
+              accessibilityLabel="I don't know the year"
+              onPress={toggleNoYear}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 16,
+                paddingBottom: 12,
+              }}
+            >
+              <Ionicons
+                name={draftNoYear ? "checkbox-outline" : "square-outline"}
+                size={20}
+                color={colors.forest}
+              />
+              <Text
+                style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginLeft: 8 }}
+              >
+                I don't know the year
+              </Text>
+            </TouchableOpacity>
             <View
               style={{
                 flexDirection: "row",
