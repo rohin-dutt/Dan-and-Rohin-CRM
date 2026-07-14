@@ -16,7 +16,7 @@ import { colors, fonts } from "@/constants/theme"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { DatePickerModal } from "@/components/DatePickerModal"
 import { PillButton } from "@/components/PillButton"
-import { formatFullDate, toLocalDateString, todayInputValue, updateStreakAfterAction } from "@roots/shared"
+import { formatFullDate, toLocalDateString, todayInputValue } from "@roots/shared"
 
 export type QuickAddMode = "note" | "chat"
 
@@ -171,7 +171,6 @@ export function QuickAddFormSheet({
         p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
       })
       if (rpcError) throw rpcError
-      await updateStreakAfterAction(supabase)
       DeviceEventEmitter.emit("interactionAdded")
       onClose()
     } catch (e) {

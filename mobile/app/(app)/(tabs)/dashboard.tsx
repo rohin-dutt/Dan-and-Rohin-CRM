@@ -11,7 +11,7 @@ import { loadImportantMomentsForUser } from "@/lib/important-moments"
 import { personImageUrl } from "@/lib/person-display"
 import { firstNameFromMetadata } from "@/lib/user-metadata"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
-import type { ImportantMoment, Person, Settings } from "@/types"
+import type { ImportantMoment, Person } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
 import {
@@ -35,7 +35,6 @@ export default function DashboardScreen() {
   const [people, setPeople] = useState<Person[]>([])
   const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
-  const [settings, setSettings] = useState<Settings | null>(null)
   const [firstName, setFirstName] = useState("there")
   const [momentsExpanded, setMomentsExpanded] = useState(false)
 
@@ -50,16 +49,14 @@ export default function DashboardScreen() {
       const userId = session.user.id
       setFirstName(firstNameFromMetadata(session.user.user_metadata))
 
-      const [peopleRes, settingsRes, loadedMoments] = await Promise.all([
+      const [peopleRes, loadedMoments] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", userId),
-        supabase.from("settings").select("*").eq("user_id", userId).maybeSingle(),
         loadImportantMomentsForUser(userId),
       ])
 
       if (peopleRes.error) throw peopleRes.error
       const loadedPeople = peopleRes.data ?? []
       setPeople(loadedPeople)
-      setSettings(settingsRes.data ?? null)
       setImportantMoments(loadedMoments)
 
       if (loadedPeople.length > 0) {
@@ -133,15 +130,6 @@ export default function DashboardScreen() {
             <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-[15px]">
               {getGreeting(firstName)}
             </Text>
-            {settings?.current_streak ? (
-              <Text style={{ fontFamily: fonts.medium, color: colors.amber }} className="mt-1 text-sm">
-                {settings.current_streak} day streak 🔥
-              </Text>
-            ) : (
-              <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                Start your streak — log a chat today 🌱
-              </Text>
-            )}
             <TouchableOpacity
               onPress={inviteFriend}
               accessibilityRole="button"
