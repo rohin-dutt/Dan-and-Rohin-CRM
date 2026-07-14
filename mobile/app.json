@@ -12,6 +12,11 @@
       "resizeMode": "cover",
       "backgroundColor": "#0F4A24"
     },
+    "extra": {
+      "eas": {
+        "projectId": "01a3bd29-9f55-47c7-9949-faa4ad100aba"
+      }
+    },
     "ios": {
       "bundleIdentifier": "com.useroots.app",
       "supportsTablet": false,
@@ -47,12 +52,6 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ],
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "881bdfad-e977-4517-bb9c-c9e6e7bad942"
-      }
-    }
+    ]
   }
 }
