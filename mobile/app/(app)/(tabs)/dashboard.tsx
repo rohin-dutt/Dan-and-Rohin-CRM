@@ -291,7 +291,7 @@ export default function DashboardScreen() {
             <View className="flex-row items-start">
               <SummaryStat icon="people" value={String(getTotalContacts(people))} label="People" />
               <SummaryDivider />
-              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions.filter(isTouchPoint)))} label="Conversations" />
+              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions.filter(isTouchPoint)))} label="Chats" />
               <SummaryDivider />
               <SummaryStat icon="pencil-outline" value={String(noteCount)} label="Notes" />
               <SummaryDivider />
