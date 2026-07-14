@@ -4,6 +4,30 @@ import { Ionicons } from "@expo/vector-icons"
 import MapView, { Callout, Marker } from "react-native-maps"
 import { colors, fonts } from "@/constants/theme"
 
+const ROOTS_MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#f5f0e8" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#4a4035" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#f5f0e8" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#c8bfb0" }] },
+  { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#8f7e6e" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#ede8dc" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#ddd8c4" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6b5e4e" }] },
+  { featureType: "poi.park", elementType: "geometry.fill", stylers: [{ color: "#c8d5b9" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#4a6741" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#e0d8cc" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7a6e5e" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#f5f0e8" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#e8e0d0" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#d4c8b8" }] },
+  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9a8e7e" }] },
+  { featureType: "transit.line", elementType: "geometry", stylers: [{ color: "#ddd4c4" }] },
+  { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#ddd4c4" }] },
+  { featureType: "water", elementType: "geometry.fill", stylers: [{ color: "#b8ccd4" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#5a7a8a" }] },
+]
+
 export type RootsMapPersonPreview = {
   id: string
   name: string
@@ -51,7 +75,7 @@ const RootsMapSurface = forwardRef<RootsMapSurfaceHandle, RootsMapSurfaceProps>(
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
-        mapType="mutedStandard"
+        customMapStyle={ROOTS_MAP_STYLE}
         initialRegion={initialRegion}
         showsUserLocation={false}
         showsMyLocationButton={false}
