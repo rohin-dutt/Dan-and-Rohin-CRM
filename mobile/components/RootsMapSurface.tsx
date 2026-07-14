@@ -51,6 +51,7 @@ const RootsMapSurface = forwardRef<RootsMapSurfaceHandle, RootsMapSurfaceProps>(
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
+        mapType="mutedStandard"
         initialRegion={initialRegion}
         showsUserLocation={false}
         showsMyLocationButton={false}
