@@ -1,13 +1,11 @@
 import {
   categorizePeople,
   getMostContacted,
-  getNextDueDays,
-  getOnTimeRate,
   getUpcomingMoments,
   type Interaction,
   type UpcomingMomentItem,
 } from "@roots/shared"
-import type { ImportantMoment, Person } from "@/types"
+import type { Person } from "@/types"
 
 // Interaction columns the dashboard needs — includes follow-up fields so
 // categorizePeople can bucket people correctly (not just cadence-based).
@@ -25,8 +23,7 @@ export type DashboardModel = {
   comingUpList: Person[]
   followUps: Person[]
   followUpExtraCount: number
-  upcomingMoments: UpcomingMomentItem[]
-  onTimeRate: number | null
+  upcomingBirthdays: UpcomingMomentItem[]
   mostContacted: Person | null
 }
 
@@ -35,9 +32,8 @@ export type DashboardModel = {
 export function buildDashboardModel(input: {
   people: Person[]
   interactions: DashboardInteraction[]
-  importantMoments: ImportantMoment[]
 }): DashboardModel {
-  const { people, interactions, importantMoments } = input
+  const { people, interactions } = input
 
   // categorizePeople accounts for explicit follow-ups (follow_up_needed +
   // follow_up_date) in addition to cadence, so people with an open follow-up
@@ -59,16 +55,8 @@ export function buildDashboardModel(input: {
     comingUpList,
     followUps: followUpList.slice(0, 3),
     followUpExtraCount: Math.max(0, followUpList.length - 3),
-    upcomingMoments: getUpcomingMoments(people, importantMoments, new Date(), 14),
-    onTimeRate: getOnTimeRate(people),
+    // No important moments passed: the home tab only surfaces birthdays.
+    upcomingBirthdays: getUpcomingMoments(people, [], new Date(), 14),
     mostContacted: getMostContacted(people, interactions),
   }
-}
-
-export function statusDotForPerson(person: Person): "red" | "amber" | "green" | "gray" {
-  const days = getNextDueDays(person)
-  if (days == null) return "gray"
-  if (days <= 0) return "red"
-  if (days <= 7) return "amber"
-  return "green"
 }

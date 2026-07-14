@@ -3,21 +3,20 @@ import { DeviceEventEmitter, Share, Text, TouchableOpacity, View } from "react-n
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
-import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard, StatusDot } from "@/components/RootsUI"
+import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
-import { loadImportantMomentsForUser } from "@/lib/important-moments"
+import { countPersonNotesForUser } from "@/lib/person-notes"
 import { personImageUrl } from "@/lib/person-display"
 import { firstNameFromMetadata } from "@/lib/user-metadata"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
-import type { ImportantMoment, Person } from "@/types"
+import type { Person } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
 import {
   buildDashboardModel,
   DASHBOARD_INTERACTION_COLUMNS,
-  statusDotForPerson,
   type DashboardInteraction,
 } from "@/features/dashboard/derive"
 import { MetricCard, SummaryDivider, SummaryStat } from "@/features/dashboard/components"
@@ -28,13 +27,20 @@ function getGreeting(firstName: string): string {
   return `${time}, ${firstName}`
 }
 
+// "Charlie Sutheby" -> "Charlie S."
+function shortDisplayName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length < 2) return parts[0] ?? fullName
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
 export default function DashboardScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [people, setPeople] = useState<Person[]>([])
   const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
-  const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
+  const [noteCount, setNoteCount] = useState(0)
   const [firstName, setFirstName] = useState("there")
   const [momentsExpanded, setMomentsExpanded] = useState(false)
 
@@ -49,15 +55,15 @@ export default function DashboardScreen() {
       const userId = session.user.id
       setFirstName(firstNameFromMetadata(session.user.user_metadata))
 
-      const [peopleRes, loadedMoments] = await Promise.all([
+      const [peopleRes, loadedNoteCount] = await Promise.all([
         supabase.from("people").select("*").eq("user_id", userId),
-        loadImportantMomentsForUser(userId),
+        countPersonNotesForUser(userId),
       ])
 
       if (peopleRes.error) throw peopleRes.error
       const loadedPeople = peopleRes.data ?? []
       setPeople(loadedPeople)
-      setImportantMoments(loadedMoments)
+      setNoteCount(loadedNoteCount)
 
       if (loadedPeople.length > 0) {
         const personIds = loadedPeople.map((person) => person.id)
@@ -94,8 +100,8 @@ export default function DashboardScreen() {
   }, [load])
 
   const dashboard = useMemo(
-    () => buildDashboardModel({ people, interactions, importantMoments }),
-    [importantMoments, interactions, people],
+    () => buildDashboardModel({ people, interactions }),
+    [interactions, people],
   )
 
   const inviteFriend = useCallback(async () => {
@@ -170,7 +176,7 @@ export default function DashboardScreen() {
             <MetricCard
               icon="time"
               value={dashboard.dueThisWeekList.length}
-              label="Due This Week"
+              label="This week"
               tone="amber"
               onPress={() => router.push("/people?status=due_this_week")}
             />
@@ -185,7 +191,7 @@ export default function DashboardScreen() {
 
           <SoftCard className="mx-5 mt-5 p-5">
             <SectionTitle
-              title="People to follow up with"
+              title="People to reach out to"
               actionLabel="View all"
               onAction={() => router.push("/people?status=overdue&status=due_this_week")}
             />
@@ -204,9 +210,6 @@ export default function DashboardScreen() {
                     activeOpacity={0.76}
                     className="flex-row items-center"
                   >
-                    <View className="mr-3 items-center">
-                      <StatusDot status={statusDotForPerson(person)} />
-                    </View>
                     <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
                     <View className="ml-4 flex-1">
                       <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
@@ -241,20 +244,20 @@ export default function DashboardScreen() {
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-4">
-            <SectionTitle title="Upcoming moments" />
-            {dashboard.upcomingMoments.length === 0 ? (
+            <SectionTitle title="Upcoming birthdays" />
+            {dashboard.upcomingBirthdays.length === 0 ? (
               <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">
-                No birthdays or important moments in the next two weeks.
+                No birthdays in the next two weeks.
               </Text>
             ) : (
-              (momentsExpanded ? dashboard.upcomingMoments : dashboard.upcomingMoments.slice(0, 3)).map((moment, index) => (
+              (momentsExpanded ? dashboard.upcomingBirthdays : dashboard.upcomingBirthdays.slice(0, 3)).map((moment, index) => (
                 <TouchableOpacity
                   key={moment.id}
                   onPress={() => router.push(`/people/${moment.person.id}`)}
                   className={`flex-row items-center ${index > 0 ? "mt-5" : ""}`}
                 >
                   <IconTile
-                    icon={moment.kind === "birthday" ? "calendar-outline" : "sparkles-outline"}
+                    icon="calendar-outline"
                     color={index % 3 === 0 ? colors.danger : index % 3 === 1 ? colors.purple : colors.amber}
                     background={index % 3 === 0 ? "#FDECE8" : index % 3 === 1 ? "#F2EEFA" : "#FFF3DE"}
                     size={38}
@@ -270,32 +273,31 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               ))
             )}
-            {!momentsExpanded && dashboard.upcomingMoments.length > 3 ? (
+            {!momentsExpanded && dashboard.upcomingBirthdays.length > 3 ? (
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Show ${dashboard.upcomingMoments.length - 3} more upcoming moments`}
+                accessibilityLabel={`Show ${dashboard.upcomingBirthdays.length - 3} more upcoming birthdays`}
                 onPress={() => setMomentsExpanded(true)}
                 className="mt-4"
               >
                 <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-                  {dashboard.upcomingMoments.length - 3} more
+                  {dashboard.upcomingBirthdays.length - 3} more
                 </Text>
               </TouchableOpacity>
             ) : null}
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-5">
-            <SectionTitle title="Your Roots Stats" />
             <View className="flex-row items-start">
-              <SummaryStat icon="people" value={String(getTotalContacts(people))} label="Total contacts" />
+              <SummaryStat icon="people" value={String(getTotalContacts(people))} label="People" />
               <SummaryDivider />
-              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions.filter(isTouchPoint)))} label="Interactions logged" />
+              <SummaryStat icon="chatbubble" value={String(getTotalInteractions(interactions.filter(isTouchPoint)))} label="Conversations" />
               <SummaryDivider />
-              <SummaryStat icon="golf" value={dashboard.onTimeRate == null ? "-" : `${dashboard.onTimeRate}%`} label="On-time outreach" />
+              <SummaryStat icon="pencil-outline" value={String(noteCount)} label="Notes" />
               <SummaryDivider />
               <SummaryStat
                 icon="star"
-                value={dashboard.mostContacted?.name.split(/\s+/).slice(0, 2).join(" ") ?? "-"}
+                value={dashboard.mostContacted ? shortDisplayName(dashboard.mostContacted.name) : "-"}
                 label="Most contacted"
               />
             </View>
