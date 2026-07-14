@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Animated, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
@@ -123,6 +123,8 @@ export default function RootsMapScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false)
   const [geocodeSuggestions, setGeocodeSuggestions] = useState<MapboxFeature[]>([])
   const [mapInitialRegion, setMapInitialRegion] = useState<RootsMapRegion>(getDefaultRegion())
+  const [pendingMapRegion, setPendingMapRegion] = useState<RootsMapRegion | null>(null)
+  const [searchedPlaceName, setSearchedPlaceName] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -212,8 +214,16 @@ export default function RootsMapScreen() {
     }),
   ).current
 
+  useEffect(() => {
+    if (!pendingMapRegion) return
+    if (!mapRef.current) return
+    mapRef.current.animateToRegion(pendingMapRegion, 500)
+    setPendingMapRegion(null)
+  }, [pendingMapRegion, groups])
+
   function handleQueryChange(text: string) {
     setQuery(text)
+    setSearchedPlaceName(null)
     if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current)
     if (!text.trim()) {
       setGeocodeSuggestions([])
@@ -227,17 +237,34 @@ export default function RootsMapScreen() {
   }
 
   function handleGeocodeSuggestionSelect(feature: MapboxFeature) {
-    mapRef.current?.animateToRegion(
-      {
-        latitude: feature.center[1],
-        longitude: feature.center[0],
-        latitudeDelta: 5,
-        longitudeDelta: 5,
-      },
-      500,
-    )
+    const region: RootsMapRegion = {
+      latitude: feature.center[1],
+      longitude: feature.center[0],
+      latitudeDelta: 5,
+      longitudeDelta: 5,
+    }
+
     setGeocodeSuggestions([])
     setQuery("")
+
+    // Clearing the query resets the people filter, but people with no saved
+    // coordinates at all would still leave the map unavailable after that
+    // reset, so check the unfiltered set before deciding how to respond.
+    const hasMappablePeople = buildGroups(people).length > 0
+    if (!hasMappablePeople) {
+      setPendingMapRegion(null)
+      setSearchedPlaceName(feature.place_name)
+      return
+    }
+
+    setSearchedPlaceName(null)
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(region, 500)
+    } else {
+      // Map isn't mounted yet (was showing the unavailable state) — the
+      // effect above fires once it remounts with the cleared filter.
+      setPendingMapRegion(region)
+    }
   }
 
   if (loading) return <LoadingState />
@@ -281,6 +308,7 @@ export default function RootsMapScreen() {
                 onPress={() => {
                   setQuery("")
                   setGeocodeSuggestions([])
+                  setSearchedPlaceName(null)
                 }}
                 className="mr-2"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -390,10 +418,12 @@ export default function RootsMapScreen() {
         <View className="flex-1 px-5">
           <SoftCard className="p-5">
             <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
-              Map unavailable
+              {searchedPlaceName ? "No people found nearby" : "Map unavailable"}
             </Text>
             <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
-              None of the matching people have saved latitude and longitude. Add a location with geocoding enabled to place people on the map.
+              {searchedPlaceName
+                ? `None of your people have a saved location near "${searchedPlaceName}". Add a location with geocoding enabled to place them on the map.`
+                : "None of the matching people have saved latitude and longitude. Add a location with geocoding enabled to place people on the map."}
             </Text>
           </SoftCard>
         </View>
