@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "expo-router"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -13,6 +13,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const passwordInputRef = useRef<TextInput>(null)
 
   async function handleSignIn() {
     setError(null)
@@ -49,13 +50,19 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
         <TextField
+          ref={passwordInputRef}
           label="Password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="password"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
         />
 
         <TouchableOpacity

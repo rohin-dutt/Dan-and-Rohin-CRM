@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { Linking, Share, Switch, Text, TouchableOpacity, View } from "react-native"
+import { useEffect, useRef, useState } from "react"
+import { Linking, Share, Switch, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ConfirmModal } from "@/components/ConfirmModal"
@@ -40,6 +40,8 @@ export default function SettingsScreen() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const newPasswordInputRef = useRef<TextInput>(null)
+  const confirmPasswordInputRef = useRef<TextInput>(null)
 
   function setOk(message: string) {
     setStatus({ ok: true, message })
@@ -293,20 +295,30 @@ export default function SettingsScreen() {
                 onChangeText={setCurrentPassword}
                 placeholder="Your current password"
                 secureTextEntry
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => newPasswordInputRef.current?.focus()}
               />
               <TextField
+                ref={newPasswordInputRef}
                 label="New password"
                 value={newPassword}
                 onChangeText={setNewPassword}
                 placeholder="At least 8 characters"
                 secureTextEntry
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
               />
               <TextField
+                ref={confirmPasswordInputRef}
                 label="Confirm password"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm new password"
                 secureTextEntry
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
               />
               <Button title="Update password" onPress={savePassword} loading={savingPassword} />
             </InlineForm>

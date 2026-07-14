@@ -1,19 +1,9 @@
-import { Text, TextInput, View } from "react-native"
+import { forwardRef } from "react"
+import { Text, TextInput, type TextInputProps, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 
-export function CompactTextField({
-  label,
-  icon,
-  value,
-  onChangeText,
-  placeholder,
-  multiline = false,
-  keyboardType,
-  autoCapitalize,
-  maxLength,
-  required,
-}: {
+type CompactTextFieldProps = {
   label: string
   icon: keyof typeof Ionicons.glyphMap
   value: string
@@ -24,7 +14,29 @@ export function CompactTextField({
   autoCapitalize?: "none" | "sentences" | "words" | "characters"
   maxLength?: number
   required?: boolean
-}) {
+  returnKeyType?: TextInputProps["returnKeyType"]
+  onSubmitEditing?: TextInputProps["onSubmitEditing"]
+  submitBehavior?: TextInputProps["submitBehavior"]
+}
+
+export const CompactTextField = forwardRef<TextInput, CompactTextFieldProps>(function CompactTextField(
+  {
+    label,
+    icon,
+    value,
+    onChangeText,
+    placeholder,
+    multiline = false,
+    keyboardType,
+    autoCapitalize,
+    maxLength,
+    required,
+    returnKeyType,
+    onSubmitEditing,
+    submitBehavior,
+  },
+  ref,
+) {
   return (
     <View className="mb-3">
       <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="mb-1.5 text-sm">
@@ -41,6 +53,7 @@ export function CompactTextField({
           <Ionicons name={icon} size={20} color={colors.forest} />
         </View>
         <TextInput
+          ref={ref}
           accessibilityLabel={label}
           value={value}
           onChangeText={onChangeText}
@@ -58,9 +71,11 @@ export function CompactTextField({
             color: colors.ink,
             textAlignVertical: multiline ? "top" : "center",
           }}
-          returnKeyType={multiline ? "default" : "next"}
+          returnKeyType={returnKeyType ?? (multiline ? "default" : "done")}
+          onSubmitEditing={onSubmitEditing}
+          submitBehavior={submitBehavior ?? (multiline ? "newline" : "blurAndSubmit")}
         />
       </View>
     </View>
   )
-}
+})
