@@ -36,7 +36,7 @@ type LocationGroup = {
 // collapsed peek must be tall enough that the "Locations" header and the
 // people/locations subtext are fully visible above it.
 const SHEET_EXPANDED_HEIGHT = 460
-const SHEET_COLLAPSED_HEIGHT = 208
+const SHEET_COLLAPSED_HEIGHT = 140
 const SHEET_TRAVEL = SHEET_EXPANDED_HEIGHT - SHEET_COLLAPSED_HEIGHT
 
 function clampSheetOffset(value: number) {
