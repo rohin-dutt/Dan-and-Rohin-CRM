@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "expo-router"
-import { Text, TouchableOpacity, View } from "react-native"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -16,6 +16,9 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmationSent, setConfirmationSent] = useState(false)
+  const lastNameInputRef = useRef<TextInput>(null)
+  const emailInputRef = useRef<TextInput>(null)
+  const passwordInputRef = useRef<TextInput>(null)
 
   async function handleSignUp() {
     setError(null)
@@ -68,22 +71,46 @@ export default function SignupScreen() {
           </View>
         )}
 
-        <TextField label="First name" value={firstName} onChangeText={setFirstName} autoComplete="given-name" />
-        <TextField label="Last name" value={lastName} onChangeText={setLastName} autoComplete="family-name" />
         <TextField
+          label="First name"
+          value={firstName}
+          onChangeText={setFirstName}
+          autoComplete="given-name"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => lastNameInputRef.current?.focus()}
+        />
+        <TextField
+          ref={lastNameInputRef}
+          label="Last name"
+          value={lastName}
+          onChangeText={setLastName}
+          autoComplete="family-name"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => emailInputRef.current?.focus()}
+        />
+        <TextField
+          ref={emailInputRef}
           label="Email"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
         <TextField
+          ref={passwordInputRef}
           label="Password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="new-password"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
         />
 
         <Button title="Create Account" onPress={handleSignUp} loading={loading} />

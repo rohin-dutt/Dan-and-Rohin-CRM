@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
@@ -39,6 +39,12 @@ export default function NewPersonScreen() {
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(90)
   const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
+  const lastNameInputRef = useRef<TextInput>(null)
+  const howMetInputRef = useRef<TextInput>(null)
+  const phoneInputRef = useRef<TextInput>(null)
+  const companyInputRef = useRef<TextInput>(null)
+  const roleInputRef = useRef<TextInput>(null)
+  const emailInputRef = useRef<TextInput>(null)
 
   const freqMenu = useAnchoredMenu()
   const locationField = useLocationAutocomplete()
@@ -189,6 +195,8 @@ export default function NewPersonScreen() {
                 placeholderTextColor="#8F96A3"
                 autoCapitalize="words"
                 returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => lastNameInputRef.current?.focus()}
                 className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
                 style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
               />
@@ -198,13 +206,15 @@ export default function NewPersonScreen() {
                 Last name <Text style={{ color: "#B91C1C" }}>*</Text>
               </Text>
               <TextInput
+                ref={lastNameInputRef}
                 accessibilityLabel="Last name"
                 value={lastName}
                 onChangeText={setLastName}
                 placeholder="Taylor"
                 placeholderTextColor="#8F96A3"
                 autoCapitalize="words"
-                returnKeyType="next"
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
                 className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
                 style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
               />
@@ -292,7 +302,8 @@ export default function NewPersonScreen() {
                 placeholderTextColor="#8F96A3"
                 className="flex-1 px-3 text-sm"
                 style={{ fontFamily: fonts.body, color: colors.ink, height: 44 }}
-                returnKeyType="next"
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
               />
               {locationField.latitude !== null ? (
                 <View className="pr-3">
@@ -308,15 +319,20 @@ export default function NewPersonScreen() {
 
           {/* How you met (or Relationship for Family) */}
           <CompactTextField
+            ref={howMetInputRef}
             label={category === "Family" ? "Relationship" : "How you met"}
             icon="people-outline"
             value={howMet}
             onChangeText={setHowMet}
             placeholder={category === "Family" ? "Parent, sibling, partner..." : "At a conference, through a friend..."}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => phoneInputRef.current?.focus()}
           />
 
           {/* Phone */}
           <CompactTextField
+            ref={phoneInputRef}
             label="Phone"
             icon="call-outline"
             value={phone}
@@ -344,6 +360,7 @@ export default function NewPersonScreen() {
           {category === "Professional" ? (
             <>
               <CompactTextField
+                ref={emailInputRef}
                 label="Email"
                 icon="mail-outline"
                 value={email}
@@ -351,8 +368,12 @@ export default function NewPersonScreen() {
                 placeholder="alex@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => companyInputRef.current?.focus()}
               />
               <CompactTextField
+                ref={companyInputRef}
                 label="Company"
                 icon="business-outline"
                 value={company}
@@ -388,24 +409,37 @@ export default function NewPersonScreen() {
             <View className="border-t border-stone-100 p-3">
               {(category === "Friend" || category === "Family") ? (
                 <CompactTextField
+                  ref={companyInputRef}
                   label="Company"
                   icon="business-outline"
                   value={company}
                   onChangeText={setCompany}
                   placeholder="Company name"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => roleInputRef.current?.focus()}
                 />
               ) : null}
 
               <CompactTextField
+                ref={roleInputRef}
                 label="Role"
                 icon="briefcase-outline"
                 value={role}
                 onChangeText={setRole}
                 placeholder="Job title"
+                returnKeyType={category === "Friend" || category === "Family" ? "next" : "done"}
+                submitBehavior={category === "Friend" || category === "Family" ? "submit" : "blurAndSubmit"}
+                onSubmitEditing={
+                  category === "Friend" || category === "Family"
+                    ? () => emailInputRef.current?.focus()
+                    : undefined
+                }
               />
 
               {(category === "Friend" || category === "Family") ? (
                 <CompactTextField
+                  ref={emailInputRef}
                   label="Email"
                   icon="mail-outline"
                   value={email}

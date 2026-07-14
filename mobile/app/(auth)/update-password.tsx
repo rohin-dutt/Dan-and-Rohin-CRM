@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Text, TouchableOpacity, View } from "react-native"
+import { useRef, useState } from "react"
+import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
@@ -14,6 +14,7 @@ export default function UpdatePasswordScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const confirmPasswordInputRef = useRef<TextInput>(null)
 
   async function handleUpdate() {
     setError(null)
@@ -64,13 +65,19 @@ export default function UpdatePasswordScreen() {
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="new-password"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
         />
         <TextField
+          ref={confirmPasswordInputRef}
           label="Confirm password"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
           autoComplete="new-password"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
         />
 
         <Button title="Update password" onPress={handleUpdate} loading={loading} />
