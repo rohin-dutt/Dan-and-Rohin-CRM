@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
-import { Alert, Linking, Share, Text, View } from "react-native"
+import { Linking, Share, Switch, Text, TouchableOpacity, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ConfirmModal } from "@/components/ConfirmModal"
 import { TextField } from "@/components/TextField"
-import { Divider } from "@/components/RootsUI"
+import { Divider, IconTile } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { supabase } from "@/lib/supabase"
@@ -30,6 +30,7 @@ export default function SettingsScreen() {
   const [expanded, setExpanded] = useState<ExpandedPanel>(null)
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -50,6 +51,12 @@ export default function SettingsScreen() {
   }
 
   const dataManagement = useDataManagement({ onSuccess: setOk, onFailure: setFailure })
+
+  useEffect(() => {
+    if (!status?.ok) return
+    const timer = setTimeout(() => setStatus(null), 2000)
+    return () => clearTimeout(timer)
+  }, [status])
 
   useEffect(() => {
     async function load() {
@@ -129,12 +136,21 @@ export default function SettingsScreen() {
     setSavingPassword(true)
     setStatus(null)
     try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      })
+      if (signInError) {
+        setFailure("Current password is incorrect")
+        return
+      }
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
       if (updateError) throw updateError
+      setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
       setExpanded(null)
-      setOk("Password updated.")
+      setOk("Password changed.")
     } catch (e) {
       setFailure(e instanceof Error ? e.message : "Failed to update password.")
     } finally {
@@ -208,11 +224,6 @@ export default function SettingsScreen() {
       settings?.push_important_moments_enabled,
   )
   const pushOn = pushPreferenceOn && pushRegistered
-  const pushDescription = pushOn
-    ? "Reminder notifications are enabled and this device is registered."
-    : pushPreferenceOn
-      ? "Reminder notifications are enabled for your account, but this device is not registered. Tap to enable this device."
-      : "Enable reminder notifications and register this device."
 
   return (
     <Screen>
@@ -277,6 +288,13 @@ export default function SettingsScreen() {
           {expanded === "password" ? (
             <InlineForm>
               <TextField
+                label="Current password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder="Your current password"
+                secureTextEntry
+              />
+              <TextField
                 label="New password"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -303,30 +321,67 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="Notifications" subtitle="Choose how you stay up to date.">
-          <SettingsRow
-            icon="notifications-outline"
-            title="Push notifications"
-            description={pushDescription}
-            value={pushOn ? "On" : "Off"}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Push notifications"
             disabled={toggling || !settings}
             onPress={togglePushNotifications}
-          />
+            activeOpacity={0.74}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+              <IconTile icon="notifications-outline" size={44} color={colors.forest} background={colors.mint} />
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                  Push notifications
+                </Text>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                  Push notifications help you stay in touch
+                </Text>
+              </View>
+              <Switch
+                value={pushOn}
+                onValueChange={togglePushNotifications}
+                disabled={toggling || !settings}
+                trackColor={{ false: "#D1D5DB", true: colors.forest }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#D1D5DB"
+              />
+            </View>
+          </TouchableOpacity>
           <Divider />
-          <SettingsRow
-            icon="mail-open-outline"
-            title="Weekly email digest"
-            description="Get a weekly summary of who to reach out to"
-            value={settings?.email_reminders_enabled ? "On" : "Off"}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Weekly email digest"
             disabled={togglingDigest || !settings}
             onPress={toggleEmailDigest}
-          />
+            activeOpacity={0.74}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
+              <IconTile icon="mail-open-outline" size={44} color={colors.forest} background={colors.mint} />
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                  Weekly email digest
+                </Text>
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                  Get a weekly summary of your Roots activity and a preview of the week ahead
+                </Text>
+              </View>
+              <Switch
+                value={Boolean(settings?.email_reminders_enabled)}
+                onValueChange={toggleEmailDigest}
+                disabled={togglingDigest || !settings}
+                trackColor={{ false: "#D1D5DB", true: colors.forest }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#D1D5DB"
+              />
+            </View>
+          </TouchableOpacity>
         </SettingsSection>
 
         <SettingsSection title="Invite a Friend" subtitle="Share Roots with someone who would use it.">
           <SettingsRow
             icon="share-outline"
             title="Invite a friend"
-            description="Send the current Roots website link"
             onPress={() =>
               Share.share({
                 message:
@@ -336,17 +391,13 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title="Tags" subtitle="Organize your people with tags.">
+        <SettingsSection title="Your data" subtitle="Access and manage your Roots data.">
           <SettingsRow
-            icon="pricetag-outline"
-            title="Manage tags"
-            description="Not available in the app yet — add or remove tags from a person's edit screen"
-            onPress={() =>
-              Alert.alert(
-                "Manage tags",
-                "Dedicated tag management has not been built in the mobile app yet. You can add or remove a person's tags from their edit screen, or manage all tags on the website.",
-              )
-            }
+            icon="download-outline"
+            title="Export data"
+            description="Download a copy of your data as JSON"
+            disabled={dataManagement.dataWorking}
+            onPress={dataManagement.exportData}
           />
         </SettingsSection>
 
@@ -354,7 +405,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="help-circle-outline"
             title="Help & Support"
-            description="Get help or contact us"
+            description="Contact us"
             onPress={() => Linking.openURL("https://useroots.app/contact").catch(() => null)}
           />
           <Divider />

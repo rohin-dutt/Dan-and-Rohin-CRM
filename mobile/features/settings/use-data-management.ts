@@ -51,7 +51,7 @@ export function useDataManagement({
         title: "Roots export",
         message: JSON.stringify(payload, null, 2),
       })
-      onSuccess("Export generated.")
+      onSuccess("Your data is being exported.")
     } catch (e) {
       onFailure(e instanceof Error ? e.message : "Failed to export data.")
     } finally {
@@ -109,7 +109,7 @@ export function useDataManagement({
   function deleteAccount() {
     Alert.alert(
       "Delete account",
-      "This permanently deletes your Roots account and private CRM data. This cannot be undone.",
+      "This permanently deletes your Roots account and all associated data. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
