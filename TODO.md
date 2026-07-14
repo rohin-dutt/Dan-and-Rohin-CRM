@@ -6,21 +6,22 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
-- [ ] `npm.cmd run lint` fails on existing public website copy lint errors.
-      Command: `npm.cmd run lint`. Failure summary: ESLint reports
+- [ ] `npm run lint` fails on existing public website copy lint errors.
+      Command: `npm run lint`. Failure summary: ESLint reports five
       `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
-      `app/(site)/contact/ContactForm.tsx`, `app/(site)/page.tsx`, and
-      `app/(site)/terms/page.tsx`. Likely owner: public website/content lint
-      cleanup. This was confirmed during the June 14, 2026 mobile push
-      readiness pass; the introduced push helper lint issue was fixed before
-      re-running.
+      `app/(site)/contact/ContactForm.tsx`, and `app/(site)/page.tsx`. Likely
+      owner: public website/content lint cleanup. Reconfirmed on July 14, 2026,
+      during the mobile bottom-sheet dismissal fix; the changed mobile file
+      had no reported lint errors.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:
       `Missing API key. Pass it to the constructor new Resend("re_123")` while
       collecting page data for `/api/contact`. Likely owner: contact API/env
       handling; move Resend initialization behind the request-time env check or
-      provide the required build env.
+      provide the required build env. Reconfirmed with `npm run build` on July
+      14, 2026, during the mobile bottom-sheet dismissal fix; compilation and
+      TypeScript completed before the existing page-data failure.
 - [ ] `npm test` fails on `tests/date-utils.test.mjs` with
       `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
       TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.
