@@ -15,7 +15,7 @@
     "ios": {
       "bundleIdentifier": "com.useroots.app",
       "supportsTablet": false,
-      "buildNumber": "2026071401",
+      "buildNumber": "2026071402",
       "infoPlist": {
         "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
         "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up, birthday, and important moment reminders.",
