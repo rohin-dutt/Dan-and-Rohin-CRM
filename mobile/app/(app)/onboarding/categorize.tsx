@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react"
 import { ActivityIndicator, DeviceEventEmitter, Text, TouchableOpacity, View } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { useRouter } from "expo-router"
 import type * as Contacts from "expo-contacts"
 import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
-import { ErrorBanner } from "@/components/ErrorBanner"
 import { PersonAvatar } from "@/components/RootsUI"
 import { getSelectedContacts } from "@/features/onboarding/onboarding-contacts"
 import {
   createPersonWithRelations,
-  updatePersonWithRelations,
   PersonRelationsError,
   type PersonWriteValues,
 } from "@/lib/people-data"
@@ -24,6 +23,11 @@ const CATEGORY_FREQUENCY_DAYS: Record<RelationshipCategoryLabel, number> = {
   Friend: 90,
   Family: 30,
   Professional: 180,
+}
+
+type Categorization = {
+  contact: Contacts.ExistingContact
+  category: RelationshipCategoryLabel
 }
 
 // Contacts without a birth year get the placeholder year so the rest of the
@@ -55,10 +59,8 @@ export default function OnboardingCategorizeScreen() {
   const [contacts] = useState<Contacts.ExistingContact[]>(() => getSelectedContacts())
   const [userId, setUserId] = useState<string | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [savedPersonIds, setSavedPersonIds] = useState<Map<number, string>>(new Map())
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [failedCategory, setFailedCategory] = useState<RelationshipCategoryLabel | null>(null)
+  const [categorizations, setCategorizations] = useState<Map<number, Categorization>>(new Map())
+  const [isSavingBatch, setIsSavingBatch] = useState(false)
 
   useEffect(() => {
     if (contacts.length === 0) {
@@ -74,56 +76,51 @@ export default function OnboardingCategorizeScreen() {
     })
   }, [contacts, router])
 
-  async function handleSelectCategory(category: RelationshipCategoryLabel) {
-    if (saving || !userId) return
-    setSaving(true)
-    setError(null)
-    setFailedCategory(null)
+  // Saves every categorized contact to Supabase in one pass. Best-effort: a
+  // contact that fails to save is skipped rather than blocking the rest of
+  // the batch, since onboarding shouldn't strand the user on a network error.
+  async function saveBatch(finalCategorizations: Map<number, Categorization>) {
+    setIsSavingBatch(true)
 
-    const contact = contacts[currentIndex]
-    const person = personValuesFromContact(contact, category)
-    const existingId = savedPersonIds.get(currentIndex)
-
-    let personId = existingId
-    try {
-      if (existingId) {
-        await updatePersonWithRelations({ userId, personId: existingId, person, categoryLabel: category })
-      } else {
-        personId = await createPersonWithRelations({ userId, person, categoryLabel: category })
-      }
-    } catch (e) {
-      if (e instanceof PersonRelationsError) {
-        // The person row was written; the category tag is best-effort during
-        // onboarding, so continue instead of blocking the flow.
-        personId = e.personId
-      } else {
-        setError(e instanceof Error ? e.message : "Failed to save. Please try again.")
-        setFailedCategory(category)
-        setSaving(false)
-        return
+    let savedCount = 0
+    for (const { contact, category } of finalCategorizations.values()) {
+      if (!userId) break
+      const person = personValuesFromContact(contact, category)
+      try {
+        await createPersonWithRelations({ userId, person, categoryLabel: category })
+        savedCount += 1
+      } catch (e) {
+        if (e instanceof PersonRelationsError) {
+          // The person row was written; the category tag/moments are
+          // best-effort during onboarding, so still count it as saved.
+          savedCount += 1
+        }
       }
     }
 
-    const nextSaved = new Map(savedPersonIds)
-    if (personId) nextSaved.set(currentIndex, personId)
-    setSavedPersonIds(nextSaved)
-    setSaving(false)
+    DeviceEventEmitter.emit(PEOPLE_CHANGED_EVENT)
+    router.push({
+      pathname: "/(app)/onboarding/celebrate",
+      params: { count: String(savedCount) },
+    })
+  }
+
+  function handleSelectCategory(category: RelationshipCategoryLabel) {
+    if (isSavingBatch || !userId) return
+
+    const next = new Map(categorizations)
+    next.set(currentIndex, { contact: contacts[currentIndex], category })
+    setCategorizations(next)
 
     if (currentIndex === contacts.length - 1) {
-      DeviceEventEmitter.emit(PEOPLE_CHANGED_EVENT)
-      router.push({
-        pathname: "/(app)/onboarding/celebrate",
-        params: { count: String(nextSaved.size) },
-      })
+      void saveBatch(next)
     } else {
       setCurrentIndex(currentIndex + 1)
     }
   }
 
   function handleBack() {
-    if (saving) return
-    setError(null)
-    setFailedCategory(null)
+    if (isSavingBatch) return
     if (currentIndex === 0) {
       router.back()
     } else {
@@ -133,9 +130,21 @@ export default function OnboardingCategorizeScreen() {
 
   if (contacts.length === 0) return null
 
+  if (isSavingBatch) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center" style={{ backgroundColor: colors.cream }}>
+        <ActivityIndicator color={colors.forest} />
+        <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-4 text-center text-sm">
+          Saving your people...
+        </Text>
+      </SafeAreaView>
+    )
+  }
+
   const contact = contacts[currentIndex]
   const phone = contact.phoneNumbers?.find((entry) => entry.number?.trim())?.number?.trim()
   const email = contact.emails?.find((entry) => entry.email?.trim())?.email?.trim()
+  const selectedCategory = categorizations.get(currentIndex)?.category
 
   return (
     <Screen scrollable={false}>
@@ -171,24 +180,6 @@ export default function OnboardingCategorizeScreen() {
             </Text>
           ) : null}
 
-          {error != null && (
-            <View className="mt-6 w-full">
-              <ErrorBanner message={error} />
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Try again"
-                onPress={() => {
-                  if (failedCategory) void handleSelectCategory(failedCategory)
-                }}
-                className="min-h-11 items-center justify-center"
-              >
-                <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
-                  Try again
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
           <Text
             style={{ fontFamily: fonts.semibold, color: colors.warmBlack }}
             className="mt-10 text-base"
@@ -196,24 +187,23 @@ export default function OnboardingCategorizeScreen() {
             How do you know them?
           </Text>
 
-          {saving ? (
-            <View className="mt-6 h-24 items-center justify-center">
-              <ActivityIndicator color={colors.forest} />
-            </View>
-          ) : (
-            <View className="mt-6 w-full flex-row gap-2">
-              {RELATIONSHIP_CATEGORIES.map((category) => (
+          <View className="mt-6 w-full flex-row gap-2">
+            {RELATIONSHIP_CATEGORIES.map((category) => {
+              const selected = selectedCategory === category.label
+              return (
                 <TouchableOpacity
                   key={category.label}
                   accessibilityRole="button"
+                  accessibilityState={{ selected }}
                   accessibilityLabel={`Categorize as ${category.label}`}
-                  onPress={() => void handleSelectCategory(category.label)}
+                  onPress={() => handleSelectCategory(category.label)}
                   activeOpacity={0.78}
-                  className="min-h-24 flex-1 items-center justify-center rounded-2xl border border-stone-200 bg-white px-1 py-4 shadow-sm"
+                  style={{ backgroundColor: selected ? colors.forest : "white" }}
+                  className="min-h-24 flex-1 items-center justify-center rounded-2xl border border-stone-200 px-1 py-4 shadow-sm"
                 >
-                  <Ionicons name={category.icon} size={26} color={colors.forest} />
+                  <Ionicons name={category.icon} size={26} color={selected ? "white" : colors.forest} />
                   <Text
-                    style={{ fontFamily: fonts.semibold, color: colors.ink }}
+                    style={{ fontFamily: fonts.semibold, color: selected ? "white" : colors.ink }}
                     className="mt-2 text-sm"
                     numberOfLines={1}
                     adjustsFontSizeToFit
@@ -222,9 +212,9 @@ export default function OnboardingCategorizeScreen() {
                     {category.label}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+              )
+            })}
+          </View>
         </View>
       </View>
     </Screen>
