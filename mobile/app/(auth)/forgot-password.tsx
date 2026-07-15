@@ -1,7 +1,12 @@
 import { useState } from "react"
-import { useRouter } from "expo-router"
+import * as Linking from "expo-linking"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { Text, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
+import {
+  PASSWORD_RECOVERY_ERROR_MESSAGE,
+  type PasswordRecoveryFailureReason,
+} from "@/lib/auth-links"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
@@ -9,26 +14,49 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 
 export default function ForgotPasswordScreen() {
   const router = useRouter()
+  const { recoveryError } = useLocalSearchParams<{
+    recoveryError?: PasswordRecoveryFailureReason
+  }>()
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+  const [dismissedLinkError, setDismissedLinkError] = useState(false)
+
+  const linkError = recoveryError && !dismissedLinkError
+    ? PASSWORD_RECOVERY_ERROR_MESSAGE
+    : null
 
   async function handleReset() {
     setError(null)
-    if (!email.trim()) {
+    setDismissedLinkError(true)
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!normalizedEmail) {
       setError("Email is required")
       return
     }
+
+    setEmail(normalizedEmail)
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "roots://update-password",
-    })
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
+
+    try {
+      const redirectTo = Linking.createURL("update-password")
+      const { error: requestError } = await supabase.auth.resetPasswordForEmail(
+        normalizedEmail,
+        { redirectTo },
+      )
+
+      if (requestError) {
+        setError("We couldn't send a reset link. Check your connection and try again.")
+        return
+      }
+
       setSent(true)
+    } catch {
+      setError("We couldn't send a reset link. Check your connection and try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -44,12 +72,12 @@ export default function ForgotPasswordScreen() {
           We'll send a reset link to your email.
         </Text>
 
-        {error && <ErrorBanner message={error} />}
+        {(error || linkError) && <ErrorBanner message={error ?? linkError ?? ""} />}
 
         {sent ? (
           <View className="bg-green-50 border border-green-200 rounded-xl p-4">
             <Text className="text-green-700 text-sm font-medium">
-              Check your email for a reset link.
+              If an account exists for that email, a reset link is on its way.
             </Text>
           </View>
         ) : (

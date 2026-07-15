@@ -278,14 +278,21 @@ Required auth flows:
 - Update password.
 - Session restore.
 
-Deep link scheme proposal:
+Deep link scheme:
 
 ```text
 roots://
 ```
 
-The exact redirect URLs must be added to Supabase Auth settings and the Expo
-app configuration before password reset and OAuth-style redirects can pass QA.
+Password recovery uses the exact callback `roots://update-password`, generated
+at runtime with `Linking.createURL("update-password")`. The callback must remain
+in the hosted Supabase Auth redirect allowlist and in local
+`additional_redirect_urls`. Recovery-link exchange must finish successfully and
+return a real session before the app shows the update-password screen.
+
+Expo Go URLs are not stable production authentication callbacks. Password
+recovery must be verified with a development or TestFlight build using the
+configured `roots` scheme.
 
 ## Navigation
 

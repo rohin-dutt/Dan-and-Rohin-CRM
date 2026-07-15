@@ -1,7 +1,8 @@
 import { Slot, useRouter, useSegments } from "expo-router"
 import { useFonts } from "expo-font"
-import { useEffect, useState } from "react"
-import { ActivityIndicator, DeviceEventEmitter, Linking, View } from "react-native"
+import * as Linking from "expo-linking"
+import { useEffect, useRef, useState } from "react"
+import { ActivityIndicator, DeviceEventEmitter, View } from "react-native"
 import {
   CormorantGaramond_700Bold,
 } from "@expo-google-fonts/cormorant-garamond"
@@ -13,7 +14,7 @@ import {
 } from "@expo-google-fonts/inter"
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
-import { handlePasswordRecoveryUrl } from "@/lib/auth-links"
+import { handlePasswordRecoveryUrl, isPasswordRecoveryUrl } from "@/lib/auth-links"
 import {
   FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
   hasCompletedFirstDownloadIntro,
@@ -24,11 +25,17 @@ import { colors } from "@/constants/theme"
 import "../global.css"
 
 export default function RootLayout() {
+  const initialUrl = Linking.getLinkingURL()
   const [session, setSession] = useState<Session | null>(null)
   const [introComplete, setIntroComplete] = useState<boolean | null>(null)
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
   const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [recoveryLinkPending, setRecoveryLinkPending] = useState(
+    Boolean(initialUrl && isPasswordRecoveryUrl(initialUrl)),
+  )
+  const recoveryInFlightRef = useRef(false)
+  const processedRecoveryFingerprintRef = useRef<number | null>(null)
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_700Bold,
     Inter_400Regular,
@@ -103,11 +110,58 @@ export default function RootLayout() {
   }, [session, peopleStatusVersion])
 
   useEffect(() => {
+    function fingerprintUrl(url: string) {
+      let hash = 2166136261
+      for (let index = 0; index < url.length; index += 1) {
+        hash ^= url.charCodeAt(index)
+        hash = Math.imul(hash, 16777619)
+      }
+      return hash >>> 0
+    }
+
     async function handleUrl(url: string | null) {
-      if (!url) return
-      const result = await handlePasswordRecoveryUrl(url)
-      if (result.handled) {
-        router.replace("/(auth)/update-password")
+      if (!url || !isPasswordRecoveryUrl(url)) return
+
+      const fingerprint = fingerprintUrl(url)
+      if (
+        recoveryInFlightRef.current ||
+        processedRecoveryFingerprintRef.current === fingerprint
+      ) {
+        return
+      }
+
+      recoveryInFlightRef.current = true
+      processedRecoveryFingerprintRef.current = fingerprint
+      setRecoveryLinkPending(true)
+
+      try {
+        const result = await handlePasswordRecoveryUrl(url)
+        if (!result.handled) return
+
+        if (result.ok) {
+          const {
+            data: { session: recoverySession },
+          } = await supabase.auth.getSession()
+
+          if (!recoverySession) {
+            router.replace({
+              pathname: "/(auth)/forgot-password",
+              params: { recoveryError: "exchange_failed" },
+            })
+            return
+          }
+
+          setSession(recoverySession)
+          router.replace("/(auth)/update-password")
+        } else {
+          router.replace({
+            pathname: "/(auth)/forgot-password",
+            params: { recoveryError: result.reason },
+          })
+        }
+      } finally {
+        recoveryInFlightRef.current = false
+        setRecoveryLinkPending(false)
       }
     }
 
@@ -125,7 +179,7 @@ export default function RootLayout() {
   }, [router, loading, fontsLoaded])
 
   useEffect(() => {
-    if (loading || introComplete == null) return
+    if (loading || introComplete == null || recoveryLinkPending) return
 
     const inAuthGroup = segments[0] === "(auth)"
     const inIntro = segments[0] === "intro"
@@ -149,12 +203,13 @@ export default function RootLayout() {
     } else if (hasPeople && (inAuthGroup || inIntro)) {
       router.replace("/(app)/(tabs)/dashboard")
     }
-  }, [session, loading, introComplete, hasPeople, segments])
+  }, [session, loading, introComplete, hasPeople, recoveryLinkPending, segments])
 
   if (
     loading ||
     (!fontsLoaded && !fontError) ||
     introComplete == null ||
+    recoveryLinkPending ||
     (session && hasPeople == null)
   ) {
     return (
