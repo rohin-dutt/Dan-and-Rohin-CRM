@@ -11,7 +11,7 @@ import { personImageUrl } from "@/lib/person-display"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getNextActionDays } from "@roots/shared"
-import { ContactActionButtons, StatStrip, TabBar, TagPill, type ProfileTab } from "@/features/person-detail/components"
+import { ContactActionButtons, StatStrip, TabBar, type ProfileTab } from "@/features/person-detail/components"
 import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person-detail/tabs"
 import { formatNextAction } from "@/features/person-detail/helpers"
 import { usePersonDetail } from "@/features/person-detail/use-person-detail"
@@ -119,7 +119,6 @@ export default function PersonDetailScreen() {
   }, null)
   const nextActionDays = getNextActionDays(person, earliestFollowUpDate)
   const subtitle = [person.role, person.company].filter(Boolean).join(" at ")
-  const topTags = tags.slice(0, 3)
 
   return (
     <Screen scrollable={false}>
@@ -174,19 +173,14 @@ export default function PersonDetailScreen() {
                   {person.relationship_type}
                 </Text>
               ) : null}
-              {topTags.length > 0 || person.phone ? (
+              {person.phone ? (
                 <View className="mt-3 flex-row flex-wrap items-center gap-2">
-                  {topTags.map((tag, index) => (
-                    <TagPill key={tag.id} tag={tag} highlighted={index === 0} />
-                  ))}
-                  {person.phone ? (
-                    <ContactActionButtons
-                      phone={person.phone}
-                      email={person.email}
-                      personName={person.name}
-                      onLogInteraction={() => setSheetMode("chat")}
-                    />
-                  ) : null}
+                  <ContactActionButtons
+                    phone={person.phone}
+                    email={person.email}
+                    personName={person.name}
+                    onLogInteraction={() => setSheetMode("chat")}
+                  />
                 </View>
               ) : null}
             </View>
