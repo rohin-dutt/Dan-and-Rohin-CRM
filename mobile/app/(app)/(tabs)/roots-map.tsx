@@ -125,9 +125,11 @@ export default function RootsMapScreen() {
   const [mapInitialRegion, setMapInitialRegion] = useState<RootsMapRegion>(getDefaultRegion())
   const [pendingMapRegion, setPendingMapRegion] = useState<RootsMapRegion | null>(null)
   const [searchedPlaceName, setSearchedPlaceName] = useState<string | null>(null)
+  const hasLoadedOnce = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent?: boolean) => {
     try {
+      if (!silent && !hasLoadedOnce.current) setLoading(true)
       setError(null)
       const {
         data: { session },
@@ -151,13 +153,17 @@ export default function RootsMapScreen() {
       setError(e instanceof Error ? e.message : "Failed to load your roots.")
     } finally {
       setLoading(false)
+      hasLoadedOnce.current = true
     }
   }, [])
 
+  useEffect(() => {
+    load()
+  }, [load])
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true)
-      load()
+      if (hasLoadedOnce.current) load(true)
     }, [load]),
   )
 

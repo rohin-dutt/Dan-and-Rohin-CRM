@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DeviceEventEmitter, Share, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useRouter } from "expo-router"
@@ -43,9 +43,11 @@ export default function DashboardScreen() {
   const [noteCount, setNoteCount] = useState(0)
   const [firstName, setFirstName] = useState("there")
   const [momentsExpanded, setMomentsExpanded] = useState(false)
+  const hasLoadedOnce = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent?: boolean) => {
     try {
+      if (!silent && !hasLoadedOnce.current) setLoading(true)
       setError(null)
       const {
         data: { session },
@@ -80,13 +82,17 @@ export default function DashboardScreen() {
       setError(e instanceof Error ? e.message : "Failed to load dashboard.")
     } finally {
       setLoading(false)
+      hasLoadedOnce.current = true
     }
   }, [])
 
+  useEffect(() => {
+    load()
+  }, [load])
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true)
-      load()
+      if (hasLoadedOnce.current) load(true)
     }, [load]),
   )
 

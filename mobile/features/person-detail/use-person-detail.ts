@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DeviceEventEmitter } from "react-native"
 import { useFocusEffect } from "expo-router"
 import { supabase } from "@/lib/supabase"
@@ -20,9 +20,11 @@ export function usePersonDetail(id: string) {
   const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [followUpUpdating, setFollowUpUpdating] = useState(false)
+  const hasLoadedOnce = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent?: boolean) => {
     try {
+      if (!silent && !hasLoadedOnce.current) setLoading(true)
       setError(null)
       const [personRes, interactionsRes, tagsRes, loadedMoments, loadedNotes] = await Promise.all([
         supabase.from("people").select("*").eq("id", id).single(),
@@ -52,13 +54,20 @@ export function usePersonDetail(id: string) {
       setError(e instanceof Error ? e.message : "Failed to load person")
     } finally {
       setLoading(false)
+      hasLoadedOnce.current = true
     }
   }, [id])
 
+  // `load` changes with `id`, so a reused hook instance reloads (with the
+  // spinner) when it starts pointing at a different person.
+  useEffect(() => {
+    hasLoadedOnce.current = false
+    load()
+  }, [load])
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true)
-      load()
+      if (hasLoadedOnce.current) load(true)
     }, [load]),
   )
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DeviceEventEmitter, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
@@ -49,6 +49,7 @@ export default function PeopleScreen() {
   const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
   const sortMenu = useAnchoredMenu()
+  const hasLoadedOnce = useRef(false)
 
   const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
   // Locations may contain commas ("Paris, France"), so they must never go
@@ -63,8 +64,9 @@ export default function PeopleScreen() {
     setLocationFilters(parseLocationParam(locationParam))
   }, [locationParam])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent?: boolean) => {
     try {
+      if (!silent && !hasLoadedOnce.current) setLoading(true)
       setError(null)
       const {
         data: { session },
@@ -105,13 +107,17 @@ export default function PeopleScreen() {
       setError(e instanceof Error ? e.message : "Failed to load people.")
     } finally {
       setLoading(false)
+      hasLoadedOnce.current = true
     }
   }, [])
 
+  useEffect(() => {
+    load()
+  }, [load])
+
   useFocusEffect(
     useCallback(() => {
-      setLoading(true)
-      load()
+      if (hasLoadedOnce.current) load(true)
     }, [load]),
   )
 
