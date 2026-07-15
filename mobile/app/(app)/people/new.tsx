@@ -15,7 +15,6 @@ import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequenci
 import { normalizeMomentDrafts, toLocalDateString, type ImportantMomentDraft } from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
-import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
 
@@ -38,7 +37,7 @@ export default function NewPersonScreen() {
   const [notes, setNotes] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(90)
-  const [importantMoments, setImportantMoments] = useState<ImportantMomentDraft[]>([])
+  const importantMoments: ImportantMomentDraft[] = []
   const lastNameInputRef = useRef<TextInput>(null)
   const howMetInputRef = useRef<TextInput>(null)
   const phoneInputRef = useRef<TextInput>(null)
@@ -341,13 +340,13 @@ export default function NewPersonScreen() {
             keyboardType="phone-pad"
           />
 
-          {/* Notes */}
+          {/* Overview */}
           <CompactTextField
-            label="Notes"
+            label="Overview"
             icon="document-text-outline"
             value={notes}
             onChangeText={setNotes}
-            placeholder="Anything else to remember..."
+            placeholder="Any general details you want to remember about this person?"
             multiline
           />
 
@@ -453,8 +452,6 @@ export default function NewPersonScreen() {
               {category === "Professional" ? (
                 <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
               ) : null}
-
-              <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
             </View>
           ) : null}
         </SoftCard>

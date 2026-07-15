@@ -34,7 +34,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
           <QuickAddAction
             icon="person-outline"
             label="Add someone new"
-            description="Add someone new to your Roots"
+            description="Add someone to your Roots"
             color={colors.forest}
             background={colors.mint}
             onPress={() => {
@@ -45,8 +45,8 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
           <Divider />
           <QuickAddAction
             icon="chatbubble-outline"
-            label="Log interaction"
-            description="Log a chat, call, or meeting"
+            label="Log a chat"
+            description="Who did you talk to recently?"
             color="#98520B"
             background="#FBF1E9"
             onPress={() => openForm("chat")}

@@ -61,6 +61,7 @@ export function QuickAddFormSheet({
   const [followUpEnabled, setFollowUpEnabled] = useState(false)
   const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
   const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
+  const [followUpNote, setFollowUpNote] = useState("")
 
   // Note fields
   const [noteText, setNoteText] = useState("")
@@ -96,6 +97,7 @@ export function QuickAddFormSheet({
     setFollowUpEnabled(false)
     setFollowUpDate(null)
     setShowFollowUpPicker(false)
+    setFollowUpNote("")
     setNoteText("")
     setLoadingPeople(true)
     setFetchError(null)
@@ -169,6 +171,7 @@ export function QuickAddFormSheet({
         p_notes: interactionNotes.trim() || null,
         p_follow_up_needed: followUpEnabled,
         p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
+        p_follow_up_note: followUpEnabled ? followUpNote.trim() || null : null,
       })
       if (rpcError) throw rpcError
       DeviceEventEmitter.emit("interactionAdded")
@@ -588,7 +591,10 @@ export function QuickAddFormSheet({
                   value={followUpEnabled}
                   onValueChange={(value) => {
                     setFollowUpEnabled(value)
-                    if (!value) setShowFollowUpPicker(false)
+                    if (!value) {
+                      setShowFollowUpPicker(false)
+                      setFollowUpNote("")
+                    }
                   }}
                   trackColor={{ false: "#D6D3D1", true: colors.forest }}
                   thumbColor="#FFFFFF"
@@ -618,6 +624,35 @@ export function QuickAddFormSheet({
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.muted} />
                 </TouchableOpacity>
+              ) : null}
+
+              {followUpEnabled ? (
+                <View style={{ marginTop: 14 }}>
+                  <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14, marginBottom: 8 }}>
+                    Follow-up note (optional)
+                  </Text>
+                  <TextInput
+                    value={followUpNote}
+                    onChangeText={setFollowUpNote}
+                    placeholder="What do you want to remember to ask or do?"
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    numberOfLines={3}
+                    style={{
+                      fontFamily: fonts.body,
+                      color: colors.ink,
+                      fontSize: 14,
+                      borderWidth: 1,
+                      borderColor: "#E7E5E4",
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      backgroundColor: "white",
+                      minHeight: 84,
+                      textAlignVertical: "top",
+                    }}
+                  />
+                </View>
               ) : null}
             </View>
 

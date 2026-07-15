@@ -17,7 +17,6 @@ import { colors, fonts } from "@/constants/theme"
 import { INTERACTION_TYPES, normalizeMomentDrafts, toLocalDateString, type ImportantMomentDraft } from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
-import { MomentDraftsEditor } from "@/features/person-form/MomentDraftsEditor"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
 
@@ -371,13 +370,13 @@ export default function OnboardingManualScreen() {
               keyboardType="phone-pad"
             />
 
-            {/* Notes */}
+            {/* Overview */}
             <CompactTextField
-              label="Notes"
+              label="Overview"
               icon="document-text-outline"
               value={notes}
               onChangeText={setNotes}
-              placeholder="Anything else to remember..."
+              placeholder="Any general details you want to remember about this person?"
               multiline
             />
 
@@ -483,8 +482,6 @@ export default function OnboardingManualScreen() {
                 {category === "Professional" ? (
                   <BirthdayField date={birthdayDate} onChange={setBirthdayDate} />
                 ) : null}
-
-                <MomentDraftsEditor moments={importantMoments} onChange={setImportantMoments} />
               </View>
             ) : null}
           </SoftCard>
