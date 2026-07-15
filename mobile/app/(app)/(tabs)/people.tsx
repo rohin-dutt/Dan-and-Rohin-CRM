@@ -175,7 +175,7 @@ export default function PeopleScreen() {
       <BrandHeader
         title="Your People"
         titleIcon="heart-outline"
-        subtitle="The people who matter most."
+        subtitle="The people who matter."
       />
 
       <View className="px-5">
@@ -309,7 +309,7 @@ export default function PeopleScreen() {
           renderItem={({ item }) => (
             <PersonCard
               person={item}
-              tags={tagsByPerson.get(item.id) ?? []}
+              followUpDate={followUpByPerson.get(item.id) ?? null}
               onPress={() => router.push(`/people/${item.id}`)}
             />
           )}

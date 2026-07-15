@@ -1,5 +1,5 @@
 import type { Ionicons } from "@expo/vector-icons"
-import { getNextDueDays, getRelationshipStatus, isTouchPoint } from "@roots/shared"
+import { getRelationshipStatus, isTouchPoint } from "@roots/shared"
 import { colors } from "@/constants/theme"
 import type { Interaction, Person, Tag } from "@/types"
 
@@ -115,40 +115,32 @@ export function matchesStatusFilter(
   })
 }
 
-export function statusDotForPerson(person: Person): "red" | "amber" | "green" | "gray" {
-  const status = getRelationshipStatus(person)
-  if (status === "overdue") return "red"
-  if (status === "due_this_week") return "amber"
-  if (status === "recent") return "green"
-  return "gray"
-}
-
-export function statusLabel(person: Person) {
-  const days = getNextDueDays(person)
-  if (days == null || days > 7) return "Active"
-  if (days <= 0) return "Due today"
-  return `Due in ${days} ${days === 1 ? "day" : "days"}`
-}
-
-export function statusTone(person: Person) {
-  const days = getNextDueDays(person)
-  if (days == null || days > 7) return { bg: colors.mint, text: colors.forest }
-  return { bg: "#FFF3DE", text: "#98520B" }
+export function followUpBadgeForPerson(
+  person: Person,
+  followUpDate: string | null = null,
+): { label: string; bg: string; text: string } | null {
+  const status = getRelationshipStatus(person, new Date(), followUpDate)
+  if (status === "overdue") return { label: "Overdue", bg: colors.mint, text: colors.forest }
+  if (status === "due_this_week") return { label: "This week", bg: "#FFF3DE", text: colors.amber }
+  return null
 }
 
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-export function formatLastInteraction(dateStr: string | null | undefined): string {
-  if (!dateStr) return "No interactions yet"
+export function formatLastInteraction(dateStr: string | null | undefined, personName?: string): string {
+  if (!dateStr) {
+    const firstName = personName?.split(" ")[0]
+    return firstName ? `Say hello to ${firstName} 👋` : "Say hello 👋"
+  }
   const [yearPart, monthPart, dayPart] = dateStr.slice(0, 10).split("-").map(Number)
   const date = new Date(yearPart, monthPart - 1, dayPart)
   const currentYear = new Date().getFullYear()
   const month = MONTH_SHORT[date.getMonth()]
   const day = date.getDate()
   if (date.getFullYear() === currentYear) {
-    return `Last interaction ${month} ${day}`
+    return `Last talked ${month} ${day}`
   }
-  return `Last interaction ${month} ${day}, ${date.getFullYear()}`
+  return `Last talked ${month} ${day}, ${date.getFullYear()}`
 }
 
 export function buildInteractionCounts(interactions: InteractionSummary[]): Map<string, number> {
