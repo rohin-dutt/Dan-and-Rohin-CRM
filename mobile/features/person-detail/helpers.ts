@@ -11,11 +11,12 @@ export function getTagFromJoin(row: PersonTagRow): Tag | null {
 }
 
 export function formatNextAction(days: number | null): string {
-  if (days == null) return "No cadence"
-  if (days < 0) return `${Math.abs(days)}d overdue`
-  if (days === 0) return "Due today"
-  if (days === 1) return "Due tomorrow"
-  return `Due in ${days}d`
+  if (days == null) return "—"
+  if (days < 0) return "Overdue"
+  if (days === 0) return "Today"
+  const due = new Date()
+  due.setDate(due.getDate() + days)
+  return `by ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(due)}`
 }
 
 // Interaction type recorded when a follow-up is completed and the user opts
@@ -26,6 +27,7 @@ export const FOLLOW_UP_COMPLETED_TYPE = "follow_up_completed"
 export function interactionIcon(type: string): keyof typeof Ionicons.glyphMap {
   const normalized = type.trim().toLowerCase()
   if (normalized === FOLLOW_UP_COMPLETED_TYPE) return "checkmark-done-outline"
+  if (normalized.includes("in person") || normalized.includes("in-person")) return "people-outline"
   if (normalized.includes("call") || normalized.includes("phone")) return "call-outline"
   if (normalized.includes("text") || normalized.includes("message")) return "chatbubble-outline"
   if (normalized.includes("coffee")) return "cafe-outline"

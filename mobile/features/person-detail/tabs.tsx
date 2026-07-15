@@ -11,10 +11,30 @@ import { DetailEmptyState, InfoList, SectionCard, TagPill, type InfoRow } from "
 import { FOLLOW_UP_COMPLETED_TYPE, interactionIcon } from "./helpers"
 import type { Interaction, Person, PersonNote, Tag } from "@/types"
 
-export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
-  const [expanded, setExpanded] = useState(false)
+type TimelineEntry =
+  | { kind: "interaction"; id: string; date: string | null; interaction: Interaction }
+  | { kind: "note"; id: string; date: string | null; note: PersonNote }
 
-  if (interactions.length === 0) {
+export function TimelineTab({ interactions, notes }: { interactions: Interaction[]; notes: PersonNote[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+
+  const entries: TimelineEntry[] = [
+    ...interactions.map((interaction): TimelineEntry => ({
+      kind: "interaction",
+      id: `interaction-${interaction.id}`,
+      date: interaction.date,
+      interaction,
+    })),
+    ...notes.map((note): TimelineEntry => ({
+      kind: "note",
+      id: `note-${note.id}`,
+      date: note.note_date ?? note.created_at,
+      note,
+    })),
+  ].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+
+  if (entries.length === 0) {
     return (
       <View className="mt-6">
         <DetailEmptyState title="No interactions yet" body="Log a call, text, or meeting to start this contact's timeline." />
@@ -22,49 +42,77 @@ export function TimelineTab({ interactions }: { interactions: Interaction[] }) {
     )
   }
 
-  const visible = expanded ? interactions : interactions.slice(0, 3)
-  const extraCount = interactions.length - 3
+  const visible = showAll ? entries : entries.slice(0, 3)
+  const extraCount = entries.length - 3
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
   return (
     <View className="mt-6">
-      {visible.map((interaction, index) => {
+      {visible.map((entry, index) => {
         // Completed follow-ups are logged without a type badge; the timeline
         // shows a fixed description instead.
-        const isFollowUpCompleted = interaction.type === FOLLOW_UP_COMPLETED_TYPE
+        const isFollowUpCompleted = entry.kind === "interaction" && entry.interaction.type === FOLLOW_UP_COMPLETED_TYPE
+        const isExpanded = expandedIds.has(entry.id)
+        const body = entry.kind === "note" ? entry.note.body : entry.interaction.notes
+        const title =
+          entry.kind === "note"
+            ? `${formatTimelineDate(entry.date)}  ·  Note`
+            : isFollowUpCompleted
+              ? formatTimelineDate(entry.date)
+              : `${formatTimelineDate(entry.date)}  ·  ${entry.interaction.type}`
         return (
-          <View key={interaction.id} className="flex-row">
+          <View key={entry.id} className="flex-row">
             <View className="items-center">
-              <IconTile icon={interactionIcon(interaction.type)} size={44} />
+              <IconTile
+                icon={entry.kind === "note" ? "pencil-outline" : interactionIcon(entry.interaction.type)}
+                size={44}
+              />
               {index < visible.length - 1 ? <View className="w-px flex-1 bg-stone-200" /> : null}
             </View>
-            <View className="ml-4 flex-1 pb-6">
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isExpanded }}
+              accessibilityLabel={isExpanded ? "Collapse timeline entry" : "Expand timeline entry"}
+              activeOpacity={0.78}
+              onPress={() => toggleExpanded(entry.id)}
+              className="ml-4 flex-1 pb-6"
+            >
               <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
-                {isFollowUpCompleted
-                  ? formatTimelineDate(interaction.date)
-                  : `${formatTimelineDate(interaction.date)}  ·  ${interaction.type}`}
+                {title}
               </Text>
               {isFollowUpCompleted ? (
                 <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
                   Follow up completed
                 </Text>
-              ) : interaction.notes ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
-                  {interaction.notes}
+              ) : body ? (
+                <Text
+                  style={{ fontFamily: fonts.body, color: colors.muted }}
+                  className="mt-2 text-base leading-6"
+                  numberOfLines={isExpanded ? undefined : 1}
+                >
+                  {body}
                 </Text>
-              ) : (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm">
-                  No notes for this interaction.
-                </Text>
-              )}
-            </View>
+              ) : null}
+            </TouchableOpacity>
           </View>
         )
       })}
-      {!expanded && extraCount > 0 ? (
+      {!showAll && extraCount > 0 ? (
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`Show ${extraCount} more interactions`}
-          onPress={() => setExpanded(true)}
+          accessibilityLabel={`Show ${extraCount} more timeline entries`}
+          onPress={() => setShowAll(true)}
           className="py-2"
         >
           <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-sm">
@@ -410,7 +458,7 @@ export function FollowUpsTab({
           ))}
         </View>
       ) : (
-        <DetailEmptyState title="No open follow-ups" body="Open follow-ups from logged interactions will appear here." />
+        <DetailEmptyState title="No open follow-ups" body="Open follow-ups will appear here." />
       )}
 
       {completedFollowUps.length > 0 ? (

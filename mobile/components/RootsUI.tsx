@@ -163,7 +163,7 @@ export function PersonAvatar({
       style={{ width: size, height: size, borderRadius: size / 2 }}
       accessibilityLabel={`${name} initials`}
     >
-      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-sm">
+      <Text style={{ fontFamily: fonts.bold, color: colors.forest, fontSize: Math.round(size * 0.38) }}>
         {initials}
       </Text>
     </View>

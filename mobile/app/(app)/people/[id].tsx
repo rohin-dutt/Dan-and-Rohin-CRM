@@ -169,6 +169,11 @@ export default function PersonDetailScreen() {
                   {subtitle}
                 </Text>
               ) : null}
+              {person.relationship_type ? (
+                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-1">
+                  {person.relationship_type}
+                </Text>
+              ) : null}
               {topTags.length > 0 || person.phone ? (
                 <View className="mt-3 flex-row flex-wrap items-center gap-2">
                   {topTags.map((tag, index) => (
@@ -196,7 +201,9 @@ export default function PersonDetailScreen() {
 
           <TabBar activeTab={activeTab} onChange={setActiveTab} />
 
-          {activeTab === "Timeline" ? <TimelineTab interactions={touchPointInteractions} /> : null}
+          {activeTab === "Timeline" ? (
+            <TimelineTab interactions={touchPointInteractions} notes={personNotes} />
+          ) : null}
 
           {activeTab === "About" ? (
             <AboutTab person={person} tags={tags} onLogInteraction={() => setSheetMode("chat")} />
@@ -230,7 +237,7 @@ export default function PersonDetailScreen() {
       >
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="Log interaction"
+          accessibilityLabel="Log a chat"
           onPress={() => setSheetMode("chat")}
           activeOpacity={0.8}
           className="min-h-12 flex-1 flex-row items-center justify-center rounded-2xl"
@@ -238,7 +245,7 @@ export default function PersonDetailScreen() {
         >
           <Ionicons name="chatbubble-outline" size={17} color="#FFFFFF" style={{ marginRight: 7 }} />
           <Text style={{ fontFamily: fonts.semibold, color: "#FFFFFF" }} className="text-base">
-            Log Interaction
+            Log a chat
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

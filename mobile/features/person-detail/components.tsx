@@ -252,9 +252,9 @@ export function StatStrip({
 }) {
   const stats = [
     ["Last talked", lastTalked],
-    ["Next action", nextAction],
-    ["Interactions", String(interactionsCount)],
-    ["Open follow-ups", String(openFollowUpsCount)],
+    ["Reach out", nextAction],
+    ["Chats", String(interactionsCount)],
+    ["Follow up?", openFollowUpsCount > 0 ? "Yes" : "No"],
   ]
 
   return (
@@ -295,7 +295,7 @@ export function SectionCard({
     <SoftCard className="mb-4 p-4">
       <View className="mb-3 flex-row items-center">
         <IconTile icon={icon} size={36} />
-        <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="ml-3 text-lg">
+        <Text style={{ fontFamily: fonts.heading, color: colors.warmBlack }} className="ml-3 text-lg">
           {title}
         </Text>
       </View>
