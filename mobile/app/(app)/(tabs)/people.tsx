@@ -172,7 +172,7 @@ export default function PeopleScreen() {
   const activeFilterCount =
     statusFilters.length + tagFilters.length + locationFilters.length + (params.moments === "upcoming" ? 1 : 0)
   const hasActiveFilter = activeFilterCount > 0
-  const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last Contacted"
+  const currentSortLabel = SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Last talked to"
 
   if (loading) return <LoadingState />
 

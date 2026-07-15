@@ -45,7 +45,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
           <Divider />
           <QuickAddAction
             icon="chatbubble-outline"
-            label="Log a chat"
+            label="Talked to someone?"
             description="Who did you talk to recently?"
             color="#98520B"
             background="#FBF1E9"

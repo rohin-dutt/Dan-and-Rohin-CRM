@@ -18,12 +18,6 @@ export type InfoRow = {
   value: string
   actionIcon?: keyof typeof Ionicons.glyphMap
   tone?: "green" | "purple" | "amber" | "red"
-  contactActions?: {
-    phone?: string | null
-    email?: string | null
-    personName: string
-    onLogInteraction: () => void
-  }
 }
 
 const toneColors = {
@@ -321,23 +315,9 @@ export function InfoList({ rows }: { rows: InfoRow[] }) {
                 <Text style={{ fontFamily: fonts.semibold, color: colors.warmBlack }} className="text-sm">
                   {row.label}
                 </Text>
-                {row.contactActions ? (
-                  <View className="mt-0.5 flex-row items-center">
-                    <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="flex-1 text-sm">
-                      {row.value}
-                    </Text>
-                    <ContactActionButtons
-                      phone={row.contactActions.phone}
-                      email={row.contactActions.email}
-                      personName={row.contactActions.personName}
-                      onLogInteraction={row.contactActions.onLogInteraction}
-                    />
-                  </View>
-                ) : (
-                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
-                    {row.value}
-                  </Text>
-                )}
+                <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-0.5 text-sm">
+                  {row.value}
+                </Text>
               </View>
               {row.actionIcon ? <Ionicons name={row.actionIcon} size={22} color={colors.forest} /> : null}
             </View>

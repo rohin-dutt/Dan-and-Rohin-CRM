@@ -145,13 +145,13 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={inviteFriend}
               accessibilityRole="button"
-              accessibilityLabel="Invite a friend"
+              accessibilityLabel="Invite someone you know to Roots"
               activeOpacity={0.76}
               className="mt-3 flex-row items-center rounded-2xl border border-stone-200 bg-white px-4 py-3 shadow-sm"
             >
               <Ionicons name="share-outline" size={18} color={colors.forest} />
               <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="ml-2 flex-1 text-sm">
-                Invite a friend
+                Invite someone you know to Roots
               </Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
@@ -294,6 +294,7 @@ export default function DashboardScreen() {
           </SoftCard>
 
           <SoftCard className="mx-5 mt-5 p-5">
+            <SectionTitle title="At a glance" />
             <View className="flex-row items-start">
               <SummaryStat icon="people" value={String(getTotalContacts(people))} label="People" />
               <SummaryDivider />

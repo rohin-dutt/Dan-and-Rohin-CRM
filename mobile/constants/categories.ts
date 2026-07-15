@@ -4,7 +4,7 @@ import type { Ionicons } from "@expo/vector-icons"
 // categories and the tag each one maps to when a person is saved.
 export const RELATIONSHIP_CATEGORIES = [
   { label: "Friend", tagName: "Friend", tagColor: "#16A34A", icon: "people-outline" },
-  { label: "Family", tagName: "Family", tagColor: "#2563EB", icon: "people-circle-outline" },
+  { label: "Family", tagName: "Family", tagColor: "#2563EB", icon: "home-outline" },
   { label: "Professional", tagName: "Professional", tagColor: "#D97706", icon: "briefcase-outline" },
 ] as const satisfies ReadonlyArray<{
   label: string

@@ -500,9 +500,9 @@ export default function EditPersonScreen() {
             keyboardType="phone-pad"
           />
 
-          {/* Overview */}
+          {/* About them */}
           <CompactTextField
-            label="Overview"
+            label="About them"
             icon="document-text-outline"
             value={notes}
             onChangeText={setNotes}

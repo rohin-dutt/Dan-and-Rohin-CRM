@@ -410,10 +410,10 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SettingsSection>
 
-        <SettingsSection title="Invite a Friend" subtitle="Share Roots with someone who would use it.">
+        <SettingsSection title="Invite" subtitle="Share Roots with someone who would use it.">
           <SettingsRow
             icon="share-outline"
-            title="Invite a friend"
+            title="Invite someone you know to Roots"
             onPress={() =>
               Share.share({
                 message:
@@ -423,7 +423,7 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title="Your data" subtitle="Access and manage your Roots data.">
+        <SettingsSection title="Your Data" subtitle="Access and manage your Roots data.">
           <SettingsRow
             icon="download-outline"
             title="Export data"

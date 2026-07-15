@@ -14,7 +14,7 @@ export function SettingsSection({
 }) {
   return (
     <SoftCard className="mb-4 p-4">
-      <Text style={{ fontFamily: fonts.bold, color: colors.forest }} className="text-lg">
+      <Text style={{ fontFamily: fonts.heading, color: colors.forest }} className="text-lg">
         {title}
       </Text>
       <Text style={{ fontFamily: fonts.body, color: colors.ink }} className="mt-1 text-sm">

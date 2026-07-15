@@ -118,7 +118,8 @@ export default function PersonDetailScreen() {
     return earliest
   }, null)
   const nextActionDays = getNextActionDays(person, earliestFollowUpDate)
-  const subtitle = [person.role, person.company].filter(Boolean).join(" at ")
+  const jobInfo = [person.role, person.company].filter(Boolean).join(" at ")
+  const headerLine = [person.relationship_type, jobInfo].filter(Boolean).join(" · ")
 
   return (
     <Screen scrollable={false}>
@@ -163,14 +164,9 @@ export default function PersonDetailScreen() {
               >
                 {person.name}
               </Text>
-              {subtitle ? (
+              {headerLine ? (
                 <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-base leading-5">
-                  {subtitle}
-                </Text>
-              ) : null}
-              {person.relationship_type ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13 }} className="mt-1">
-                  {person.relationship_type}
+                  {headerLine}
                 </Text>
               ) : null}
               {person.phone ? (
@@ -200,7 +196,7 @@ export default function PersonDetailScreen() {
           ) : null}
 
           {activeTab === "About" ? (
-            <AboutTab person={person} tags={tags} onLogInteraction={() => setSheetMode("chat")} />
+            <AboutTab person={person} tags={tags} />
           ) : null}
 
           {activeTab === "Notes" ? (

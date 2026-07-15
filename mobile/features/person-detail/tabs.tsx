@@ -127,22 +127,16 @@ export function TimelineTab({ interactions, notes }: { interactions: Interaction
 export function AboutTab({
   person,
   tags,
-  onLogInteraction,
 }: {
   person: Person
   tags: Tag[]
-  onLogInteraction: () => void
 }) {
   const overview = person.notes?.trim()
+  const firstName = person.name.split(" ")[0]
 
   const contactRows: InfoRow[] = []
   if (person.phone) {
-    contactRows.push({
-      icon: "call-outline",
-      label: "Phone",
-      value: person.phone,
-      contactActions: { phone: person.phone, email: person.email, personName: person.name, onLogInteraction },
-    })
+    contactRows.push({ icon: "call-outline", label: "Phone", value: person.phone })
   }
   if (person.location) contactRows.push({ icon: "location-outline", label: "Location", value: person.location })
 
@@ -162,7 +156,7 @@ export function AboutTab({
     personalRows.push({ icon: "heart-outline", label: "Relationship type", value: person.relationship_type, tone: "red" })
   }
   if (person.contact_frequency_days) {
-    personalRows.push({ icon: "time-outline", label: "Contact frequency", value: formatFrequency(person.contact_frequency_days), tone: "green" })
+    personalRows.push({ icon: "time-outline", label: "Keep in touch", value: formatFrequency(person.contact_frequency_days), tone: "green" })
   }
 
   const work = [person.role, person.company].filter(Boolean).join(" at ")
@@ -180,7 +174,7 @@ export function AboutTab({
   return (
     <View className="mt-5">
       {overview ? (
-        <SectionCard icon="person-outline" title="Overview">
+        <SectionCard icon="person-outline" title={`About ${firstName}`}>
           <Text style={{ fontFamily: fonts.body, color: colors.warmBlack }} className="text-base leading-6">
             {overview}
           </Text>

@@ -16,40 +16,38 @@ export function PersonCard({
   onPress: () => void
 }) {
   const badge = followUpBadgeForPerson(person, followUpDate ?? null)
+  const subtitle = [person.relationship_type, person.company].filter(Boolean).join(" · ")
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel={`Open ${person.name}`}>
       <SoftCard className="mb-3 p-4">
-        <View className="flex-row">
+        <View className="flex-row items-center">
           <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
           <View className="ml-4 flex-1">
-            <View className="flex-row items-start justify-between">
-              <View className="max-w-[64%]">
-                <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="text-lg">
-                  {person.name}
-                </Text>
-                {[person.relationship_type, person.company].filter(Boolean).join(" · ") ? (
-                  <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="mt-1 text-sm">
-                    {[person.relationship_type, person.company].filter(Boolean).join(" · ")}
-                  </Text>
-                ) : null}
-                <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mt-1 text-sm">
-                  {formatLastInteraction(person.last_contacted_at, person.name)}
-                </Text>
-              </View>
+            <View className="flex-row items-center justify-between">
+              <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="flex-1 text-lg">
+                {person.name}
+              </Text>
               {badge ? (
                 <View
-                  className="items-center justify-center"
+                  className="ml-2 items-center justify-center"
                   style={{ backgroundColor: badge.bg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}
                 >
                   <Text style={{ fontFamily: fonts.medium, color: badge.text, fontSize: 11 }}>{badge.label}</Text>
                 </View>
               ) : null}
             </View>
-
-            <View className="mt-3 flex-row items-center justify-end">
-              <Ionicons name="chevron-forward" size={21} color={colors.muted} />
-            </View>
+            {subtitle ? (
+              <Text style={{ fontFamily: fonts.body, color: colors.ink }} numberOfLines={1} className="mt-1 text-sm">
+                {subtitle}
+              </Text>
+            ) : null}
+            <Text style={{ fontFamily: fonts.body, color: colors.muted }} numberOfLines={1} className="mt-1 text-sm">
+              {formatLastInteraction(person.last_contacted_at, person.name)}
+            </Text>
+          </View>
+          <View className="ml-2">
+            <Ionicons name="chevron-forward" size={21} color={colors.muted} />
           </View>
         </View>
       </SoftCard>

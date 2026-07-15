@@ -256,7 +256,7 @@ export function QuickAddFormSheet({
         {/* Header */}
         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
           <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 20, flex: 1 }}>
-            {mode === "note" ? "Add a note" : "Log a chat"}
+            {mode === "note" ? "Add a note" : "How'd it go?"}
           </Text>
           <TouchableOpacity
             accessibilityRole="button"
@@ -320,11 +320,6 @@ export function QuickAddFormSheet({
               <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 15 }}>
                 {selectedPerson.name}
               </Text>
-              {selectedPerson.company ? (
-                <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 13, marginTop: 1 }}>
-                  {selectedPerson.company}
-                </Text>
-              ) : null}
             </View>
             <TouchableOpacity
               accessibilityRole="button"
@@ -406,11 +401,6 @@ export function QuickAddFormSheet({
                     <Text style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 14 }}>
                       {person.name}
                     </Text>
-                    {person.company ? (
-                      <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 1 }}>
-                        {person.company}
-                      </Text>
-                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -600,7 +590,7 @@ export function QuickAddFormSheet({
               >
                 <View style={{ flex: 1, marginRight: 16 }}>
                   <Text style={{ fontFamily: fonts.medium, color: colors.ink, fontSize: 14 }}>
-                    Set a follow-up
+                    Remind me to reach out
                   </Text>
                   <Text style={{ fontFamily: fonts.body, color: colors.muted, fontSize: 12, marginTop: 2 }}>
                     Remind yourself to follow up with this person

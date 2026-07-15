@@ -31,9 +31,9 @@ export const PEOPLE_CATEGORIES: Array<{ label: CategoryFilter; icon: keyof typeo
 ]
 
 export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: "last_contacted", label: "Last Contacted" },
-  { key: "name", label: "Sort by First Name" },
-  { key: "most_contacted", label: "Most Contacted" },
+  { key: "last_contacted", label: "Last talked to" },
+  { key: "name", label: "First Name (A-Z)" },
+  { key: "most_contacted", label: "Most talked to" },
   { key: "recently_added", label: "Recently Added" },
 ]
 
