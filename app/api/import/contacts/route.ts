@@ -24,6 +24,7 @@ export async function POST(request: Request) {
 
   let imported = 0;
   const errors: string[] = [];
+  const createdPeople: Array<{ id: string; name: string }> = [];
 
   for (const contact of contacts) {
     if (!contact.name?.trim()) continue;
@@ -31,20 +32,28 @@ export async function POST(request: Request) {
     const email = Array.isArray(contact.email) ? contact.email[0] : contact.email;
     const phone = Array.isArray(contact.tel) ? contact.tel[0] : contact.tel;
 
-    const { error } = await auth.supabase.from("people").insert({
-      name: contact.name.trim(),
-      email: email ?? null,
-      phone: phone ?? null,
-      user_id: auth.user.id,
-      contact_frequency_days: 30,
-    });
+    const { data: createdPerson, error } = await auth.supabase
+      .from("people")
+      .insert({
+        name: contact.name.trim(),
+        email: email ?? null,
+        phone: phone ?? null,
+        user_id: auth.user.id,
+        contact_frequency_days: 30,
+      })
+      .select("id, name")
+      .single();
 
     if (error) {
       errors.push(`Failed to import "${contact.name}": ${error.message}`);
     } else {
       imported++;
+      createdPeople.push({
+        id: createdPerson.id,
+        name: createdPerson.name,
+      });
     }
   }
 
-  return Response.json({ ok: true, imported, errors });
+  return Response.json({ ok: true, imported, errors, createdPeople });
 }

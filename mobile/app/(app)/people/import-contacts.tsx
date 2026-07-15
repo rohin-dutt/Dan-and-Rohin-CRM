@@ -8,10 +8,16 @@ import { Card } from "@/components/Card"
 import { EmptyState } from "@/components/EmptyState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
+import { ConfirmModal } from "@/components/ConfirmModal"
 import { Screen } from "@/components/Screen"
 import { callTrustedApi } from "@/lib/trusted-api"
 import { supabase } from "@/lib/supabase"
 import { mapDeviceContact, toContactImportPayload, type ImportCandidate } from "@/lib/contact-import"
+import {
+  clearPendingImportEditQueue,
+  serializeImportEditQueue,
+  setPendingImportEditQueue,
+} from "@/lib/import-edit-queue"
 import type { Person } from "@/types"
 import { colors } from "@/constants/theme"
 
@@ -21,6 +27,15 @@ type ImportResponse = {
   ok: boolean
   imported: number
   errors: string[]
+  createdPeople: Array<{
+    id: string
+    name: string
+  }>
+}
+
+type BatchReviewPrompt = {
+  createdPersonIds: string[]
+  failureCount: number
 }
 
 function matchesCandidate(candidate: ImportCandidate, rawQuery: string) {
@@ -31,6 +46,19 @@ function matchesCandidate(candidate: ImportCandidate, rawQuery: string) {
     (candidate.email ?? "").toLowerCase().startsWith(query) ||
     (candidate.phone ?? "").toLowerCase().startsWith(query)
   )
+}
+
+function batchReviewMessage(prompt: BatchReviewPrompt) {
+  const importedCount = prompt.createdPersonIds.length
+  const importedSummary = `${importedCount} ${importedCount === 1 ? "person was" : "people were"} imported.`
+  const failureSummary = prompt.failureCount > 0
+    ? ` ${prompt.failureCount} contact${prompt.failureCount === 1 ? "" : "s"} could not be imported.`
+    : ""
+  const detailsSummary = importedCount === 1
+    ? "This person still needs relationship details and a little more information so Roots can personalize reminders and follow-ups."
+    : "These people still need relationship details and a little more information so Roots can personalize reminders and follow-ups."
+
+  return `${importedSummary}${failureSummary}\n\n${detailsSummary}`
 }
 
 export default function ImportContactsScreen() {
@@ -45,6 +73,7 @@ export default function ImportContactsScreen() {
   const [showDuplicates, setShowDuplicates] = useState(false)
   const [search, setSearch] = useState("")
   const [result, setResult] = useState<string | null>(null)
+  const [batchReviewPrompt, setBatchReviewPrompt] = useState<BatchReviewPrompt | null>(null)
 
   const visibleCandidates = useMemo(
     () =>
@@ -115,7 +144,7 @@ export default function ImportContactsScreen() {
       setCandidates(mapped)
       setHiddenDuplicateIds(new Set())
       setShowDuplicates(false)
-      setSelectedIds(new Set(mapped.filter((candidate) => candidate.duplicateReason == null).map((candidate) => candidate.id)))
+      setSelectedIds(new Set())
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load contacts.")
     } finally {
@@ -148,6 +177,40 @@ export default function ImportContactsScreen() {
     setSelectedIds(new Set())
   }
 
+  function reviewBatchNow() {
+    if (!batchReviewPrompt) return
+
+    if (!setPendingImportEditQueue(batchReviewPrompt.createdPersonIds)) {
+      setBatchReviewPrompt(null)
+      setError("The contacts were imported, but Roots could not open them for review.")
+      return
+    }
+
+    const firstPersonId = batchReviewPrompt.createdPersonIds[0]
+    if (!firstPersonId) {
+      clearPendingImportEditQueue()
+      setBatchReviewPrompt(null)
+      setError("The contacts were imported, but Roots could not open them for review.")
+      return
+    }
+
+    setBatchReviewPrompt(null)
+    router.replace({
+      pathname: "/(app)/people/[id]/edit",
+      params: {
+        id: firstPersonId,
+        importReview: "1",
+        importIndex: "0",
+      },
+    })
+  }
+
+  function reviewBatchLater() {
+    clearPendingImportEditQueue()
+    setBatchReviewPrompt(null)
+    router.dismissTo("/people")
+  }
+
   async function importSelectedContacts() {
     if (selectedCandidates.length === 0) {
       setError("Select at least one contact to import.")
@@ -174,26 +237,64 @@ export default function ImportContactsScreen() {
     setSaving(true)
     setError(null)
     setResult(null)
-    const submittedIds = new Set(selectedCandidates.map((candidate) => candidate.id))
+    const submittedCandidates = selectedCandidates
+    const shouldReviewSequentially = submittedCandidates.length <= 3
+
+    function reviewCreatedPeople(createdPersonIds: string[]) {
+      const importQueue = serializeImportEditQueue(createdPersonIds)
+      const firstPersonId = createdPersonIds[0]
+      if (!importQueue || !firstPersonId) {
+        setError("The contacts were imported, but Roots could not open them for review.")
+        return
+      }
+
+      router.replace({
+        pathname: "/(app)/people/[id]/edit",
+        params: {
+          id: firstPersonId,
+          importQueue,
+          importIndex: "0",
+        },
+      })
+    }
 
     try {
       const response = await callTrustedApi("/api/import/contacts", {
         body: {
-          contacts: selectedCandidates.map(toContactImportPayload),
+          contacts: submittedCandidates.map(toContactImportPayload),
         },
       }) as ImportResponse
 
       const failures = response.errors.length
       setResult(`Imported ${response.imported} contact${response.imported === 1 ? "" : "s"}${failures ? ` with ${failures} warning${failures === 1 ? "" : "s"}` : ""}.`)
-      if (failures === 0) {
-        setCandidates((current) => current.filter((candidate) => !submittedIds.has(candidate.id)))
-        setSelectedIds(new Set())
-        setHiddenDuplicateIds((current) => {
-          const next = new Set(current)
-          submittedIds.forEach((id) => next.delete(id))
-          return next
-        })
+      const createdPersonIds = response.createdPeople.map((person) => person.id)
+
+      if (createdPersonIds.length === 0) {
+        setError(response.errors.join("\n") || "No contacts were imported.")
+        return
       }
+
+      if (shouldReviewSequentially) {
+        if (failures > 0) {
+          setError(response.errors.join("\n"))
+          Alert.alert(
+            "Some contacts weren't imported",
+            `${response.errors.join("\n")}\n\nThe ${createdPersonIds.length} successfully imported ${createdPersonIds.length === 1 ? "person is" : "people are"} ready to review.`,
+            [
+              {
+                text: "Review imported people",
+                onPress: () => reviewCreatedPeople(createdPersonIds),
+              },
+            ],
+            { cancelable: false },
+          )
+        } else {
+          reviewCreatedPeople(createdPersonIds)
+        }
+        return
+      }
+
+      setBatchReviewPrompt({ createdPersonIds, failureCount: failures })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to import contacts.")
     } finally {
@@ -337,6 +438,16 @@ export default function ImportContactsScreen() {
           }
         />
       ) : null}
+
+      <ConfirmModal
+        visible={batchReviewPrompt !== null}
+        title={batchReviewPrompt?.failureCount ? "Contacts imported with warnings" : "Contacts imported"}
+        message={batchReviewPrompt ? batchReviewMessage(batchReviewPrompt) : ""}
+        confirmLabel="Review now"
+        cancelLabel="Do it later"
+        onConfirm={reviewBatchNow}
+        onCancel={reviewBatchLater}
+      />
     </Screen>
   )
 }
