@@ -110,16 +110,22 @@ export default function SettingsScreen() {
   }
 
   async function saveDisplayName() {
+    const previousName = displayName
+    const trimmedName = displayName.trim()
     setSavingProfile(true)
     setStatus(null)
+    // Optimistically show the edit as saved right away; revert if it fails.
+    setDisplayName(trimmedName)
+    setExpanded(null)
     try {
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { full_name: displayName.trim() || null },
+        data: { full_name: trimmedName || null },
       })
       if (updateError) throw updateError
-      setExpanded(null)
       setOk("Profile updated.")
     } catch (e) {
+      setDisplayName(previousName)
+      setExpanded("profile")
       setFailure(e instanceof Error ? e.message : "Failed to update profile.")
     } finally {
       setSavingProfile(false)
@@ -160,30 +166,34 @@ export default function SettingsScreen() {
     }
   }
 
-  async function updateSettingsPatch(patch: Partial<Settings>) {
-    if (!settings) return
+  async function commitSettingsPatch(patch: Partial<Settings>) {
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) throw new Error("Not authenticated")
 
     const { error: err } = await supabase
       .from("settings")
       .update(patch)
       .eq("user_id", session.user.id)
     if (err) throw err
-    setSettings({ ...settings, ...patch })
-    setError(null)
   }
 
   async function toggleEmailDigest() {
     if (!settings || togglingDigest) return
+    const previousSettings = settings
+    const patch = { email_reminders_enabled: !settings.email_reminders_enabled }
+
+    // Flip the switch immediately; the network save happens in the background.
+    setSettings({ ...settings, ...patch })
+    setError(null)
     setTogglingDigest(true)
     try {
-      await updateSettingsPatch({ email_reminders_enabled: !settings.email_reminders_enabled })
+      await commitSettingsPatch(patch)
       setOk("Email digest preference saved.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update email digest.")
+      setSettings(previousSettings)
+      setFailure(e instanceof Error ? e.message : "Failed to update email digest.")
     } finally {
       setTogglingDigest(false)
     }
@@ -191,28 +201,38 @@ export default function SettingsScreen() {
 
   async function togglePushNotifications() {
     if (!settings || toggling) return
+    const previousSettings = settings
+    const previousRegistered = pushRegistered
+    const pushPreferenceOn =
+      settings.push_followups_enabled ||
+      settings.push_birthdays_enabled ||
+      settings.push_important_moments_enabled
+    const currentlyOn = pushPreferenceOn && pushRegistered
+    const nextOn = !currentlyOn
+    const patch = {
+      push_followups_enabled: nextOn,
+      push_birthdays_enabled: nextOn,
+      push_important_moments_enabled: nextOn,
+    }
+
+    // Flip the switch immediately; token registration and the network save
+    // happen in the background.
+    setSettings({ ...settings, ...patch })
+    setPushRegistered(nextOn)
+    setError(null)
     setToggling(true)
     try {
-      const pushPreferenceOn =
-        settings.push_followups_enabled ||
-        settings.push_birthdays_enabled ||
-        settings.push_important_moments_enabled
-      const currentlyOn = pushPreferenceOn && pushRegistered
       if (currentlyOn) {
         await revokePushToken()
-        setPushRegistered(false)
       } else {
         await registerPushToken()
-        setPushRegistered(true)
       }
-      await updateSettingsPatch({
-        push_followups_enabled: !currentlyOn,
-        push_birthdays_enabled: !currentlyOn,
-        push_important_moments_enabled: !currentlyOn,
-      })
+      await commitSettingsPatch(patch)
       setOk("Push notification preference saved.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to update push notifications.")
+      setSettings(previousSettings)
+      setPushRegistered(previousRegistered)
+      setFailure(e instanceof Error ? e.message : "Failed to update push notifications.")
     } finally {
       setToggling(false)
     }

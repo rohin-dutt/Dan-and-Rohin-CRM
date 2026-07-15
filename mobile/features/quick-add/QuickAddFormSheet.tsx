@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -11,6 +11,7 @@ import {
 } from "react-native"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
+import type { Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import { colors, fonts } from "@/constants/theme"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
@@ -70,6 +71,30 @@ export function QuickAddFormSheet({
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // Cached session: avoids paying a network round trip inside every save
+  // call. Fetched once on mount, with the save/load paths falling back to a
+  // fresh fetch (and re-caching) if it hasn't resolved yet.
+  const sessionRef = useRef<Session | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) sessionRef.current = session
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function getCachedSession() {
+    if (sessionRef.current) return sessionRef.current
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    sessionRef.current = session
+    return session
+  }
+
   // Backdrop taps (and swipe-down) dismiss the open inline date picker
   // first; only when it is closed do they close the whole sheet. The
   // follow-up picker is a separate modal that handles its own backdrop.
@@ -105,9 +130,7 @@ export function QuickAddFormSheet({
     let cancelled = false
     async function loadPeople() {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+        const session = await getCachedSession()
         if (!session) throw new Error("You must be signed in.")
 
         const { data, error: peopleError } = await supabase
@@ -160,9 +183,7 @@ export function QuickAddFormSheet({
     setSaving(true)
     setFormError(null)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const session = await getCachedSession()
       if (!session) throw new Error("Not authenticated")
       const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
         p_person_id: selectedPerson.id,
@@ -196,9 +217,7 @@ export function QuickAddFormSheet({
     setSaving(true)
     setFormError(null)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const session = await getCachedSession()
       if (!session) throw new Error("Not authenticated")
       const { error: insertError } = await supabase.from("person_notes").insert({
         user_id: session.user.id,

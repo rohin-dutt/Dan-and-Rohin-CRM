@@ -100,6 +100,16 @@ export function usePersonDetail(id: string) {
   const completeFollowUp = useCallback(
     async (interactionId: string, countAsInteraction: boolean) => {
       if (followUpUpdating) return
+      const previousInteractions = interactions
+
+      // Reflect "done" immediately; revert if either write fails.
+      setInteractions((prev) =>
+        prev.map((interaction) =>
+          interaction.id === interactionId
+            ? { ...interaction, follow_up_status: "done" }
+            : interaction,
+        ),
+      )
       setFollowUpUpdating(true)
       try {
         const { error: updateError } = await supabase
@@ -107,6 +117,7 @@ export function usePersonDetail(id: string) {
           .update({ follow_up_status: "done" })
           .eq("id", interactionId)
         if (updateError) {
+          setInteractions(previousInteractions)
           setError(updateError.message)
           return
         }
@@ -120,6 +131,7 @@ export function usePersonDetail(id: string) {
             p_follow_up_date: null,
           })
           if (rpcError) {
+            setInteractions(previousInteractions)
             setError(rpcError.message)
             return
           }
@@ -131,7 +143,7 @@ export function usePersonDetail(id: string) {
         setFollowUpUpdating(false)
       }
     },
-    [followUpUpdating, id, load],
+    [followUpUpdating, id, interactions, load],
   )
 
   // "Delete" permanently removes the follow-up from the interaction without
@@ -160,6 +172,12 @@ export function usePersonDetail(id: string) {
   const updatePersonNote = useCallback(async (noteId: string, body: string) => {
     const trimmed = body.trim()
     if (!trimmed) return
+    const previousNotes = personNotes
+
+    // Show the edited text immediately; revert to the original on failure.
+    setPersonNotes((prev) =>
+      prev.map((note) => (note.id === noteId ? { ...note, body: trimmed } : note)),
+    )
     const { data, error: noteError } = await supabase
       .from("person_notes")
       .update({ body: trimmed, updated_at: new Date().toISOString() })
@@ -167,11 +185,12 @@ export function usePersonDetail(id: string) {
       .select("*")
       .single()
     if (noteError) {
+      setPersonNotes(previousNotes)
       setError(noteError.message)
       return
     }
     setPersonNotes((prev) => prev.map((note) => (note.id === noteId ? data : note)))
-  }, [])
+  }, [personNotes])
 
   const deletePersonNote = useCallback(async (noteId: string) => {
     const { error: noteError } = await supabase.from("person_notes").delete().eq("id", noteId)

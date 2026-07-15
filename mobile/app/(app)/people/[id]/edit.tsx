@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
+import type { Session } from "@supabase/supabase-js"
 import { Screen } from "@/components/Screen"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
@@ -85,14 +86,36 @@ export default function EditPersonScreen() {
   const locationField = useLocationAutocomplete()
   const { resetLocation } = locationField
 
+  // Cached session: avoids paying a network round trip inside every save
+  // call. Fetched once on mount, with a fallback fetch (and re-cache) if
+  // it hasn't resolved by the time it's needed.
+  const sessionRef = useRef<Session | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) sessionRef.current = session
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function getCachedSession() {
+    if (sessionRef.current) return sessionRef.current
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    sessionRef.current = session
+    return session
+  }
+
   useEffect(() => {
     async function load() {
       setLoading(true)
       setError(null)
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
+        const session = await getCachedSession()
         if (!session) return
 
         const [personRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
@@ -170,9 +193,7 @@ export default function EditPersonScreen() {
     setCategoryError(null)
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const session = await getCachedSession()
       if (!session) throw new Error("Not authenticated")
 
       const trimmedLocation = locationField.location.trim()
@@ -238,9 +259,7 @@ export default function EditPersonScreen() {
   }
 
   async function handleCreateTag(tagName: string) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    const session = await getCachedSession()
     if (!session) return
 
     const { data, error: createError } = await supabase

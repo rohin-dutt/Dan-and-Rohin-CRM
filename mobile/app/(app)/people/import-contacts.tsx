@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import * as Contacts from "expo-contacts"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
+import type { Session } from "@supabase/supabase-js"
 import { Button } from "@/components/Button"
 import { Card } from "@/components/Card"
 import { EmptyState } from "@/components/EmptyState"
@@ -93,10 +94,32 @@ export default function ImportContactsScreen() {
   const duplicateCount = candidates.filter((candidate) => candidate.duplicateReason != null).length
   const visibleDuplicateCount = visibleCandidates.filter((candidate) => candidate.duplicateReason != null).length
 
-  async function loadExistingPeople() {
+  // Cached session: avoids paying a network round trip inside every save
+  // call. Fetched once on mount, with a fallback fetch (and re-cache) if
+  // it hasn't resolved by the time it's needed.
+  const sessionRef = useRef<Session | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) sessionRef.current = session
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function getCachedSession() {
+    if (sessionRef.current) return sessionRef.current
     const {
       data: { session },
     } = await supabase.auth.getSession()
+    sessionRef.current = session
+    return session
+  }
+
+  async function loadExistingPeople() {
+    const session = await getCachedSession()
     if (!session) throw new Error("You must be signed in.")
 
     const { data, error: peopleError } = await supabase

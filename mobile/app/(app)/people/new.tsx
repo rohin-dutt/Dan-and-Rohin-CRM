@@ -1,7 +1,8 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
+import type { Session } from "@supabase/supabase-js"
 import { Screen } from "@/components/Screen"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { ConfirmModal } from "@/components/ConfirmModal"
@@ -48,6 +49,30 @@ export default function NewPersonScreen() {
   const freqMenu = useAnchoredMenu()
   const locationField = useLocationAutocomplete()
 
+  // Cached session: avoids paying a network round trip inside the save
+  // call. Fetched once on mount, with a fallback fetch (and re-cache) if
+  // it hasn't resolved by the time the user taps Save.
+  const sessionRef = useRef<Session | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) sessionRef.current = session
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function getCachedSession() {
+    if (sessionRef.current) return sessionRef.current
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    sessionRef.current = session
+    return session
+  }
+
   async function handleSave() {
     if (saving) return
     if (!firstName.trim()) {
@@ -74,9 +99,7 @@ export default function NewPersonScreen() {
     setCategoryError(null)
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const session = await getCachedSession()
       if (!session) throw new Error("Not authenticated")
 
       await createPersonWithRelations({
