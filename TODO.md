@@ -11,8 +11,8 @@ the roadmap or architecture direction changes.
       `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
       `app/(site)/contact/ContactForm.tsx`, and `app/(site)/page.tsx`. Likely
       owner: public website/content lint cleanup. Reconfirmed on July 14, 2026,
-      during the mobile bottom-sheet dismissal fix; the changed mobile file
-      had no reported lint errors.
+      during the larger-import review follow-up; the changed mobile and API
+      files had no reported lint errors.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:
@@ -20,7 +20,7 @@ the roadmap or architecture direction changes.
       collecting page data for `/api/contact`. Likely owner: contact API/env
       handling; move Resend initialization behind the request-time env check or
       provide the required build env. Reconfirmed with `npm run build` on July
-      14, 2026, during the mobile bottom-sheet dismissal fix; compilation and
+      14, 2026, during the larger-import review follow-up; compilation and
       TypeScript completed before the existing page-data failure.
 - [ ] `npm test` fails on `tests/date-utils.test.mjs` with
       `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import

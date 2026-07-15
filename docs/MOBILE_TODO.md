@@ -296,8 +296,8 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
     unselected contacts.
 - [x] Detect likely duplicates.
   - The review screen flags exact name, email, or phone matches against the
-    signed-in user's existing people and excludes those from the default safe
-    selection.
+    signed-in user's existing people. Candidates start unselected, and only
+    contacts the user explicitly selects are imported.
 - [ ] Support create, update existing, and skip.
   - Create and skip-by-deselection are implemented. Update-existing remains
     open because `/api/import/contacts` is currently create-only.

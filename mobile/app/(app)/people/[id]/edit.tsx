@@ -6,10 +6,16 @@ import { Screen } from "@/components/Screen"
 import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { ConfirmModal } from "@/components/ConfirmModal"
 import { SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
 import { loadImportantMomentsForPerson } from "@/lib/important-moments"
+import {
+  clearPendingImportEditQueue,
+  parseImportEditQueue,
+  parsePendingImportEditQueue,
+} from "@/lib/import-edit-queue"
 import { updatePersonWithRelations } from "@/lib/people-data"
 import { colors, fonts } from "@/constants/theme"
 import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
@@ -29,12 +35,30 @@ import type { Person, Tag } from "@/types"
 
 export default function EditPersonScreen() {
   const router = useRouter()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const params = useLocalSearchParams<{
+    id: string | string[]
+    importQueue?: string | string[]
+    importReview?: string | string[]
+    importIndex?: string | string[]
+  }>()
+  const id = typeof params.id === "string" ? params.id : ""
+  const routeImportEditQueue = parseImportEditQueue({
+    currentPersonId: id,
+    serializedIds: params.importQueue,
+    rawIndex: params.importIndex,
+  })
+  const pendingImportEditQueue = parsePendingImportEditQueue({
+    currentPersonId: id,
+    rawQueueFlag: params.importReview,
+    rawIndex: params.importIndex,
+  })
+  const importEditQueue = routeImportEditQueue ?? pendingImportEditQueue
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
+  const [confirmQueueCancel, setConfirmQueueCancel] = useState(false)
   const [detailsExpanded, setDetailsExpanded] = useState(false)
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
@@ -64,6 +88,8 @@ export default function EditPersonScreen() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
+      setError(null)
       try {
         const {
           data: { session },
@@ -96,12 +122,10 @@ export default function EditPersonScreen() {
         resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
         setNotes(p.notes ?? "")
 
-        if (p.birthday) {
-          setBirthdayDate(parseLocalDateString(p.birthday))
-        }
+        setBirthdayDate(p.birthday ? parseLocalDateString(p.birthday) : null)
 
         const cat = findRelationshipCategory(p.relationship_type)
-        if (cat) setCategory(cat.label)
+        setCategory(cat?.label ?? null)
 
         setAllTags(tagsRes.data ?? [])
         setSelectedTagIds((personTagsRes.data ?? []).map((pt) => pt.tag_id))
@@ -176,7 +200,37 @@ export default function EditPersonScreen() {
         moments: cleanMoments,
       })
 
-      router.back()
+      if (importEditQueue) {
+        const nextIndex = importEditQueue.index + 1
+        if (nextIndex < importEditQueue.ids.length) {
+          const nextId = importEditQueue.ids[nextIndex]
+          if (!nextId) {
+            clearPendingImportEditQueue()
+            router.dismissTo("/people")
+            return
+          }
+
+          router.replace({
+            pathname: "/(app)/people/[id]/edit",
+            params: routeImportEditQueue
+              ? {
+                  id: nextId,
+                  importQueue: JSON.stringify(importEditQueue.ids),
+                  importIndex: String(nextIndex),
+                }
+              : {
+                  id: nextId,
+                  importReview: "1",
+                  importIndex: String(nextIndex),
+                },
+          })
+        } else {
+          clearPendingImportEditQueue()
+          router.dismissTo("/people")
+        }
+      } else {
+        router.back()
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save changes")
     } finally {
@@ -207,6 +261,20 @@ export default function EditPersonScreen() {
     }
   }
 
+  function handleCancel() {
+    if (importEditQueue) {
+      setConfirmQueueCancel(true)
+    } else {
+      router.back()
+    }
+  }
+
+  function stopQueueReview() {
+    setConfirmQueueCancel(false)
+    clearPendingImportEditQueue()
+    router.dismissTo("/people")
+  }
+
   if (loading) return <LoadingState />
 
   return (
@@ -217,7 +285,7 @@ export default function EditPersonScreen() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Cancel editing person"
-            onPress={() => router.back()}
+            onPress={handleCancel}
             className="min-h-11 justify-center pr-4"
           >
             <Text style={{ fontFamily: fonts.medium, color: colors.forest }} className="text-lg">
@@ -239,6 +307,12 @@ export default function EditPersonScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {importEditQueue ? (
+          <Text style={{ fontFamily: fonts.medium, color: colors.muted }} className="mt-1 text-center text-xs">
+            Imported person {importEditQueue.index + 1} of {importEditQueue.ids.length}
+          </Text>
+        ) : null}
 
         {error != null && <ErrorBanner message={error} />}
 
@@ -551,6 +625,17 @@ export default function EditPersonScreen() {
         selectedKey={frequencyDays}
         onSelect={setFrequencyDays}
         onClose={freqMenu.close}
+      />
+
+      <ConfirmModal
+        visible={confirmQueueCancel}
+        title="Stop reviewing imported people?"
+        message="The people you imported will stay in Roots, but the remaining people will not be reviewed now."
+        confirmLabel="Stop reviewing"
+        cancelLabel="Keep reviewing"
+        destructive
+        onConfirm={stopQueueReview}
+        onCancel={() => setConfirmQueueCancel(false)}
       />
     </Screen>
   )
