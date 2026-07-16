@@ -35,13 +35,20 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
   const [pushRegistered, setPushRegistered] = useState(false)
-  const [toggling, setToggling] = useState(false)
-  const [togglingDigest, setTogglingDigest] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const newPasswordInputRef = useRef<TextInput>(null)
   const confirmPasswordInputRef = useRef<TextInput>(null)
+  const userIdRef = useRef<string | null>(null)
+  const settingsRef = useRef<Settings | null>(null)
+  const persistedDigestRef = useRef(false)
+  const digestDesiredRef = useRef<boolean | null>(null)
+  const digestSaveInFlightRef = useRef(false)
+  const persistedPushOnRef = useRef(false)
+  const pushDesiredRef = useRef<boolean | null>(null)
+  const pushSaveInFlightRef = useRef(false)
+  const pushRegisteredRef = useRef(false)
 
   function setOk(message: string) {
     setStatus({ ok: true, message })
@@ -53,6 +60,11 @@ export default function SettingsScreen() {
   }
 
   const dataManagement = useDataManagement({ onSuccess: setOk, onFailure: setFailure })
+
+  function applySettings(nextSettings: Settings) {
+    settingsRef.current = nextSettings
+    setSettings(nextSettings)
+  }
 
   useEffect(() => {
     if (!status?.ok) return
@@ -67,6 +79,7 @@ export default function SettingsScreen() {
           data: { session },
         } = await supabase.auth.getSession()
         if (!session) return
+        userIdRef.current = session.user.id
         setEmail(session.user.email ?? "")
         setDisplayName(displayNameFromMetadata(session.user.user_metadata))
 
@@ -75,18 +88,29 @@ export default function SettingsScreen() {
           .select("*")
           .eq("user_id", session.user.id)
           .maybeSingle()
-        if (data) {
-          setSettings(data)
-        } else {
+        let loadedSettings = data
+        if (!loadedSettings) {
           const { data: created, error: createError } = await supabase
             .from("settings")
             .upsert({ user_id: session.user.id }, { onConflict: "user_id" })
             .select("*")
             .single()
           if (createError) throw createError
-          setSettings(created)
+          loadedSettings = created
         }
-        setPushRegistered(await getPushRegistrationStatus().catch(() => false))
+
+        const registered = await getPushRegistrationStatus().catch(() => false)
+        const pushPreferenceOn = Boolean(
+          loadedSettings.push_followups_enabled ||
+            loadedSettings.push_birthdays_enabled ||
+            loadedSettings.push_important_moments_enabled,
+        )
+
+        applySettings(loadedSettings)
+        setPushRegistered(registered)
+        pushRegisteredRef.current = registered
+        persistedDigestRef.current = loadedSettings.email_reminders_enabled
+        persistedPushOnRef.current = pushPreferenceOn && registered
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load settings.")
       } finally {
@@ -113,16 +137,15 @@ export default function SettingsScreen() {
     const previousName = displayName
     const trimmedName = displayName.trim()
     setSavingProfile(true)
-    setStatus(null)
     // Optimistically show the edit as saved right away; revert if it fails.
     setDisplayName(trimmedName)
     setExpanded(null)
+    setOk("Profile saved.")
     try {
       const { error: updateError } = await supabase.auth.updateUser({
         data: { full_name: trimmedName || null },
       })
       if (updateError) throw updateError
-      setOk("Profile updated.")
     } catch (e) {
       setDisplayName(previousName)
       setExpanded("profile")
@@ -167,75 +190,122 @@ export default function SettingsScreen() {
   }
 
   async function commitSettingsPatch(patch: Partial<Settings>) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session) throw new Error("Not authenticated")
+    const userId = userIdRef.current
+    if (!userId) throw new Error("Not authenticated")
 
     const { error: err } = await supabase
       .from("settings")
       .update(patch)
-      .eq("user_id", session.user.id)
+      .eq("user_id", userId)
     if (err) throw err
   }
 
-  async function toggleEmailDigest() {
-    if (!settings || togglingDigest) return
-    const previousSettings = settings
-    const patch = { email_reminders_enabled: !settings.email_reminders_enabled }
+  async function flushEmailDigestChanges() {
+    if (digestSaveInFlightRef.current) return
+    digestSaveInFlightRef.current = true
 
-    // Flip the switch immediately; the network save happens in the background.
-    setSettings({ ...settings, ...patch })
-    setError(null)
-    setTogglingDigest(true)
     try {
-      await commitSettingsPatch(patch)
+      while (digestDesiredRef.current !== null) {
+        const nextEnabled = digestDesiredRef.current
+        digestDesiredRef.current = null
+        if (nextEnabled === persistedDigestRef.current) continue
+        await commitSettingsPatch({ email_reminders_enabled: nextEnabled })
+        persistedDigestRef.current = nextEnabled
+      }
       setOk("Email digest preference saved.")
     } catch (e) {
-      setSettings(previousSettings)
+      digestDesiredRef.current = null
+      const currentSettings = settingsRef.current
+      if (currentSettings) {
+        applySettings({
+          ...currentSettings,
+          email_reminders_enabled: persistedDigestRef.current,
+        })
+      }
       setFailure(e instanceof Error ? e.message : "Failed to update email digest.")
     } finally {
-      setTogglingDigest(false)
+      digestSaveInFlightRef.current = false
+      if (digestDesiredRef.current !== null) void flushEmailDigestChanges()
     }
   }
 
-  async function togglePushNotifications() {
-    if (!settings || toggling) return
-    const previousSettings = settings
-    const previousRegistered = pushRegistered
-    const pushPreferenceOn =
-      settings.push_followups_enabled ||
-      settings.push_birthdays_enabled ||
-      settings.push_important_moments_enabled
-    const currentlyOn = pushPreferenceOn && pushRegistered
-    const nextOn = !currentlyOn
-    const patch = {
-      push_followups_enabled: nextOn,
-      push_birthdays_enabled: nextOn,
-      push_important_moments_enabled: nextOn,
-    }
+  function toggleEmailDigest() {
+    const currentSettings = settingsRef.current
+    if (!currentSettings) return
 
-    // Flip the switch immediately; token registration and the network save
-    // happen in the background.
-    setSettings({ ...settings, ...patch })
-    setPushRegistered(nextOn)
+    const nextEnabled = !currentSettings.email_reminders_enabled
+    applySettings({ ...currentSettings, email_reminders_enabled: nextEnabled })
+    digestDesiredRef.current = nextEnabled
     setError(null)
-    setToggling(true)
+    void flushEmailDigestChanges()
+  }
+
+  async function flushPushNotificationChanges() {
+    if (pushSaveInFlightRef.current) return
+    pushSaveInFlightRef.current = true
+
     try {
-      if (currentlyOn) {
-        await revokePushToken()
-      } else {
-        await registerPushToken()
+      while (pushDesiredRef.current !== null) {
+        const nextEnabled = pushDesiredRef.current
+        pushDesiredRef.current = null
+        if (nextEnabled === persistedPushOnRef.current) continue
+        const patch = {
+          push_followups_enabled: nextEnabled,
+          push_birthdays_enabled: nextEnabled,
+          push_important_moments_enabled: nextEnabled,
+        }
+
+        if (nextEnabled) await registerPushToken()
+        else await revokePushToken()
+
+        await commitSettingsPatch(patch)
+        persistedPushOnRef.current = nextEnabled
       }
-      await commitSettingsPatch(patch)
       setOk("Push notification preference saved.")
     } catch (e) {
-      setSettings(previousSettings)
-      setPushRegistered(previousRegistered)
+      pushDesiredRef.current = null
+      const currentSettings = settingsRef.current
+      const persistedEnabled = persistedPushOnRef.current
+      if (currentSettings) {
+        applySettings({
+          ...currentSettings,
+          push_followups_enabled: persistedEnabled,
+          push_birthdays_enabled: persistedEnabled,
+          push_important_moments_enabled: persistedEnabled,
+        })
+      }
+      setPushRegistered(persistedEnabled)
+      pushRegisteredRef.current = persistedEnabled
       setFailure(e instanceof Error ? e.message : "Failed to update push notifications.")
     } finally {
-      setToggling(false)
+      pushSaveInFlightRef.current = false
+      if (pushDesiredRef.current !== null) void flushPushNotificationChanges()
     }
+  }
+
+  function togglePushNotifications() {
+    const currentSettings = settingsRef.current
+    if (!currentSettings) return
+
+    const pushPreferenceOn = Boolean(
+      currentSettings.push_followups_enabled ||
+        currentSettings.push_birthdays_enabled ||
+        currentSettings.push_important_moments_enabled,
+    )
+    const nextEnabled = !(pushPreferenceOn && pushRegisteredRef.current)
+    const nextSettings = {
+      ...currentSettings,
+      push_followups_enabled: nextEnabled,
+      push_birthdays_enabled: nextEnabled,
+      push_important_moments_enabled: nextEnabled,
+    }
+
+    applySettings(nextSettings)
+    setPushRegistered(nextEnabled)
+    pushRegisteredRef.current = nextEnabled
+    pushDesiredRef.current = nextEnabled
+    setError(null)
+    void flushPushNotificationChanges()
   }
 
   if (loading) return <LoadingState />
@@ -354,9 +424,10 @@ export default function SettingsScreen() {
 
         <SettingsSection title="Notifications" subtitle="Choose how you stay up to date.">
           <TouchableOpacity
-            accessibilityRole="button"
+            accessibilityRole="switch"
             accessibilityLabel="Push notifications"
-            disabled={toggling || !settings}
+            accessibilityState={{ checked: pushOn, disabled: !settings }}
+            disabled={!settings}
             onPress={togglePushNotifications}
             activeOpacity={0.74}
           >
@@ -372,8 +443,9 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={pushOn}
-                onValueChange={togglePushNotifications}
-                disabled={toggling || !settings}
+                disabled={!settings}
+                pointerEvents="none"
+                accessible={false}
                 trackColor={{ false: "#D1D5DB", true: colors.forest }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
@@ -382,9 +454,13 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <Divider />
           <TouchableOpacity
-            accessibilityRole="button"
+            accessibilityRole="switch"
             accessibilityLabel="Weekly email digest"
-            disabled={togglingDigest || !settings}
+            accessibilityState={{
+              checked: Boolean(settings?.email_reminders_enabled),
+              disabled: !settings,
+            }}
+            disabled={!settings}
             onPress={toggleEmailDigest}
             activeOpacity={0.74}
           >
@@ -400,8 +476,9 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={Boolean(settings?.email_reminders_enabled)}
-                onValueChange={toggleEmailDigest}
-                disabled={togglingDigest || !settings}
+                disabled={!settings}
+                pointerEvents="none"
+                accessible={false}
                 trackColor={{ false: "#D1D5DB", true: colors.forest }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
