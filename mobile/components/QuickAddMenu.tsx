@@ -10,10 +10,18 @@ import { QuickAddFormSheet, type QuickAddMode } from "@/features/quick-add/Quick
 export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const router = useRouter()
   const [pickerMode, setPickerMode] = useState<QuickAddMode | null>(null)
+  const [pendingMode, setPendingMode] = useState<QuickAddMode | null>(null)
 
   function openForm(mode: QuickAddMode) {
+    if (pendingMode) return
+    setPendingMode(mode)
     onClose()
-    setPickerMode(mode)
+  }
+
+  function handleMenuClosed() {
+    if (!pendingMode) return
+    setPickerMode(pendingMode)
+    setPendingMode(null)
   }
 
   return (
@@ -22,6 +30,7 @@ export function QuickAddMenu({ visible, onClose }: { visible: boolean; onClose: 
       <BottomSheetModal
         visible={visible}
         onClose={onClose}
+        onClosed={handleMenuClosed}
         animationType="fade"
         backdropOpacity={0.45}
         avoidKeyboard={false}
