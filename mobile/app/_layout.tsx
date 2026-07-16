@@ -1,6 +1,6 @@
 import { Slot, useRouter, useSegments } from "expo-router"
 import { useFonts } from "expo-font"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, DeviceEventEmitter, Linking, View } from "react-native"
 import {
   CormorantGaramond_700Bold,
@@ -29,6 +29,7 @@ export default function RootLayout() {
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
   const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
+  const sessionUserIdRef = useRef<string | null>(null)
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_700Bold,
     Inter_400Regular,
@@ -44,6 +45,7 @@ export default function RootLayout() {
       supabase.auth.getSession(),
       hasCompletedFirstDownloadIntro(),
     ]).then(([{ data: { session } }, completedIntro]) => {
+      sessionUserIdRef.current = session?.user.id ?? null
       setSession(session)
       setIntroComplete(completedIntro)
       setLoading(false)
@@ -51,9 +53,13 @@ export default function RootLayout() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setHasPeople(null)
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const nextUserId = nextSession?.user.id ?? null
+      const userChanged = sessionUserIdRef.current !== nextUserId
+
+      sessionUserIdRef.current = nextUserId
+      setSession(nextSession)
+      if (userChanged) setHasPeople(null)
     })
 
     return () => subscription.unsubscribe()
