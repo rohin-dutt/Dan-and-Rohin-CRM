@@ -14,8 +14,9 @@ export function LogoMark({ size = 34, muted = false }: { size?: number; muted?: 
         width: size,
         height: size,
         opacity: muted ? 0.62 : 1,
-        tintColor: muted ? colors.sage : undefined,
       }}
+      tintColor={muted ? colors.sage : undefined}
+      accessibilityLabel="Roots"
       accessibilityIgnoresInvertColors
     />
   )

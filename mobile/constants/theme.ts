@@ -3,6 +3,8 @@ import type { TextStyle } from "react-native"
 export const colors = {
   cream: "#F7F5EF",
   ivory: "#FCFBF7",
+  brandIvory: "#FBF2E5",
+  sand: "#EFE5D3",
   sage: "#6F8E70",
   forest: "#0F4A24",
   mint: "#EEF4EA",

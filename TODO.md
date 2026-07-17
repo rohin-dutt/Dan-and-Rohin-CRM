@@ -13,6 +13,9 @@ the roadmap or architecture direction changes.
       owner: public website/content lint cleanup. Reconfirmed on July 17, 2026,
       after the mobile form-control alignment and settings-toggle interaction
       fixes; repository tests, mobile typecheck, and mobile-only lint passed.
+      Reconfirmed again after the first-download onboarding redesign, native
+      Apple sign-in implementation, and image-first visual rework; the same
+      five public-site errors remain and no mobile lint errors were reported.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:
@@ -23,6 +26,10 @@ the roadmap or architecture direction changes.
       July 16, 2026, after combining the mobile bottom-sheet animation fix and
       fast cold-start cache; compilation and TypeScript completed before the
       existing page-data failure.
+      Reconfirmed on July 17, 2026 after the first-download onboarding redesign,
+      native Apple sign-in implementation, and image-first visual rework;
+      compilation and TypeScript again completed before the same `/api/contact`
+      page-data failure.
 - [x] The earlier `npm test` TypeScript-loader failure is no longer
       reproducible. `npm.cmd test` passed on July 16, 2026, after fast
       cold-start cache implementation.
