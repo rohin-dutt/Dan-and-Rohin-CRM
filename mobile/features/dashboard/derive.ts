@@ -51,16 +51,20 @@ function countFilledEnrichmentFields(person: Person): number {
 // priority over never-contacted. Rotates daily so the nudge stays fresh
 // without changing within a day.
 function pickEnrichmentNudge(people: Person[]): EnrichmentNudge | null {
-  const pool: EnrichmentNudge[] = []
+  const caseAPool: Person[] = []
+  const caseBPool: Person[] = []
   for (const person of people) {
     if (countFilledEnrichmentFields(person) < 2) {
-      pool.push({ person, reason: "missing_details" })
+      caseAPool.push(person)
     } else if (person.last_contacted_at == null) {
-      pool.push({ person, reason: "no_interactions" })
+      caseBPool.push(person)
     }
   }
-  if (pool.length === 0) return null
-  return pool[Math.floor(Date.now() / 86400000) % pool.length]
+  const activePool = caseAPool.length > 0 ? caseAPool : caseBPool
+  if (activePool.length === 0) return null
+  const index = Math.floor(Date.now() / 86400000) % activePool.length
+  const person = activePool[index]
+  return { person, reason: caseAPool.length > 0 ? "missing_details" : "no_interactions" }
 }
 
 // Pure derivation of the dashboard sections from loaded rows; isolated so a
