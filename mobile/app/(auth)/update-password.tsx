@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Text, TextInput, View } from "react-native"
+import { DeviceEventEmitter, Text, TextInput, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
@@ -7,6 +7,7 @@ import { Screen } from "@/components/Screen"
 import { TextField } from "@/components/TextField"
 import { LoadingState } from "@/components/LoadingState"
 import { supabase } from "@/lib/supabase"
+import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
 
 export default function UpdatePasswordScreen() {
   const router = useRouter()
@@ -15,10 +16,14 @@ export default function UpdatePasswordScreen() {
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
   const confirmPasswordInputRef = useRef<TextInput>(null)
+  // Signing out after a successful update also drops the session, which
+  // would otherwise trip the "session lost" listener below and bounce to
+  // forgot-password right as we're navigating to login.
+  const intentionalSignOutRef = useRef(false)
 
   const returnToForgotPassword = useCallback(() => {
+    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
     router.replace({
       pathname: "/(auth)/forgot-password",
       params: { recoveryError: "invalid_or_expired" },
@@ -42,7 +47,7 @@ export default function UpdatePasswordScreen() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!cancelled && !session) {
+      if (!cancelled && !session && !intentionalSignOutRef.current) {
         returnToForgotPassword()
       }
     })
@@ -55,7 +60,6 @@ export default function UpdatePasswordScreen() {
 
   async function handleUpdate() {
     setError(null)
-    setSaved(false)
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters.")
@@ -95,10 +99,12 @@ export default function UpdatePasswordScreen() {
       return
     }
 
-    setLoading(false)
     setPassword("")
     setConfirmPassword("")
-    setSaved(true)
+    intentionalSignOutRef.current = true
+    await supabase.auth.signOut({ scope: "local" })
+    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
+    router.replace({ pathname: "/(auth)/login", params: { passwordUpdated: "true" } })
   }
 
   if (checkingSession) {
@@ -115,44 +121,28 @@ export default function UpdatePasswordScreen() {
 
         {error && <ErrorBanner message={error} />}
 
-        {saved ? (
-          <>
-            <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-              <Text className="text-green-700 text-sm font-medium">
-                Password updated successfully.
-              </Text>
-            </View>
-            <Button
-              title="Continue to Roots"
-              onPress={() => router.replace("/(app)/(tabs)/dashboard")}
-            />
-          </>
-        ) : (
-          <>
-            <TextField
-              label="New password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              returnKeyType="next"
-              submitBehavior="submit"
-              onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
-            />
-            <TextField
-              ref={confirmPasswordInputRef}
-              label="Confirm password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              returnKeyType="done"
-              submitBehavior="blurAndSubmit"
-            />
+        <TextField
+          label="New password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+        />
+        <TextField
+          ref={confirmPasswordInputRef}
+          label="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
+        />
 
-            <Button title="Update password" onPress={handleUpdate} loading={loading} />
-          </>
-        )}
+        <Button title="Update password" onPress={handleUpdate} loading={loading} />
       </View>
     </Screen>
   )

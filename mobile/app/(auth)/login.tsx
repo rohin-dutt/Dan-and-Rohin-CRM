@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 
 export default function LoginScreen() {
   const router = useRouter()
+  const { passwordUpdated } = useLocalSearchParams<{ passwordUpdated?: string }>()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -42,6 +43,13 @@ export default function LoginScreen() {
         <Text className="text-base text-gray-500 mb-8">Sign in to Roots</Text>
 
         {error && <ErrorBanner message={error} />}
+        {passwordUpdated === "true" && (
+          <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+            <Text className="text-green-700 text-sm font-medium">
+              Password updated. Sign in with your new password.
+            </Text>
+          </View>
+        )}
 
         <TextField
           label="Email"

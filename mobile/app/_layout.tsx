@@ -15,7 +15,11 @@ import {
 } from "@expo-google-fonts/inter"
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
-import { handlePasswordRecoveryUrl, isPasswordRecoveryUrl } from "@/lib/auth-links"
+import {
+  handlePasswordRecoveryUrl,
+  isPasswordRecoveryUrl,
+  PASSWORD_RECOVERY_RESOLVED_EVENT,
+} from "@/lib/auth-links"
 import {
   FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
   hasCompletedFirstDownloadIntro,
@@ -33,7 +37,17 @@ export default function RootLayout() {
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
   const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
+  // Stays true for the whole recovery flow (deep link -> update-password
+  // screen), so routing keeps forcing update-password even once a session
+  // exists. Cleared only on a successful password update or a bounce back to
+  // forgot-password on an invalid/expired link.
   const [recoveryLinkPending, setRecoveryLinkPending] = useState(
+    Boolean(initialUrl && isPasswordRecoveryUrl(initialUrl)),
+  )
+  // True only while the deep link is actively being exchanged for a session;
+  // gates the loading spinner so it doesn't block the update-password screen
+  // for the rest of the recovery flow.
+  const [recoveryExchangeInProgress, setRecoveryExchangeInProgress] = useState(
     Boolean(initialUrl && isPasswordRecoveryUrl(initialUrl)),
   )
   const sessionUserIdRef = useRef<string | null>(null)
@@ -88,10 +102,15 @@ export default function RootLayout() {
       PEOPLE_CHANGED_EVENT,
       () => setPeopleStatusVersion((version) => version + 1),
     )
+    const recoverySub = DeviceEventEmitter.addListener(
+      PASSWORD_RECOVERY_RESOLVED_EVENT,
+      () => setRecoveryLinkPending(false),
+    )
 
     return () => {
       introSub.remove()
       peopleSub.remove()
+      recoverySub.remove()
     }
   }, [])
 
@@ -156,10 +175,14 @@ export default function RootLayout() {
       recoveryInFlightRef.current = true
       processedRecoveryFingerprintRef.current = fingerprint
       setRecoveryLinkPending(true)
+      setRecoveryExchangeInProgress(true)
 
       try {
         const result = await handlePasswordRecoveryUrl(url)
-        if (!result.handled) return
+        if (!result.handled) {
+          setRecoveryLinkPending(false)
+          return
+        }
 
         if (result.ok) {
           const {
@@ -167,6 +190,7 @@ export default function RootLayout() {
           } = await supabase.auth.getSession()
 
           if (!recoverySession) {
+            setRecoveryLinkPending(false)
             router.replace({
               pathname: "/(auth)/forgot-password",
               params: { recoveryError: "exchange_failed" },
@@ -176,7 +200,11 @@ export default function RootLayout() {
 
           setSession(recoverySession)
           router.replace("/(auth)/update-password")
+          // recoveryLinkPending stays true: the update-password screen clears
+          // it via PASSWORD_RECOVERY_RESOLVED_EVENT after a successful
+          // password update, or after bouncing back to forgot-password.
         } else {
+          setRecoveryLinkPending(false)
           router.replace({
             pathname: "/(auth)/forgot-password",
             params: { recoveryError: result.reason },
@@ -184,7 +212,7 @@ export default function RootLayout() {
         }
       } finally {
         recoveryInFlightRef.current = false
-        setRecoveryLinkPending(false)
+        setRecoveryExchangeInProgress(false)
       }
     }
 
@@ -202,12 +230,22 @@ export default function RootLayout() {
   }, [router, loading, fontsLoaded])
 
   useEffect(() => {
-    if (loading || introComplete == null || recoveryLinkPending) return
+    if (loading || introComplete == null) return
 
     const inAuthGroup = segments[0] === "(auth)"
     const inIntro = segments[0] === "intro"
     const inUpdatePassword = inAuthGroup && segments.join("/") === "(auth)/update-password"
     const inOnboarding = segments.join("/").startsWith("(app)/onboarding")
+
+    // A pending recovery link always wins: stay on (or navigate to)
+    // update-password regardless of session/hasPeople state, so a valid
+    // session and existing people don't bounce the user to the dashboard.
+    if (recoveryLinkPending) {
+      if (!inUpdatePassword) {
+        router.replace("/(auth)/update-password")
+      }
+      return
+    }
 
     if (!session) {
       if (!introComplete && !inIntro) {
@@ -232,7 +270,7 @@ export default function RootLayout() {
     loading ||
     (!fontsLoaded && !fontError) ||
     introComplete == null ||
-    recoveryLinkPending ||
+    recoveryExchangeInProgress ||
     (session && hasPeople == null)
   ) {
     return (

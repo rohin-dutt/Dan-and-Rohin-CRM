@@ -17,6 +17,12 @@ export type AuthLinkResult =
 export const PASSWORD_RECOVERY_ERROR_MESSAGE =
   "This reset link is invalid or has expired. Request a new link to continue."
 
+// Emitted once the recovery flow reaches a terminal state: a successful
+// password update, or a bounce back to forgot-password on an invalid/expired
+// session. Tells the root layout it can stop forcing navigation to
+// update-password.
+export const PASSWORD_RECOVERY_RESOLVED_EVENT = "passwordRecoveryResolved"
+
 const PASSWORD_RECOVERY_SCHEME = "roots:"
 const PASSWORD_RECOVERY_HOST = "update-password"
 
