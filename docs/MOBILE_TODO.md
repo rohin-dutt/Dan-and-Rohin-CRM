@@ -228,6 +228,13 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 ## Phase 5: Onboarding
 
+- [x] Rebuild the five-screen first-download intro around the approved
+      tree-and-roots identity, initial-only contact avatars, preserved product
+      copy, and left/back plus right/forward tap navigation.
+- [x] Add the native Sign in with Apple client flow to intro, login, and signup.
+- [ ] Enable and verify the Apple provider in Apple Developer and Supabase Auth;
+      this requires the external account configuration listed in
+      `docs/APP_STORE_READINESS.md`.
 - [ ] Build welcome/value screen.
 - [ ] Build add-first-person or import prompt.
 - [ ] Build reminder preference step.

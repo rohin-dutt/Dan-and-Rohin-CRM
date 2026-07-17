@@ -9,8 +9,8 @@
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#0F4A24"
+      "resizeMode": "contain",
+      "backgroundColor": "#FBF2E5"
     },
     "extra": {
       "eas": {
@@ -20,6 +20,7 @@
     "ios": {
       "bundleIdentifier": "com.useroots.app",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "buildNumber": "2026071503",
       "infoPlist": {
         "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
@@ -32,12 +33,19 @@
         "NSPrivacyTrackingDomains": []
       }
     },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FBF2E5"
+      }
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "plugins": [
       "expo-router",
       "expo-font",
+      "expo-apple-authentication",
       [
         "expo-contacts",
         {

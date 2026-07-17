@@ -41,8 +41,11 @@ and App Store Connect together.
 - [ ] EAS project configured.
 - [x] EAS development, preview/TestFlight, and production profiles defined.
 - [x] iOS bundle identifier set.
-- [ ] App icon complete.
-- [ ] Splash screen complete.
+- [x] App icon complete.
+  - Uses the approved tree-and-roots artwork in `mobile/assets/icon.png`.
+- [x] Splash screen complete.
+  - Uses the approved artwork on the matching `#FBF2E5` brand field with
+    `contain` scaling so the mark is not cropped.
 - [x] Version and build number process defined.
   - Decision: use date-based build numbers, such as `2026051601`.
 - [ ] Release channel/update policy defined.
@@ -55,6 +58,25 @@ production profiles. `mobile/app.json` sets `com.useroots.app`, `roots://`,
 version `1.0.0`, and build number `2026060201`. EAS project linking, Apple
 Developer enrollment, provisioning, upload, and TestFlight install remain
 manual external blockers.
+
+## Sign In With Apple
+
+- [x] Native Expo Apple Authentication dependency installed.
+- [x] Expo config plugin and `ios.usesAppleSignIn` capability enabled.
+- [x] Native Apple button is available from first-download intro, login, and
+      signup.
+- [x] Apple identity tokens are exchanged through Supabase
+      `signInWithIdToken`; no Apple credential is persisted by the app.
+- [x] First-authorization name data is saved to display-only user metadata when
+      Apple supplies it.
+- [ ] Enable Sign in with Apple for App ID `com.useroots.app` in the Apple
+      Developer portal.
+- [ ] Enable the Apple provider in the Supabase Auth dashboard and include
+      `com.useroots.app` in the allowed Client IDs.
+- [ ] Configure Apple's private email relay for Roots' approved sending domain.
+- [ ] Verify new-account, returning-account, hidden-email, canceled-consent,
+      revoked-credential, and existing-email collision behavior on a real
+      iPhone/TestFlight build.
 
 ## URLs
 
@@ -207,6 +229,7 @@ Screenshot rules:
 
 - [ ] Signup.
 - [ ] Login.
+- [ ] Sign in with Apple.
 - [ ] Logout.
 - [ ] Session restore.
 - [ ] Password reset.
