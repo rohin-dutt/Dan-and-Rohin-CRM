@@ -5,6 +5,7 @@ import * as FileSystem from "expo-file-system/legacy"
 import { supabase } from "@/lib/supabase"
 import { clearLocalPrivateData } from "@/lib/private-data"
 import { callTrustedApi } from "@/lib/trusted-api"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 // Export / import / restore / account deletion handlers for Settings.
 // Server-side validation is authoritative (the trusted routes validate the
@@ -17,6 +18,7 @@ export function useDataManagement({
   onSuccess: (message: string) => void
   onFailure: (message: string) => void
 }) {
+  const { refresh } = useCrmData()
   const [dataWorking, setDataWorking] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
 
@@ -68,6 +70,7 @@ export function useDataManagement({
       await callTrustedApi("/api/import/restore", {
         body: { payload, replace_existing: false },
       })
+      await refresh()
       onSuccess("Import complete. Existing data was kept and updated.")
     } catch (e) {
       onFailure(e instanceof Error ? e.message : "Failed to import data.")
@@ -94,6 +97,7 @@ export function useDataManagement({
               await callTrustedApi("/api/import/restore", {
                 body: { payload, replace_existing: true },
               })
+              await refresh()
               onSuccess("Restore complete. Your data now matches the backup file.")
             } catch (e) {
               onFailure(e instanceof Error ? e.message : "Failed to restore data.")

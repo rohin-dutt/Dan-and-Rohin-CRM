@@ -21,6 +21,7 @@ import {
 } from "@/lib/import-edit-queue"
 import type { Person } from "@/types"
 import { colors } from "@/constants/theme"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 type PermissionState = "unknown" | "denied" | "limited" | "granted"
 
@@ -64,6 +65,7 @@ function batchReviewMessage(prompt: BatchReviewPrompt) {
 
 export default function ImportContactsScreen() {
   const router = useRouter()
+  const { snapshot, refresh } = useCrmData()
   const [permissionState, setPermissionState] = useState<PermissionState>("unknown")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -119,6 +121,8 @@ export default function ImportContactsScreen() {
   }
 
   async function loadExistingPeople() {
+    if (snapshot) return snapshot.people
+
     const session = await getCachedSession()
     if (!session) throw new Error("You must be signed in.")
 
@@ -296,6 +300,7 @@ export default function ImportContactsScreen() {
         setError(response.errors.join("\n") || "No contacts were imported.")
         return
       }
+      await refresh()
 
       if (shouldReviewSequentially) {
         if (failures > 0) {

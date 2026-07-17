@@ -1,25 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { DeviceEventEmitter, Share, Text, TouchableOpacity, View } from "react-native"
+import { useCallback, useMemo, useState } from "react"
+import { Share, Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useFocusEffect, useRouter } from "expo-router"
+import { useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import { supabase } from "@/lib/supabase"
-import { countPersonNotesForUser } from "@/lib/person-notes"
 import { personImageUrl } from "@/lib/person-display"
-import { firstNameFromMetadata } from "@/lib/user-metadata"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
-import type { Person } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
-import {
-  buildDashboardModel,
-  DASHBOARD_INTERACTION_COLUMNS,
-  type DashboardInteraction,
-} from "@/features/dashboard/derive"
+import { buildDashboardModel } from "@/features/dashboard/derive"
 import { MetricCard, SummaryDivider, SummaryStat } from "@/features/dashboard/components"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 function getGreeting(firstName: string): string {
   const hour = new Date().getHours()
@@ -36,74 +29,12 @@ function shortDisplayName(fullName: string): string {
 
 export default function DashboardScreen() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [people, setPeople] = useState<Person[]>([])
-  const [interactions, setInteractions] = useState<DashboardInteraction[]>([])
-  const [noteCount, setNoteCount] = useState(0)
-  const [firstName, setFirstName] = useState("there")
+  const { snapshot, loading, refreshError } = useCrmData()
   const [momentsExpanded, setMomentsExpanded] = useState(false)
-  const hasLoadedOnce = useRef(false)
-
-  const load = useCallback(async (silent?: boolean) => {
-    try {
-      if (!silent && !hasLoadedOnce.current) setLoading(true)
-      setError(null)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) return
-
-      const userId = session.user.id
-      setFirstName(firstNameFromMetadata(session.user.user_metadata))
-
-      const [peopleRes, loadedNoteCount] = await Promise.all([
-        supabase.from("people").select("*").eq("user_id", userId),
-        countPersonNotesForUser(userId),
-      ])
-
-      if (peopleRes.error) throw peopleRes.error
-      const loadedPeople = peopleRes.data ?? []
-      setPeople(loadedPeople)
-      setNoteCount(loadedNoteCount)
-
-      if (loadedPeople.length > 0) {
-        const personIds = loadedPeople.map((person) => person.id)
-        const { data: loadedInteractions, error: interactionsError } = await supabase
-          .from("interactions")
-          .select(DASHBOARD_INTERACTION_COLUMNS)
-          .in("person_id", personIds)
-        if (interactionsError) throw interactionsError
-        setInteractions(loadedInteractions ?? [])
-      } else {
-        setInteractions([])
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard.")
-    } finally {
-      setLoading(false)
-      hasLoadedOnce.current = true
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  useFocusEffect(
-    useCallback(() => {
-      if (hasLoadedOnce.current) load(true)
-    }, [load]),
-  )
-
-  useEffect(() => {
-    const noteSub = DeviceEventEmitter.addListener("noteAdded", load)
-    const interactionSub = DeviceEventEmitter.addListener("interactionAdded", load)
-    return () => {
-      noteSub.remove()
-      interactionSub.remove()
-    }
-  }, [load])
+  const people = snapshot?.people ?? []
+  const interactions = snapshot?.interactions ?? []
+  const noteCount = snapshot?.personNotes.length ?? 0
+  const firstName = snapshot?.profile.firstName ?? "there"
 
   const dashboard = useMemo(
     () => buildDashboardModel({ people, interactions }),
@@ -159,9 +90,9 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {error ? (
+      {refreshError ? (
         <View className="px-5">
-          <ErrorBanner message={error} />
+          <ErrorBanner message={refreshError} />
         </View>
       ) : null}
 

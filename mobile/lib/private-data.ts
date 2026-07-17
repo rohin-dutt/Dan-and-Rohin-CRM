@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { clearCrmCache } from "@/lib/crm-cache"
 
 const PRIVATE_CACHE_KEYS = [
   "roots:offline-cache",
@@ -7,5 +8,8 @@ const PRIVATE_CACHE_KEYS = [
 ]
 
 export async function clearLocalPrivateData() {
-  await AsyncStorage.multiRemove(PRIVATE_CACHE_KEYS)
+  await Promise.all([
+    AsyncStorage.multiRemove(PRIVATE_CACHE_KEYS),
+    clearCrmCache(),
+  ])
 }

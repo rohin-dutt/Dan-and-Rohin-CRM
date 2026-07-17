@@ -14,17 +14,17 @@ import {
   registerPushToken,
   revokePushToken,
 } from "@/lib/push-notifications"
-import { displayNameFromMetadata } from "@/lib/user-metadata"
 import { colors, fonts } from "@/constants/theme"
 import { InlineForm, SettingsRow, SettingsSection } from "@/features/settings/components"
 import { useDataManagement } from "@/features/settings/use-data-management"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 import type { Settings } from "@/types"
 
 type Status = { ok: boolean; message: string } | null
 type ExpandedPanel = "profile" | "password" | null
 
 export default function SettingsScreen() {
-  const [loading, setLoading] = useState(true)
+  const { snapshot, loading, refreshError, updateSnapshot } = useCrmData()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>(null)
   const [expanded, setExpanded] = useState<ExpandedPanel>(null)
@@ -41,6 +41,7 @@ export default function SettingsScreen() {
   const newPasswordInputRef = useRef<TextInput>(null)
   const confirmPasswordInputRef = useRef<TextInput>(null)
   const userIdRef = useRef<string | null>(null)
+  const initializedProfileUserIdRef = useRef<string | null>(null)
   const settingsRef = useRef<Settings | null>(null)
   const persistedDigestRef = useRef(false)
   const digestDesiredRef = useRef<boolean | null>(null)
@@ -73,52 +74,42 @@ export default function SettingsScreen() {
   }, [status])
 
   useEffect(() => {
-    async function load() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session) return
-        userIdRef.current = session.user.id
-        setEmail(session.user.email ?? "")
-        setDisplayName(displayNameFromMetadata(session.user.user_metadata))
+    if (!snapshot) return
+    if (initializedProfileUserIdRef.current === snapshot.userId) return
+    initializedProfileUserIdRef.current = snapshot.userId
+    userIdRef.current = snapshot.userId
+    setEmail(snapshot.profile.email)
+    setDisplayName(snapshot.profile.displayName)
+  }, [snapshot])
 
-        const { data } = await supabase
-          .from("settings")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .maybeSingle()
-        let loadedSettings = data
-        if (!loadedSettings) {
-          const { data: created, error: createError } = await supabase
-            .from("settings")
-            .upsert({ user_id: session.user.id }, { onConflict: "user_id" })
-            .select("*")
-            .single()
-          if (createError) throw createError
-          loadedSettings = created
-        }
+  useEffect(() => {
+    const loadedSettings = snapshot?.settings
+    if (!loadedSettings) return
+    if (!digestSaveInFlightRef.current && !pushSaveInFlightRef.current) {
+      settingsRef.current = loadedSettings
+      setSettings(loadedSettings)
+      persistedDigestRef.current = loadedSettings.email_reminders_enabled
+    }
 
-        const registered = await getPushRegistrationStatus().catch(() => false)
+    let cancelled = false
+    void getPushRegistrationStatus()
+      .catch(() => false)
+      .then((registered) => {
+        if (cancelled) return
         const pushPreferenceOn = Boolean(
           loadedSettings.push_followups_enabled ||
             loadedSettings.push_birthdays_enabled ||
             loadedSettings.push_important_moments_enabled,
         )
-
-        applySettings(loadedSettings)
         setPushRegistered(registered)
         pushRegisteredRef.current = registered
-        persistedDigestRef.current = loadedSettings.email_reminders_enabled
         persistedPushOnRef.current = pushPreferenceOn && registered
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load settings.")
-      } finally {
-        setLoading(false)
-      }
+      })
+
+    return () => {
+      cancelled = true
     }
-    load()
-  }, [])
+  }, [snapshot?.settings])
 
   function handleSignOut() {
     setShowLogoutConfirm(true)
@@ -146,6 +137,14 @@ export default function SettingsScreen() {
         data: { full_name: trimmedName || null },
       })
       if (updateError) throw updateError
+      updateSnapshot((current) => ({
+        ...current,
+        profile: {
+          ...current.profile,
+          displayName: trimmedName,
+          firstName: trimmedName.split(/\s+/)[0] || "there",
+        },
+      }))
     } catch (e) {
       setDisplayName(previousName)
       setExpanded("profile")
@@ -198,6 +197,10 @@ export default function SettingsScreen() {
       .update(patch)
       .eq("user_id", userId)
     if (err) throw err
+    updateSnapshot((current) => ({
+      ...current,
+      settings: current.settings ? { ...current.settings, ...patch } : current.settings,
+    }))
   }
 
   async function flushEmailDigestChanges() {
@@ -337,7 +340,7 @@ export default function SettingsScreen() {
       </View>
 
       <View className="px-5 pb-8">
-        {error ? <ErrorBanner message={error} /> : null}
+        {error || refreshError ? <ErrorBanner message={error ?? refreshError ?? ""} /> : null}
         {status ? (
           <Text
             style={{ fontFamily: fonts.medium }}

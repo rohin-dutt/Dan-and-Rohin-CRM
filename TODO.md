@@ -11,24 +11,21 @@ the roadmap or architecture direction changes.
       `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
       `app/(site)/contact/ContactForm.tsx`, and `app/(site)/page.tsx`. Likely
       owner: public website/content lint cleanup. Reconfirmed on July 16, 2026,
-      during the mobile bottom-sheet animation fix; the mobile typecheck and
-      mobile-only lint both passed.
+      after combining the mobile bottom-sheet animation fix and fast cold-start
+      cache; the mobile typecheck and mobile-only lint both passed.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:
       `Missing API key. Pass it to the constructor new Resend("re_123")` while
       collecting page data for `/api/contact`. Likely owner: contact API/env
       handling; move Resend initialization behind the request-time env check or
-      provide the required build env. Reconfirmed with `npm run build` on July
-      16, 2026, during the mobile bottom-sheet animation fix; compilation and
-      TypeScript completed before the existing page-data failure.
-- [ ] `npm test` fails on `tests/date-utils.test.mjs` with
-      `ERR_UNKNOWN_FILE_EXTENSION` for `.ts` — Node ESM loader cannot import
-      TypeScript directly. Command: `npm test`. Fix: add a loader flag (e.g.
-      `--import tsx` or `ts-node/esm`) to the test script, or compile
-      `lib/date-utils.ts` before running the test. Pre-existing; confirmed
-      present before Phase 2/3 landing + auth changes. Owner: test runner
-      configuration.
+      provide the required build env. Reconfirmed with `npm.cmd run build` on
+      July 16, 2026, after combining the mobile bottom-sheet animation fix and
+      fast cold-start cache; compilation and TypeScript completed before the
+      existing page-data failure.
+- [x] The earlier `npm test` TypeScript-loader failure is no longer
+      reproducible. `npm.cmd test` passed on July 16, 2026, after fast
+      cold-start cache implementation.
 - [ ] Local shell issue: `npm test` failed in PowerShell before the test script
       started because `C:\Program Files\nodejs\npm.ps1` is blocked by the system
       execution policy. Workaround used for the baseline: `npm.cmd test`, which
