@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   DeviceEventEmitter,
+  Keyboard,
   ScrollView,
   Switch,
   Text,
@@ -524,6 +525,9 @@ export function QuickAddFormSheet({
               placeholder="Topics, updates, anything worth noting…"
               placeholderTextColor="#9CA3AF"
               multiline
+              blurOnSubmit
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
               numberOfLines={3}
               style={{
                 fontFamily: fonts.body,
@@ -616,6 +620,9 @@ export function QuickAddFormSheet({
                     placeholder="What do you want to remember to ask or do?"
                     placeholderTextColor="#9CA3AF"
                     multiline
+                    blurOnSubmit
+                    returnKeyType="done"
+                    onSubmitEditing={() => Keyboard.dismiss()}
                     numberOfLines={3}
                     style={{
                       fontFamily: fonts.body,
@@ -669,6 +676,9 @@ export function QuickAddFormSheet({
               placeholder="What do you want to remember?"
               placeholderTextColor="#9CA3AF"
               multiline
+              blurOnSubmit
+              returnKeyType="done"
+              onSubmitEditing={() => Keyboard.dismiss()}
               numberOfLines={4}
               style={{
                 fontFamily: fonts.body,

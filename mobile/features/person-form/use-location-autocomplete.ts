@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react"
+import { Keyboard } from "react-native"
 import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 
 // Debounced location text input with Mapbox suggestions. Editing the text
@@ -27,6 +28,7 @@ export function useLocationAutocomplete() {
   }, [])
 
   const selectSuggestion = useCallback((feature: MapboxFeature) => {
+    Keyboard.dismiss()
     setLocation(feature.place_name)
     setLatitude(feature.center[1])
     setLongitude(feature.center[0])

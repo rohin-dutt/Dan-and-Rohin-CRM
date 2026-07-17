@@ -17,6 +17,7 @@ type CompactTextFieldProps = {
   returnKeyType?: TextInputProps["returnKeyType"]
   onSubmitEditing?: TextInputProps["onSubmitEditing"]
   submitBehavior?: TextInputProps["submitBehavior"]
+  blurOnSubmit?: boolean
 }
 
 export const CompactTextField = forwardRef<TextInput, CompactTextFieldProps>(function CompactTextField(
@@ -34,6 +35,7 @@ export const CompactTextField = forwardRef<TextInput, CompactTextFieldProps>(fun
     returnKeyType,
     onSubmitEditing,
     submitBehavior,
+    blurOnSubmit,
   },
   ref,
 ) {
@@ -73,7 +75,10 @@ export const CompactTextField = forwardRef<TextInput, CompactTextFieldProps>(fun
           }}
           returnKeyType={returnKeyType ?? (multiline ? "default" : "done")}
           onSubmitEditing={onSubmitEditing}
-          submitBehavior={submitBehavior ?? (multiline ? "newline" : "blurAndSubmit")}
+          blurOnSubmit={blurOnSubmit}
+          submitBehavior={
+            submitBehavior ?? (multiline ? (blurOnSubmit ? "blurAndSubmit" : "newline") : "blurAndSubmit")
+          }
         />
       </View>
     </View>

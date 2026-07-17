@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import type { Session } from "@supabase/supabase-js"
@@ -505,6 +505,9 @@ export default function EditPersonScreen() {
             onChangeText={setNotes}
             placeholder="Any general details you want to remember about this person?"
             multiline
+            blurOnSubmit
+            returnKeyType="done"
+            onSubmitEditing={() => Keyboard.dismiss()}
           />
 
           {/* Conditional: Birthday for Friend/Family */}
