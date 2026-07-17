@@ -18,9 +18,11 @@ import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 export default function NewPersonScreen() {
   const router = useRouter()
+  const { refresh } = useCrmData()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [categoryError, setCategoryError] = useState<string | null>(null)
@@ -122,12 +124,14 @@ export default function NewPersonScreen() {
         categoryLabel: category,
         moments: cleanMoments,
       })
+      await refresh()
 
       router.back()
     } catch (e) {
       if (e instanceof PersonRelationsError) {
         // The person row was created; only tag/moment assignment failed.
         // Going back avoids a duplicate person on retry.
+        await refresh()
         setPartlySavedMessage(`${cleanName} was added, but some details could not be saved: ${e.message}`)
       } else {
         setError(e instanceof Error ? e.message : "Failed to save person")

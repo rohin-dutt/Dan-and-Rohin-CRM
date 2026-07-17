@@ -365,6 +365,15 @@ practical encrypted storage path is not available in the Expo build, delay
 offline read cache rather than storing relationship notes, contacts, or
 interaction history unencrypted.
 
+Implemented storage: a versioned, user-scoped JSON snapshot inside
+`expo-sqlite` with SQLCipher. A random database key is stored separately in
+`expo-secure-store`. The app restores that snapshot before routing into the
+authenticated UI, refreshes all shared CRM data once after the first render,
+and reuses it across Home, People, Roots Map, Settings, quick add, and person
+detail/edit flows. Builds without SQLCipher do not persist the private cache.
+The cache remains until logout, account deletion, or account switch; offline
+writes and conflict handling remain out of scope.
+
 Offline writes are out of scope unless explicitly approved later. If added,
 they require a sync queue, conflict handling, retry rules, and stronger QA.
 

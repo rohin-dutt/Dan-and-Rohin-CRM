@@ -11,7 +11,6 @@ import { ConfirmModal } from "@/components/ConfirmModal"
 import { SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
-import { loadImportantMomentsForPerson } from "@/lib/important-moments"
 import {
   clearPendingImportEditQueue,
   parseImportEditQueue,
@@ -31,10 +30,18 @@ import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
-import type { Person, Tag } from "@/types"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
+import type { Tag } from "@/types"
 
 export default function EditPersonScreen() {
   const router = useRouter()
+  const {
+    snapshot,
+    loading: crmLoading,
+    refreshing,
+    refreshError,
+    refresh,
+  } = useCrmData()
   const params = useLocalSearchParams<{
     id: string | string[]
     importQueue?: string | string[]
@@ -81,6 +88,7 @@ export default function EditPersonScreen() {
   const companyInputRef = useRef<TextInput>(null)
   const roleInputRef = useRef<TextInput>(null)
   const emailInputRef = useRef<TextInput>(null)
+  const initializedPersonIdRef = useRef<string | null>(null)
 
   const freqMenu = useAnchoredMenu()
   const locationField = useLocationAutocomplete()
@@ -111,61 +119,49 @@ export default function EditPersonScreen() {
   }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const session = await getCachedSession()
-        if (!session) return
-
-        const [personRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
-          supabase.from("people").select("*").eq("id", id).single(),
-          supabase.from("tags").select("*").eq("user_id", session.user.id),
-          supabase.from("person_tags").select("tag_id").eq("person_id", id),
-          loadImportantMomentsForPerson(id),
-        ])
-
-        if (personRes.error) throw personRes.error
-        if (tagsRes.error) throw tagsRes.error
-        if (personTagsRes.error) throw personTagsRes.error
-        const p: Person = personRes.data
-
-        // Split name into first/last
-        const nameParts = p.name.trim().split(/\s+/)
-        setFirstName(nameParts[0] ?? "")
-        setLastName(nameParts.slice(1).join(" "))
-
-        setCompany(p.company ?? "")
-        setRole(p.role ?? "")
-        setEmail(p.email ?? "")
-        setPhone(p.phone ?? "")
-        setHowMet(p.how_met ?? "")
-        setFrequencyDays(p.contact_frequency_days ?? 90)
-        resetLocation(p.location ?? "", p.latitude ?? null, p.longitude ?? null)
-        setNotes(p.notes ?? "")
-
-        setBirthdayDate(p.birthday ? parseLocalDateString(p.birthday) : null)
-
-        const cat = findRelationshipCategory(p.relationship_type)
-        setCategory(cat?.label ?? null)
-
-        setAllTags(tagsRes.data ?? [])
-        setSelectedTagIds((personTagsRes.data ?? []).map((pt) => pt.tag_id))
-        setImportantMoments(
-          loadedMoments.map((moment) => ({
-            label: moment.label,
-            date: moment.date,
-            recurs_yearly: moment.recurs_yearly,
-          })),
-        )
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load person")
-      } finally {
+    if (initializedPersonIdRef.current === id) return
+    const person = snapshot?.people.find((candidate) => candidate.id === id)
+    if (!person) {
+      if (!crmLoading && !refreshing) {
+        setError(refreshError ?? "Person not found")
         setLoading(false)
       }
+      return
     }
-    load()
-  }, [id, resetLocation])
+
+    setLoading(true)
+    setError(null)
+    const nameParts = person.name.trim().split(/\s+/)
+    setFirstName(nameParts[0] ?? "")
+    setLastName(nameParts.slice(1).join(" "))
+    setCompany(person.company ?? "")
+    setRole(person.role ?? "")
+    setEmail(person.email ?? "")
+    setPhone(person.phone ?? "")
+    setHowMet(person.how_met ?? "")
+    setFrequencyDays(person.contact_frequency_days ?? 90)
+    resetLocation(person.location ?? "", person.latitude ?? null, person.longitude ?? null)
+    setNotes(person.notes ?? "")
+    setBirthdayDate(person.birthday ? parseLocalDateString(person.birthday) : null)
+    setCategory(findRelationshipCategory(person.relationship_type)?.label ?? null)
+    setAllTags(snapshot?.tags ?? [])
+    setSelectedTagIds(
+      snapshot?.personTags
+        .filter((link) => link.person_id === id)
+        .map((link) => link.tag_id) ?? [],
+    )
+    setImportantMoments(
+      snapshot?.importantMoments
+        .filter((moment) => moment.person_id === id)
+        .map((moment) => ({
+          label: moment.label,
+          date: moment.date,
+          recurs_yearly: moment.recurs_yearly,
+        })) ?? [],
+    )
+    initializedPersonIdRef.current = id
+    setLoading(false)
+  }, [crmLoading, id, refreshError, refreshing, resetLocation, snapshot])
 
   async function handleSave() {
     if (saving) return
@@ -219,6 +215,7 @@ export default function EditPersonScreen() {
         tagIds: selectedTagIds,
         moments: cleanMoments,
       })
+      await refresh()
 
       if (importEditQueue) {
         const nextIndex = importEditQueue.index + 1

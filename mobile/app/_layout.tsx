@@ -19,6 +19,7 @@ import {
   hasCompletedFirstDownloadIntro,
 } from "@/lib/first-download-intro"
 import { PEOPLE_CHANGED_EVENT, userHasPeople } from "@/lib/onboarding-status"
+import { clearCrmCache, readCrmSnapshot } from "@/lib/crm-cache"
 import { installNotificationResponseHandler } from "@/lib/push-notifications"
 import { colors } from "@/constants/theme"
 import "../global.css"
@@ -55,11 +56,15 @@ export default function RootLayout() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       const nextUserId = nextSession?.user.id ?? null
-      const userChanged = sessionUserIdRef.current !== nextUserId
+      const previousUserId = sessionUserIdRef.current
+      const userChanged = previousUserId !== nextUserId
 
       sessionUserIdRef.current = nextUserId
       setSession(nextSession)
-      if (userChanged) setHasPeople(null)
+      if (userChanged) {
+        setHasPeople(null)
+        if (previousUserId) void clearCrmCache()
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -94,11 +99,21 @@ export default function RootLayout() {
       // mid-onboarding); resetting to null here would unmount the onboarding
       // screens during categorize saves. Session changes reset it via
       // onAuthStateChange instead.
+      let restoredFromCache = false
       try {
+        const cached = await readCrmSnapshot(session.user.id).catch(() => null)
+        if (cancelled) return
+        if (cached) {
+          restoredFromCache = true
+          setHasPeople(cached.people.length > 0)
+        }
+
+        // A cached answer unblocks routing immediately. This request then
+        // verifies it silently and keeps onboarding/account changes correct.
         const nextHasPeople = await userHasPeople(session.user.id)
         if (!cancelled) setHasPeople(nextHasPeople)
       } catch {
-        if (!cancelled) setHasPeople(false)
+        if (!cancelled && !restoredFromCache) setHasPeople(false)
       }
     }
 

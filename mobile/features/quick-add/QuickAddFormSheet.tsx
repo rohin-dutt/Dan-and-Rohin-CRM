@@ -18,6 +18,7 @@ import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { DatePickerModal } from "@/components/DatePickerModal"
 import { PillButton } from "@/components/PillButton"
 import { formatFullDate, toLocalDateString, todayInputValue } from "@roots/shared"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 export type QuickAddMode = "note" | "chat"
 
@@ -45,9 +46,8 @@ export function QuickAddFormSheet({
   onClose: () => void
   initialPerson?: QuickAddPerson | null
 }) {
-  const [people, setPeople] = useState<PersonOption[]>([])
-  const [loadingPeople, setLoadingPeople] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const { snapshot, loading: loadingPeople, refreshError: fetchError } = useCrmData()
+  const people: PersonOption[] = snapshot?.people ?? []
 
   // Person typeahead
   const [personSearch, setPersonSearch] = useState("")
@@ -109,7 +109,7 @@ export function QuickAddFormSheet({
   useEffect(() => {
     if (mode == null) return
 
-    // Reset per-open state, then load the people list for the typeahead.
+    // Reset per-open state. The typeahead reads the already-warmed CRM cache.
     setPersonSearch("")
     setSelectedPerson(initialPerson ?? null)
     setPersonInputFocused(false)
@@ -124,36 +124,6 @@ export function QuickAddFormSheet({
     setShowFollowUpPicker(false)
     setFollowUpNote("")
     setNoteText("")
-    setLoadingPeople(true)
-    setFetchError(null)
-
-    let cancelled = false
-    async function loadPeople() {
-      try {
-        const session = await getCachedSession()
-        if (!session) throw new Error("You must be signed in.")
-
-        const { data, error: peopleError } = await supabase
-          .from("people")
-          .select("id, name, company")
-          .eq("user_id", session.user.id)
-          .order("name", { ascending: true })
-
-        if (peopleError) throw peopleError
-        if (!cancelled) setPeople(data ?? [])
-      } catch (e) {
-        if (!cancelled) {
-          setFetchError(e instanceof Error ? e.message : "Could not load people.")
-          setPeople([])
-        }
-      } finally {
-        if (!cancelled) setLoadingPeople(false)
-      }
-    }
-    void loadPeople()
-    return () => {
-      cancelled = true
-    }
   }, [mode, initialPerson])
 
   const filteredPeople = useMemo(() => {

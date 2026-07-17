@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { DeviceEventEmitter, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { useEffect, useMemo, useState } from "react"
+import { FlatList, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
+import { useLocalSearchParams, useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, SearchBox } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import { supabase } from "@/lib/supabase"
-import { loadImportantMomentsForUser } from "@/lib/important-moments"
-import type { ImportantMoment, Person, PersonTag, Tag } from "@/types"
+import type { Tag } from "@/types"
 import { colors, fonts } from "@/constants/theme"
 import { getUpcomingMoments } from "@roots/shared"
 import {
@@ -17,29 +15,22 @@ import {
   buildLatestTouchByPerson,
   buildOpenFollowUpByPerson,
   filterAndSortPeople,
-  INTERACTION_SUMMARY_COLUMNS,
   parseLocationParam,
   parseMultiParam,
   PEOPLE_CATEGORIES,
   SORT_OPTIONS,
   type CategoryFilter,
-  type InteractionSummary,
   type SortKey,
 } from "@/features/people-list/filters"
 import { FilterSheet } from "@/features/people-list/FilterSheet"
 import { PersonCard } from "@/features/people-list/PersonCard"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 export default function PeopleScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ status?: string | string[]; location?: string | string[]; moments?: string }>()
+  const { snapshot, loading, refreshError } = useCrmData()
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [people, setPeople] = useState<Person[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
-  const [personTags, setPersonTags] = useState<PersonTag[]>([])
-  const [importantMoments, setImportantMoments] = useState<ImportantMoment[]>([])
-  const [interactions, setInteractions] = useState<InteractionSummary[]>([])
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("last_contacted")
   const [category, setCategory] = useState<CategoryFilter>("All")
@@ -49,7 +40,11 @@ export default function PeopleScreen() {
   const [locationSearch, setLocationSearch] = useState("")
   const [filterSheetVisible, setFilterSheetVisible] = useState(false)
   const sortMenu = useAnchoredMenu()
-  const hasLoadedOnce = useRef(false)
+  const people = snapshot?.people ?? []
+  const tags = snapshot?.tags ?? []
+  const personTags = snapshot?.personTags ?? []
+  const importantMoments = snapshot?.importantMoments ?? []
+  const interactions = snapshot?.interactions ?? []
 
   const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
   // Locations may contain commas ("Paris, France"), so they must never go
@@ -63,68 +58,6 @@ export default function PeopleScreen() {
   useEffect(() => {
     setLocationFilters(parseLocationParam(locationParam))
   }, [locationParam])
-
-  const load = useCallback(async (silent?: boolean) => {
-    try {
-      if (!silent && !hasLoadedOnce.current) setLoading(true)
-      setError(null)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) return
-
-      const [peopleRes, tagsRes, personTagsRes, loadedMoments] = await Promise.all([
-        supabase.from("people").select("*").eq("user_id", session.user.id),
-        supabase.from("tags").select("*").eq("user_id", session.user.id).order("name", { ascending: true }),
-        supabase.from("person_tags").select("person_id, tag_id"),
-        loadImportantMomentsForUser(session.user.id),
-      ])
-
-      if (peopleRes.error) throw peopleRes.error
-      if (tagsRes.error) throw tagsRes.error
-      if (personTagsRes.error) throw personTagsRes.error
-
-      const loadedPeople = peopleRes.data ?? []
-      setPeople(loadedPeople)
-      setTags(tagsRes.data ?? [])
-      setPersonTags(personTagsRes.data ?? [])
-      setImportantMoments(loadedMoments)
-
-      if (loadedPeople.length) {
-        const { data: loadedInteractions, error: interactionError } = await supabase
-          .from("interactions")
-          .select(INTERACTION_SUMMARY_COLUMNS)
-          .in(
-            "person_id",
-            loadedPeople.map((person) => person.id),
-          )
-        if (interactionError) throw interactionError
-        setInteractions(loadedInteractions ?? [])
-      } else {
-        setInteractions([])
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load people.")
-    } finally {
-      setLoading(false)
-      hasLoadedOnce.current = true
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  useFocusEffect(
-    useCallback(() => {
-      if (hasLoadedOnce.current) load(true)
-    }, [load]),
-  )
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener("interactionAdded", load)
-    return () => sub.remove()
-  }, [load])
 
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags])
 
@@ -185,7 +118,7 @@ export default function PeopleScreen() {
       />
 
       <View className="px-5">
-        {error ? <ErrorBanner message={error} /> : null}
+        {refreshError ? <ErrorBanner message={refreshError} /> : null}
         <SearchBox className="h-11">
           <TextInput
             value={search}

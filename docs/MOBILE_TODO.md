@@ -362,18 +362,31 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 ## Phase 10: Offline Read Cache
 
-- [ ] Choose storage layer.
-- [ ] Decide whether cached private data is encrypted at rest.
-- [ ] Define retention window and maximum cached history.
-- [ ] Define cache schema versioning and migration approach.
-- [ ] Cache people, tags, person_tags, touch-point interactions,
+- [x] Choose storage layer.
+  - Uses `expo-sqlite` with SQLCipher; the database key is generated with
+    `expo-crypto` and stored in `expo-secure-store`.
+- [x] Decide whether cached private data is encrypted at rest.
+  - Cache writes are disabled when `PRAGMA cipher_version` is unavailable, so
+    Expo Go cannot silently persist the CRM snapshot in plain SQLite.
+- [x] Define retention window and maximum cached history.
+  - The snapshot is retained until logout, account deletion, or account switch
+    and includes all current real touch-point interactions; revisit a history
+    cap only if real user data demonstrates a storage issue.
+- [x] Define cache schema versioning and migration approach.
+  - Snapshot schema version 1 rejects incompatible payloads and falls back to
+    an online refresh rather than attempting a risky data migration.
+- [x] Cache people, tags, person_tags, touch-point interactions,
       person_notes, and settings.
-- [ ] Derive dashboard/follow-up data locally from cache.
+  - Important moments and the minimal account display profile are included so
+    People, Home, Settings, and person details can share the same snapshot.
+- [x] Derive dashboard/follow-up data locally from cache.
 - [ ] Show offline and stale indicators.
-- [ ] Allow app launch while offline with cached data.
+- [x] Allow app launch while offline with cached data.
+  - Implemented for a matching persisted session and user-scoped snapshot;
+    native force-close/offline QA is still required.
 - [ ] Define behavior for offline launch with expired or missing session.
 - [ ] Disable or clearly block writes while offline.
-- [ ] Clear cache on logout, account deletion, and account switch.
+- [x] Clear cache on logout, account deletion, and account switch.
 
 ## Phase 11: Data Management And Account Deletion
 

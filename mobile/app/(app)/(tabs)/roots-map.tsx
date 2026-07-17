@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Animated, PanResponder, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useFocusEffect, useRouter } from "expo-router"
+import { useRouter } from "expo-router"
 import { Screen } from "@/components/Screen"
 import { BrandHeader, EmptyPanel, PersonAvatar, SearchBox, SoftCard } from "@/components/RootsUI"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
 import RootsMapSurface, { type RootsMapRegion, type RootsMapSurfaceHandle } from "@/components/RootsMapSurface"
-import { supabase } from "@/lib/supabase"
 import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
 import { colors, fonts } from "@/constants/theme"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 type MapPerson = {
   id: string
@@ -110,14 +110,12 @@ function getDefaultRegion(): RootsMapRegion {
 
 export default function RootsMapScreen() {
   const router = useRouter()
+  const { snapshot, loading, refreshError } = useCrmData()
   const mapRef = useRef<RootsMapSurfaceHandle>(null)
   const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sheetTranslateY = useRef(new Animated.Value(SHEET_TRAVEL)).current
   const sheetCurrentOffsetRef = useRef(SHEET_TRAVEL)
   const sheetDragStartOffsetRef = useRef(SHEET_TRAVEL)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [people, setPeople] = useState<MapPerson[]>([])
   const [query, setQuery] = useState("")
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
   const [sheetExpanded, setSheetExpanded] = useState(false)
@@ -125,47 +123,12 @@ export default function RootsMapScreen() {
   const [mapInitialRegion, setMapInitialRegion] = useState<RootsMapRegion>(getDefaultRegion())
   const [pendingMapRegion, setPendingMapRegion] = useState<RootsMapRegion | null>(null)
   const [searchedPlaceName, setSearchedPlaceName] = useState<string | null>(null)
-  const hasLoadedOnce = useRef(false)
-
-  const load = useCallback(async (silent?: boolean) => {
-    try {
-      if (!silent && !hasLoadedOnce.current) setLoading(true)
-      setError(null)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) return
-
-      const { data, error: peopleError } = await supabase
-        .from("people")
-        .select("id, name, company, location, latitude, longitude, last_contacted_at")
-        .eq("user_id", session.user.id)
-        .order("name", { ascending: true })
-
-      if (peopleError) throw peopleError
-      const loaded = data ?? []
-      setPeople(loaded)
-
-      const initialGroups = buildGroups(loaded)
-      const fitRegion = computeFitRegion(initialGroups)
-      if (fitRegion) setMapInitialRegion(fitRegion)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load your roots.")
-    } finally {
-      setLoading(false)
-      hasLoadedOnce.current = true
-    }
-  }, [])
+  const people: MapPerson[] = snapshot?.people ?? []
 
   useEffect(() => {
-    load()
-  }, [load])
-
-  useFocusEffect(
-    useCallback(() => {
-      if (hasLoadedOnce.current) load(true)
-    }, [load]),
-  )
+    const fitRegion = computeFitRegion(buildGroups(people))
+    if (fitRegion) setMapInitialRegion(fitRegion)
+  }, [people])
 
   const filteredPeople = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -298,7 +261,7 @@ export default function RootsMapScreen() {
           subtitle="People and places that are part of your story."
         />
         <View className="px-5">
-          {error ? <ErrorBanner message={error} /> : null}
+          {refreshError ? <ErrorBanner message={refreshError} /> : null}
           <SearchBox className="h-11">
             <TextInput
               value={query}
