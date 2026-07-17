@@ -13,6 +13,7 @@ import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/sha
 import { buildDashboardModel } from "@/features/dashboard/derive"
 import { MetricCard, SummaryDivider, SummaryStat } from "@/features/dashboard/components"
 import { useCrmData } from "@/features/crm-data/CrmDataProvider"
+import { QuickAddFormSheet, type QuickAddPerson } from "@/features/quick-add/QuickAddFormSheet"
 
 function getGreeting(firstName: string): string {
   const hour = new Date().getHours()
@@ -27,10 +28,17 @@ function shortDisplayName(fullName: string): string {
   return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
 }
 
+function firstNameOf(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? fullName
+}
+
 export default function DashboardScreen() {
   const router = useRouter()
   const { snapshot, loading, refreshError } = useCrmData()
   const [momentsExpanded, setMomentsExpanded] = useState(false)
+  // Person preselected in the "Roots works better when..." card; non-null
+  // opens the quick-add chat sheet for them.
+  const [nudgeChatPerson, setNudgeChatPerson] = useState<QuickAddPerson | null>(null)
   const people = snapshot?.people ?? []
   const interactions = snapshot?.interactions ?? []
   const noteCount = snapshot?.personNotes.length ?? 0
@@ -125,6 +133,47 @@ export default function DashboardScreen() {
               onPress={() => router.push("/people?status=coming_up")}
             />
           </View>
+
+          {dashboard.enrichmentNudge ? (
+            <SoftCard className="mx-5 mt-5 p-5">
+              <SectionTitle title="Roots works better when..." />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={
+                  dashboard.enrichmentNudge.reason === "missing_details"
+                    ? `Tell us more about ${dashboard.enrichmentNudge.person.name}`
+                    : `Note your first interaction with ${dashboard.enrichmentNudge.person.name}`
+                }
+                onPress={() => {
+                  const { person, reason } = dashboard.enrichmentNudge!
+                  if (reason === "missing_details") {
+                    router.push(`/people/${person.id}/edit`)
+                  } else {
+                    setNudgeChatPerson({ id: person.id, name: person.name, company: person.company })
+                  }
+                }}
+                activeOpacity={0.76}
+                className="flex-row items-center"
+              >
+                <PersonAvatar
+                  name={dashboard.enrichmentNudge.person.name}
+                  imageUrl={personImageUrl(dashboard.enrichmentNudge.person)}
+                  size={44}
+                />
+                <View className="ml-4 flex-1">
+                  <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
+                    {dashboard.enrichmentNudge.person.name}
+                  </Text>
+                  <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
+                    {dashboard.enrichmentNudge.reason === "missing_details"
+                      ? `Tell us more about ${firstNameOf(dashboard.enrichmentNudge.person.name)}`
+                      : `Note your first interaction with ${firstNameOf(dashboard.enrichmentNudge.person.name)}`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+              </TouchableOpacity>
+            </SoftCard>
+          ) : null}
 
           <SoftCard className="mx-5 mt-5 p-5">
             <SectionTitle
@@ -242,6 +291,12 @@ export default function DashboardScreen() {
           </SoftCard>
         </>
       )}
+
+      <QuickAddFormSheet
+        mode={nudgeChatPerson ? "chat" : null}
+        onClose={() => setNudgeChatPerson(null)}
+        initialPerson={nudgeChatPerson}
+      />
     </Screen>
   )
 }
