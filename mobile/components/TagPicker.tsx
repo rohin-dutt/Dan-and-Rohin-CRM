@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import type { Tag } from "@roots/shared"
+import { singleLineTextInputStyle } from "@/constants/theme"
 
 type TagPickerProps = {
   tags: Tag[]
@@ -34,7 +35,8 @@ export function TagPicker({ tags, selectedTagIds, onToggle, onCreateTag }: TagPi
         value={search}
         onChangeText={setSearch}
         placeholder="Search or create tag…"
-        className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white mb-3"
+        className="mb-3 rounded-xl border border-gray-200 bg-white px-3"
+        style={singleLineTextInputStyle}
         placeholderTextColor="#9CA3AF"
       />
       <View className="flex-row flex-wrap gap-2">

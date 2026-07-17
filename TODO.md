@@ -10,9 +10,9 @@ the roadmap or architecture direction changes.
       Command: `npm run lint`. Failure summary: ESLint reports five
       `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,
       `app/(site)/contact/ContactForm.tsx`, and `app/(site)/page.tsx`. Likely
-      owner: public website/content lint cleanup. Reconfirmed on July 16, 2026,
-      after combining the mobile bottom-sheet animation fix and fast cold-start
-      cache; the mobile typecheck and mobile-only lint both passed.
+      owner: public website/content lint cleanup. Reconfirmed on July 17, 2026,
+      after the mobile form-control alignment and settings-toggle interaction
+      fixes; repository tests, mobile typecheck, and mobile-only lint passed.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:

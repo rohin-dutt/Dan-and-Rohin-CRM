@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Linking, Share, Switch, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { Linking, Share, Switch, Text, TextInput, View } from "react-native"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { ConfirmModal } from "@/components/ConfirmModal"
@@ -426,14 +426,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title="Notifications" subtitle="Choose how you stay up to date.">
-          <TouchableOpacity
-            accessibilityRole="switch"
-            accessibilityLabel="Push notifications"
-            accessibilityState={{ checked: pushOn, disabled: !settings }}
-            disabled={!settings}
-            onPress={togglePushNotifications}
-            activeOpacity={0.74}
-          >
+          <View>
             <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
               <IconTile icon="notifications-outline" size={44} color={colors.forest} background={colors.mint} />
               <View style={{ flex: 1, marginLeft: 16 }}>
@@ -445,28 +438,18 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Push notifications"
                 value={pushOn}
                 disabled={!settings}
-                pointerEvents="none"
-                accessible={false}
+                onValueChange={togglePushNotifications}
                 trackColor={{ false: "#D1D5DB", true: colors.forest }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
               />
             </View>
-          </TouchableOpacity>
+          </View>
           <Divider />
-          <TouchableOpacity
-            accessibilityRole="switch"
-            accessibilityLabel="Weekly email digest"
-            accessibilityState={{
-              checked: Boolean(settings?.email_reminders_enabled),
-              disabled: !settings,
-            }}
-            disabled={!settings}
-            onPress={toggleEmailDigest}
-            activeOpacity={0.74}
-          >
+          <View>
             <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 8 }}>
               <IconTile icon="mail-open-outline" size={44} color={colors.forest} background={colors.mint} />
               <View style={{ flex: 1, marginLeft: 16 }}>
@@ -478,16 +461,16 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Weekly email digest"
                 value={Boolean(settings?.email_reminders_enabled)}
                 disabled={!settings}
-                pointerEvents="none"
-                accessible={false}
+                onValueChange={toggleEmailDigest}
                 trackColor={{ false: "#D1D5DB", true: colors.forest }}
                 thumbColor="#FFFFFF"
                 ios_backgroundColor="#D1D5DB"
               />
             </View>
-          </TouchableOpacity>
+          </View>
         </SettingsSection>
 
         <SettingsSection title="Invite" subtitle="Share Roots with someone who would use it.">

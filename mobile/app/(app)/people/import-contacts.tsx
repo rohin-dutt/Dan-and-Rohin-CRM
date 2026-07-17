@@ -11,6 +11,7 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
 import { ConfirmModal } from "@/components/ConfirmModal"
 import { Screen } from "@/components/Screen"
+import { singleLineTextInputStyle } from "@/constants/theme"
 import { callTrustedApi } from "@/lib/trusted-api"
 import { supabase } from "@/lib/supabase"
 import { mapDeviceContact, toContactImportPayload, type ImportCandidate } from "@/lib/contact-import"
@@ -371,7 +372,8 @@ export default function ImportContactsScreen() {
               value={search}
               onChangeText={setSearch}
               placeholder="Search contacts..."
-              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white mb-3 text-warm-black"
+              className="mb-3 rounded-xl border border-gray-200 bg-white px-3 text-warm-black"
+              style={singleLineTextInputStyle}
               placeholderTextColor="#9CA3AF"
               accessibilityLabel="Search import contacts"
             />

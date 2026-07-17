@@ -8,7 +8,7 @@ import { ErrorBanner } from "@/components/ErrorBanner"
 import { LoadingState } from "@/components/LoadingState"
 import RootsMapSurface, { type RootsMapRegion, type RootsMapSurfaceHandle } from "@/components/RootsMapSurface"
 import { geocodePlace, type MapboxFeature } from "@/lib/mapbox"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 type MapPerson = {
@@ -268,8 +268,8 @@ export default function RootsMapScreen() {
               onChangeText={handleQueryChange}
               placeholder="Search locations"
               placeholderTextColor="#777A83"
-              className="ml-3 flex-1 text-sm text-warm-black"
-              style={{ fontFamily: fonts.body }}
+              className="ml-3 flex-1 text-warm-black"
+              style={[singleLineTextInputStyle, { fontFamily: fonts.body }]}
               accessibilityLabel="Search locations"
             />
             {query ? (

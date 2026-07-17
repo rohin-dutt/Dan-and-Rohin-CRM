@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { normalize, STATUS_FILTERS } from "./filters"
 import type { Person } from "@/types"
 
@@ -145,8 +145,8 @@ export function FilterSheet({
             onChangeText={onLocationSearchChange}
             placeholder="City, country…"
             placeholderTextColor="#777A83"
-            className="ml-2 flex-1 text-sm"
-            style={{ fontFamily: fonts.body, color: colors.ink }}
+            className="ml-2 flex-1"
+            style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
           />
           {locationSearch ? (
             <TouchableOpacity onPress={() => onLocationSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

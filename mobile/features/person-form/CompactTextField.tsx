@@ -65,9 +65,10 @@ export const CompactTextField = forwardRef<TextInput, CompactTextFieldProps>(fun
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           maxLength={maxLength}
-          className="flex-1 px-3 text-sm"
+          className="flex-1 px-3"
           style={{
             minHeight: multiline ? 80 : 44,
+            fontSize: 14,
             paddingVertical: multiline ? 12 : 0,
             fontFamily: fonts.body,
             color: colors.ink,

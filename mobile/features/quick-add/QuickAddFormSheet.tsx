@@ -14,7 +14,7 @@ import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
 import type { Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { DatePickerModal } from "@/components/DatePickerModal"
 import { PillButton } from "@/components/PillButton"
@@ -330,7 +330,10 @@ export function QuickAddFormSheet({
                 onChangeText={setPersonSearch}
                 placeholder="Search by name…"
                 placeholderTextColor="#777A83"
-                style={{ flex: 1, fontFamily: fonts.body, color: colors.ink, fontSize: 14 }}
+                style={[
+                  singleLineTextInputStyle,
+                  { flex: 1, fontFamily: fonts.body, color: colors.ink, fontSize: 14 },
+                ]}
                 onFocus={() => setPersonInputFocused(true)}
                 onBlur={() => {
                   setTimeout(() => setPersonInputFocused(false), 150)

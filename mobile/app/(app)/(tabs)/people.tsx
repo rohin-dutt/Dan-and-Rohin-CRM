@@ -8,7 +8,7 @@ import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import type { Tag } from "@/types"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { getUpcomingMoments } from "@roots/shared"
 import {
   buildInteractionCounts,
@@ -125,8 +125,8 @@ export default function PeopleScreen() {
             onChangeText={setSearch}
             placeholder="Search people"
             placeholderTextColor="#777A83"
-            className="ml-3 flex-1 text-sm text-warm-black"
-            style={{ fontFamily: fonts.body }}
+            className="ml-3 flex-1 text-warm-black"
+            style={[singleLineTextInputStyle, { fontFamily: fonts.body }]}
             accessibilityLabel="Search people"
           />
         </SearchBox>

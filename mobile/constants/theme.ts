@@ -1,3 +1,5 @@
+import type { TextStyle } from "react-native"
+
 export const colors = {
   cream: "#F7F5EF",
   ivory: "#FCFBF7",
@@ -23,4 +25,11 @@ export const fonts = {
   medium: "Inter_500Medium",
   semibold: "Inter_600SemiBold",
   bold: "Inter_700Bold",
+}
+
+export const singleLineTextInputStyle: TextStyle = {
+  height: 44,
+  fontSize: 14,
+  paddingVertical: 0,
+  textAlignVertical: "center",
 }

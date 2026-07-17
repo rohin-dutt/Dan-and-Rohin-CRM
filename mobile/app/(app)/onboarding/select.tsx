@@ -15,7 +15,7 @@ import { Button } from "@/components/Button"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { PersonAvatar, SearchBox } from "@/components/RootsUI"
 import { setSelectedContacts } from "@/features/onboarding/onboarding-contacts"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 
 function ManualFallbackLink({ onPress }: { onPress: () => void }) {
   return (
@@ -168,8 +168,8 @@ export default function OnboardingSelectScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               accessibilityLabel="Search contacts"
-              className="ml-2 flex-1 py-3 text-sm"
-              style={{ fontFamily: fonts.body, color: colors.ink }}
+              className="ml-2 flex-1"
+              style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
             />
           </SearchBox>
         </View>

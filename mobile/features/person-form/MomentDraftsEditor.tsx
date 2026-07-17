@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Switch, Text, TextInput, TouchableOpacity, View } from "react-native"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import {
   createMomentDraft,
   formatFullDate,
@@ -68,8 +68,8 @@ export function MomentDraftsEditor({
               onChangeText={(text) => onChange(updateMomentDraft(moments, index, { label: text }))}
               placeholder="Anniversary, graduation..."
               placeholderTextColor="#8F96A3"
-              className="mt-2 rounded-xl border border-stone-200 px-3 py-2.5 text-sm"
-              style={{ fontFamily: fonts.body, color: colors.ink }}
+              className="mt-2 rounded-xl border border-stone-200 px-3"
+              style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
             />
             <TouchableOpacity
               accessibilityRole="button"

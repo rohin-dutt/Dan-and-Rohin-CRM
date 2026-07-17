@@ -17,7 +17,7 @@ import {
   parsePendingImportEditQueue,
 } from "@/lib/import-edit-queue"
 import { updatePersonWithRelations } from "@/lib/people-data"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { findRelationshipCategory, RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
 import {
@@ -353,8 +353,8 @@ export default function EditPersonScreen() {
                 returnKeyType="next"
                 submitBehavior="submit"
                 onSubmitEditing={() => lastNameInputRef.current?.focus()}
-                className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
-                style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+                className="rounded-xl border border-stone-200 bg-white px-3"
+                style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
               />
             </View>
             <View className="flex-1">
@@ -371,8 +371,8 @@ export default function EditPersonScreen() {
                 autoCapitalize="words"
                 returnKeyType="done"
                 submitBehavior="blurAndSubmit"
-                className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
-                style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+                className="rounded-xl border border-stone-200 bg-white px-3"
+                style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
               />
             </View>
           </View>
@@ -456,8 +456,8 @@ export default function EditPersonScreen() {
                 onChangeText={locationField.handleLocationChange}
                 placeholder="City, country"
                 placeholderTextColor="#8F96A3"
-                className="flex-1 px-3 text-sm"
-                style={{ fontFamily: fonts.body, color: colors.ink, height: 44 }}
+                className="flex-1 px-3"
+                style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
                 returnKeyType="done"
                 submitBehavior="blurAndSubmit"
               />

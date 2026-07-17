@@ -13,7 +13,7 @@ import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
-import { colors, fonts } from "@/constants/theme"
+import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { INTERACTION_TYPES, normalizeMomentDrafts, toLocalDateString, type ImportantMomentDraft } from "@roots/shared"
 import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
@@ -226,8 +226,8 @@ export default function OnboardingManualScreen() {
                   returnKeyType="next"
                   submitBehavior="submit"
                   onSubmitEditing={() => lastNameInputRef.current?.focus()}
-                  className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
-                  style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+                  className="rounded-xl border border-stone-200 bg-white px-3"
+                  style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
                 />
               </View>
               <View className="flex-1">
@@ -244,8 +244,8 @@ export default function OnboardingManualScreen() {
                   autoCapitalize="words"
                   returnKeyType="done"
                   submitBehavior="blurAndSubmit"
-                  className="rounded-xl border border-stone-200 bg-white px-3 text-sm"
-                  style={{ height: 44, fontFamily: fonts.body, color: colors.ink }}
+                  className="rounded-xl border border-stone-200 bg-white px-3"
+                  style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
                 />
               </View>
             </View>
@@ -329,8 +329,8 @@ export default function OnboardingManualScreen() {
                   onChangeText={locationField.handleLocationChange}
                   placeholder="City, country"
                   placeholderTextColor="#8F96A3"
-                  className="flex-1 px-3 text-sm"
-                  style={{ fontFamily: fonts.body, color: colors.ink, height: 44 }}
+                  className="flex-1 px-3"
+                  style={[singleLineTextInputStyle, { fontFamily: fonts.body, color: colors.ink }]}
                   returnKeyType="done"
                   submitBehavior="blurAndSubmit"
                 />
