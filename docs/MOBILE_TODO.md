@@ -203,10 +203,16 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Build login.
 - [ ] Build signup.
 - [ ] Build logout.
-- [ ] Build forgot password.
+- [x] Build forgot password.
+  - Generates the recovery callback from Expo configuration, normalizes email,
+    preserves account-enumeration-safe success copy, and shows safe request and
+    invalid-link errors.
 - [x] Build update password deep link handling.
   - Added `roots://update-password` handling for PKCE `code` links and
-    access/refresh-token recovery links, plus a mobile update-password screen.
+    access/refresh-token recovery links. The app pauses normal routing during
+    exchange, requires a returned session before showing the password form, and
+    routes rejected, malformed, consumed, or expired links back to forgot
+    password without exposing Supabase credentials or raw errors.
 - [ ] Restore session on app launch.
 - [ ] Protect authenticated screens.
 - [x] Send mobile bearer auth to trusted APIs.
@@ -517,6 +523,16 @@ restore, or account deletion.
 - iOS simulator verification is blocked in this Windows environment:
   XcodeBuildMCP has no configured project/workspace/scheme/simulator, and
   `list_sims` failed with `spawn xcrun ENOENT`.
+- July 14, 2026 password-recovery implementation is ready for development or
+  TestFlight build QA. Real-device email opening, password replacement, old/new
+  credential checks, consumed-link behavior, and website regression coverage
+  remain required before the mobile recovery flow can be called fully verified.
+- Hosted Supabase project `ojebeswabngvcktqsduc` keeps
+  `https://useroots.app` as its Site URL and all prior website redirects, with
+  exact `roots://update-password` allowlisted. Nonexistent `example.com`
+  recovery requests were accepted, and Auth logs retained the mobile callback
+  and the existing `https://useroots.app/auth/callback?type=recovery` website
+  callback without falling back to the Site URL.
 - Remaining mobile v1 product surfaces are not complete: Contacts
   update-existing behavior, native data management file UI, push sender,
   encrypted offline read cache, TestFlight build, and physical device QA remain
