@@ -192,7 +192,7 @@ export default function PersonDetailScreen() {
           <TabBar activeTab={activeTab} onChange={setActiveTab} />
 
           {activeTab === "Timeline" ? (
-            <TimelineTab interactions={touchPointInteractions} notes={personNotes} />
+            <TimelineTab interactions={touchPointInteractions} notes={personNotes} firstName={person.name.split(" ")[0]} />
           ) : null}
 
           {activeTab === "About" ? (
@@ -205,6 +205,7 @@ export default function PersonDetailScreen() {
               onUpdateNote={updatePersonNote}
               onDeleteNote={confirmDeleteNote}
               onAddNote={() => setSheetMode("note")}
+              firstName={person.name.split(" ")[0]}
             />
           ) : null}
 

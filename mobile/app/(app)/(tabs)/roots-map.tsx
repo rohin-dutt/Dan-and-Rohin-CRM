@@ -246,7 +246,7 @@ export default function RootsMapScreen() {
           subtitle="People and places that are part of your story."
         />
         <EmptyPanel
-          title="No people yet"
+          title="Add locations to your people to see them here"
           body="Add people with saved locations to see where your relationships live."
         />
       </Screen>
@@ -391,8 +391,8 @@ export default function RootsMapScreen() {
             </Text>
             <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
               {searchedPlaceName
-                ? `None of your people have a saved location near "${searchedPlaceName}". Add a location with geocoding enabled to place them on the map.`
-                : "None of the matching people have saved latitude and longitude. Add a location with geocoding enabled to place people on the map."}
+                ? `None of your people have a location near "${searchedPlaceName}". Edit someone's profile to add where they live.`
+                : "Add a location to someone's profile to see them on the map."}
             </Text>
           </SoftCard>
         </View>

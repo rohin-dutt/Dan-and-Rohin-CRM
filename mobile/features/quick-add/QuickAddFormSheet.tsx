@@ -388,7 +388,7 @@ export function QuickAddFormSheet({
                   marginBottom: 12,
                 }}
               >
-                No people match "{personSearch}"
+                No one found matching that name
               </Text>
             ) : fetchError ? (
               <Text

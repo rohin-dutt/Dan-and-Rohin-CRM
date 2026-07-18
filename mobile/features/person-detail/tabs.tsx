@@ -15,7 +15,15 @@ type TimelineEntry =
   | { kind: "interaction"; id: string; date: string | null; interaction: Interaction }
   | { kind: "note"; id: string; date: string | null; note: PersonNote }
 
-export function TimelineTab({ interactions, notes }: { interactions: Interaction[]; notes: PersonNote[] }) {
+export function TimelineTab({
+  interactions,
+  notes,
+  firstName,
+}: {
+  interactions: Interaction[]
+  notes: PersonNote[]
+  firstName: string
+}) {
   const [showAll, setShowAll] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
 
@@ -37,7 +45,7 @@ export function TimelineTab({ interactions, notes }: { interactions: Interaction
   if (entries.length === 0) {
     return (
       <View className="mt-6">
-        <DetailEmptyState title="No interactions yet" body="Log a call, text, or meeting to start this contact's timeline." />
+        <DetailEmptyState title="No chats yet" body={`Your conversations with ${firstName} will appear here.`} />
       </View>
     )
   }
@@ -166,7 +174,7 @@ export function AboutTab({
   if (!hasAnything) {
     return (
       <View className="mt-5">
-        <DetailEmptyState title="Nothing here yet" body="Details you add about this person will appear here." />
+        <DetailEmptyState title="Nothing here yet" body={`Details you add about ${firstName} will show up here.`} />
       </View>
     )
   }
@@ -228,11 +236,13 @@ export function NotesTab({
   onUpdateNote,
   onDeleteNote,
   onAddNote,
+  firstName,
 }: {
   notes: PersonNote[]
   onUpdateNote: (noteId: string, body: string) => Promise<void>
   onDeleteNote: (noteId: string) => void
   onAddNote: () => void
+  firstName: string
 }) {
   const [menuNoteId, setMenuNoteId] = useState<string | null>(null)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
@@ -377,7 +387,7 @@ export function NotesTab({
           })}
         </View>
       ) : (
-        <DetailEmptyState title="No notes yet" body="Notes you save about this person will appear here." />
+        <DetailEmptyState title="Nothing noted yet" body={`Your history with ${firstName} will appear here.`} />
       )}
       <View className="mt-6">
         <Button title="Add Note" onPress={onAddNote} />
@@ -414,7 +424,7 @@ export function FollowUpsTab({
                     {fu.type}
                   </Text>
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                    {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"}
+                    {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No date set"}
                   </Text>
                   {fu.notes ? (
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
@@ -481,7 +491,7 @@ export function FollowUpsTab({
                         {fu.type}
                       </Text>
                       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
-                        {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No due date"}
+                        {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No date set"}
                       </Text>
                       {fu.notes ? (
                         <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">

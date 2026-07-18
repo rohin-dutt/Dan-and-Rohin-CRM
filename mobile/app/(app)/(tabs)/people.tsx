@@ -231,7 +231,7 @@ export default function PeopleScreen() {
 
       {sorted.length === 0 ? (
         <EmptyPanel
-          title={search || category !== "All" || hasActiveFilter ? "No results" : "No people yet"}
+          title={search || category !== "All" || hasActiveFilter ? "No people match your search" : "Add your first person to Roots"}
           body={
             search || category !== "All" || hasActiveFilter
               ? "Try a different search, category, or filter."

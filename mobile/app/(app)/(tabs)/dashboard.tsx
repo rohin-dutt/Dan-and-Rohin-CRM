@@ -106,7 +106,7 @@ export default function DashboardScreen() {
 
       {people.length === 0 ? (
         <EmptyPanel
-          title="No people yet"
+          title="Add your first person to get started"
           body="Add someone you want to stay in touch with to start building your relationship dashboard."
         />
       ) : (

@@ -302,7 +302,7 @@ export function SectionCard({
 
 export function InfoList({ rows }: { rows: InfoRow[] }) {
   if (rows.length === 0) {
-    return <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="text-sm">Nothing added yet.</Text>
+    return null
   }
 
   return (
