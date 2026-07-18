@@ -6,6 +6,20 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] Complete real-iPhone/TestFlight QA for the mobile password-reset fix
+      before release.
+  - [x] Restore the sign-in entry point and replace the competing iOS cold-start
+        URL reads with Expo's reactive linking URL source.
+  - [x] Bound recovery exchange and session checks, quarantine failed/late
+        recovery sessions, and add current Supabase React Native auth locking
+        and app-state refresh handling.
+  - [x] Cover PKCE codes, implicit tokens, provider errors, missing credentials,
+        unrelated links, and operation timeouts with automated tests.
+  - [ ] On a real iPhone using a release/TestFlight build, request a fresh link,
+        open it once from Mail, update the password, confirm the success banner,
+        and sign in with the new password. Also verify an already-used link and
+        an offline/slow-network attempt return to Reset password without an
+        indefinite spinner.
 - [ ] `npm run lint` fails on existing public website copy lint errors.
       Command: `npm run lint`. Failure summary: ESLint reports five
       `react/no-unescaped-entities` errors in `app/(site)/about/page.tsx`,

@@ -7,7 +7,15 @@ import { Screen } from "@/components/Screen"
 import { TextField } from "@/components/TextField"
 import { LoadingState } from "@/components/LoadingState"
 import { supabase } from "@/lib/supabase"
-import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
+import {
+  PASSWORD_RECOVERY_FAILED_EVENT,
+  PASSWORD_RECOVERY_RESOLVED_EVENT,
+  type PasswordRecoveryFailureReason,
+} from "@/lib/auth-links"
+import { withTimeout } from "@/lib/promise-timeout"
+
+const SESSION_CHECK_TIMEOUT_MS = 10_000
+const PASSWORD_UPDATE_TIMEOUT_MS = 20_000
 
 export default function UpdatePasswordScreen() {
   const router = useRouter()
@@ -21,28 +29,40 @@ export default function UpdatePasswordScreen() {
   // would otherwise trip the "session lost" listener below and bounce to
   // forgot-password right as we're navigating to login.
   const intentionalSignOutRef = useRef(false)
+  const passwordUpdatedRef = useRef(false)
 
-  const returnToForgotPassword = useCallback(() => {
-    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
-    router.replace({
-      pathname: "/(auth)/forgot-password",
-      params: { recoveryError: "invalid_or_expired" },
-    })
-  }, [router])
+  const returnToForgotPassword = useCallback(
+    (reason: PasswordRecoveryFailureReason = "invalid_or_expired") => {
+      DeviceEventEmitter.emit(PASSWORD_RECOVERY_FAILED_EVENT)
+      router.replace({
+        pathname: "/(auth)/forgot-password",
+        params: { recoveryError: reason },
+      })
+    },
+    [router],
+  )
 
   useEffect(() => {
     let cancelled = false
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return
+    async function checkSession() {
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS)
+        if (cancelled) return
 
-      if (!session) {
-        returnToForgotPassword()
-        return
+        if (!session) {
+          returnToForgotPassword()
+        }
+      } catch {
+        if (!cancelled) returnToForgotPassword("exchange_failed")
+      } finally {
+        if (!cancelled) setCheckingSession(false)
       }
+    }
 
-      setCheckingSession(false)
-    })
+    void checkSession()
 
     const {
       data: { subscription },
@@ -61,50 +81,78 @@ export default function UpdatePasswordScreen() {
   async function handleUpdate() {
     setError(null)
 
-    if (password.length < 8) {
+    if (!passwordUpdatedRef.current && password.length < 8) {
       setError("Password must be at least 8 characters.")
       return
     }
 
-    if (password !== confirmPassword) {
+    if (!passwordUpdatedRef.current && password !== confirmPassword) {
       setError("Passwords do not match.")
       return
     }
 
     setLoading(true)
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+    try {
+      if (!passwordUpdatedRef.current) {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS)
 
-    if (!session) {
-      setLoading(false)
-      returnToForgotPassword()
-      return
-    }
+        if (!session) {
+          returnToForgotPassword()
+          return
+        }
 
-    const { error: updateError } = await supabase.auth.updateUser({ password })
+        const { error: updateError } = await withTimeout(
+          supabase.auth.updateUser({ password }),
+          PASSWORD_UPDATE_TIMEOUT_MS,
+        )
 
-    if (updateError) {
-      const {
-        data: { session: currentSession },
-      } = await supabase.auth.getSession()
-      setLoading(false)
+        if (updateError) {
+          let currentSession = null
+          try {
+            const response = await withTimeout(
+              supabase.auth.getSession(),
+              SESSION_CHECK_TIMEOUT_MS,
+            )
+            currentSession = response.data.session
+          } catch {
+            // Treat an unconfirmable session as expired below.
+          }
 
-      if (!currentSession || updateError.status === 401) {
-        returnToForgotPassword()
+          if (!currentSession || updateError.status === 401) {
+            returnToForgotPassword()
+            return
+          }
+
+          setError("We couldn't update your password. Please try again.")
+          return
+        }
+
+        passwordUpdatedRef.current = true
+      }
+
+      intentionalSignOutRef.current = true
+      const { error: signOutError } = await withTimeout(
+        supabase.auth.signOut({ scope: "local" }),
+        SESSION_CHECK_TIMEOUT_MS,
+      )
+      if (signOutError) {
+        intentionalSignOutRef.current = false
+        setError("Password updated, but we couldn't sign you out. Please try again.")
         return
       }
 
-      setError("We couldn't update your password. Please try again.")
-      return
+      setPassword("")
+      setConfirmPassword("")
+      DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
+      router.replace({ pathname: "/(auth)/login", params: { passwordUpdated: "true" } })
+    } catch {
+      intentionalSignOutRef.current = false
+      setError("We couldn't update your password. Check your connection and try again.")
+    } finally {
+      setLoading(false)
     }
-
-    setPassword("")
-    setConfirmPassword("")
-    intentionalSignOutRef.current = true
-    await supabase.auth.signOut({ scope: "local" })
-    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
-    router.replace({ pathname: "/(auth)/login", params: { passwordUpdated: "true" } })
   }
 
   if (checkingSession) {

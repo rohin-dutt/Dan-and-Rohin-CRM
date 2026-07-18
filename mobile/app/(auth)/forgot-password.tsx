@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router"
 import { Text, TouchableOpacity, View } from "react-native"
 import { supabase } from "@/lib/supabase"
 import {
-  PASSWORD_RECOVERY_ERROR_MESSAGE,
+  PASSWORD_RECOVERY_ERROR_MESSAGES,
   type PasswordRecoveryFailureReason,
 } from "@/lib/auth-links"
 import { Screen } from "@/components/Screen"
@@ -24,8 +24,12 @@ export default function ForgotPasswordScreen() {
   const [dismissedLinkError, setDismissedLinkError] = useState(false)
 
   const linkError = recoveryError && !dismissedLinkError
-    ? PASSWORD_RECOVERY_ERROR_MESSAGE
+    ? PASSWORD_RECOVERY_ERROR_MESSAGES[recoveryError]
     : null
+
+  function handleBack() {
+    router.replace("/(auth)/login")
+  }
 
   async function handleReset() {
     setError(null)
@@ -63,7 +67,12 @@ export default function ForgotPasswordScreen() {
   return (
     <Screen>
       <View className="flex-1 justify-center px-6 py-12">
-        <TouchableOpacity onPress={() => router.back()} className="mb-6">
+        <TouchableOpacity
+          onPress={handleBack}
+          className="mb-6"
+          accessibilityRole="button"
+          accessibilityLabel="Back to sign in"
+        >
           <Text className="text-sage text-sm">← Back</Text>
         </TouchableOpacity>
 

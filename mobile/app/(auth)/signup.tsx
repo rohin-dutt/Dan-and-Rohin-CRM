@@ -1,7 +1,15 @@
 import { useRef, useState } from "react"
 import { useRouter } from "expo-router"
-import { Platform, Text, TextInput, TouchableOpacity, View } from "react-native"
+import {
+  DeviceEventEmitter,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import { supabase } from "@/lib/supabase"
+import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
 import { AppleSignInButton } from "@/components/AppleSignInButton"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -20,6 +28,10 @@ export default function SignupScreen() {
   const lastNameInputRef = useRef<TextInput>(null)
   const emailInputRef = useRef<TextInput>(null)
   const passwordInputRef = useRef<TextInput>(null)
+
+  function releaseRecoveryRouting() {
+    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
+  }
 
   async function handleSignUp() {
     setError(null)
@@ -53,6 +65,7 @@ export default function SignupScreen() {
     } else if (!data.session) {
       setConfirmationSent(true)
     } else {
+      releaseRecoveryRouting()
       router.replace("/(app)/onboarding")
     }
   }
@@ -77,7 +90,10 @@ export default function SignupScreen() {
             <AppleSignInButton
               kind="sign-up"
               onError={setError}
-              onSignedIn={() => router.replace("/")}
+              onSignedIn={() => {
+                releaseRecoveryRouting()
+                router.replace("/")
+              }}
             />
             <View className="my-6 flex-row items-center">
               <View className="h-px flex-1 bg-stone-200" />
