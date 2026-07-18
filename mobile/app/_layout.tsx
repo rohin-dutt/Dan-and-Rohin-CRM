@@ -2,7 +2,7 @@ import { Slot, useRouter, useSegments } from "expo-router"
 import { useFonts } from "expo-font"
 import * as Linking from "expo-linking"
 import { useEffect, useRef, useState } from "react"
-import { ActivityIndicator, DeviceEventEmitter, Text, View } from "react-native"
+import { ActivityIndicator, DeviceEventEmitter, View } from "react-native"
 
 import {
   CormorantGaramond_700Bold,
@@ -53,13 +53,6 @@ export default function RootLayout() {
   const sessionUserIdRef = useRef<string | null>(null)
   const recoveryInFlightRef = useRef(false)
   const processedRecoveryFingerprintRef = useRef<number | null>(null)
-
-  // TEMPORARY: on-screen debug overlay for diagnosing the password recovery
-  // stuck loading screen without Xcode. Remove after diagnosis.
-  const [debugLog, setDebugLog] = useState<string[]>([])
-  function addDebugLog(msg: string) {
-    setDebugLog((prev) => [...prev.slice(-9), msg])
-  }
 
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_700Bold,
@@ -169,8 +162,6 @@ export default function RootLayout() {
     }
 
     async function handleUrl(url: string | null) {
-      console.log("[RECOVERY] handleUrl called with url:", url)
-      addDebugLog(`handleUrl called with url: ${url}`)
       if (!url || !isPasswordRecoveryUrl(url)) return
 
       const fingerprint = fingerprintUrl(url)
@@ -183,15 +174,11 @@ export default function RootLayout() {
 
       recoveryInFlightRef.current = true
       processedRecoveryFingerprintRef.current = fingerprint
-      console.log("[RECOVERY] starting exchange")
-      addDebugLog("starting exchange")
       setRecoveryLinkPending(true)
       setRecoveryExchangeInProgress(true)
 
       try {
         const result = await handlePasswordRecoveryUrl(url)
-        console.log("[RECOVERY] exchange result:", JSON.stringify(result))
-        addDebugLog(`exchange result: ${JSON.stringify(result)}`)
         if (!result.handled) {
           setRecoveryLinkPending(false)
           return
@@ -211,11 +198,7 @@ export default function RootLayout() {
             return
           }
 
-          console.log("[RECOVERY] session obtained, navigating to update-password")
-          addDebugLog("session obtained, navigating to update-password")
           setSession(recoverySession)
-          console.log("[RECOVERY] calling router.replace to update-password")
-          addDebugLog("calling router.replace to update-password")
           router.replace("/(auth)/update-password")
           // recoveryLinkPending stays true: the update-password screen clears
           // it via PASSWORD_RECOVERY_RESOLVED_EVENT after a successful
@@ -230,8 +213,6 @@ export default function RootLayout() {
       } finally {
         recoveryInFlightRef.current = false
         setRecoveryExchangeInProgress(false)
-        console.log("[RECOVERY] exchange finished, recoveryExchangeInProgress set to false")
-        addDebugLog("exchange finished, recoveryExchangeInProgress set to false")
       }
     }
 
@@ -285,29 +266,6 @@ export default function RootLayout() {
     }
   }, [session, loading, introComplete, hasPeople, recoveryLinkPending, segments])
 
-  // TEMPORARY: on-screen debug overlay for diagnosing the password recovery
-  // stuck loading screen without Xcode. Remove after diagnosis.
-  const debugOverlay = debugLog.length > 0 ? (
-    <View
-      style={{
-        position: "absolute",
-        bottom: 40,
-        left: 16,
-        right: 16,
-        backgroundColor: "rgba(0,0,0,0.85)",
-        borderRadius: 8,
-        padding: 12,
-        maxHeight: 300,
-      }}
-    >
-      {debugLog.map((log, i) => (
-        <Text key={i} style={{ color: "#0f0", fontSize: 10, fontFamily: "monospace" }}>
-          {log}
-        </Text>
-      ))}
-    </View>
-  ) : null
-
   if (
     (!fontsLoaded && !fontError) ||
     recoveryExchangeInProgress ||
@@ -327,14 +285,8 @@ export default function RootLayout() {
         }}
       >
         <ActivityIndicator color={colors.forest} />
-        {debugOverlay}
       </View>
     )
   }
-  return (
-    <View style={{ flex: 1 }}>
-      <Slot />
-      {debugOverlay}
-    </View>
-  )
+  return <Slot />
 }
