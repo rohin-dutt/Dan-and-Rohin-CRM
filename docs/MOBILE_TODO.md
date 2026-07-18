@@ -238,9 +238,16 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 - [ ] Build welcome/value screen.
 - [ ] Build add-first-person or import prompt.
 - [ ] Build reminder preference step.
-- [ ] Ask for push permission only after context is shown.
-- [ ] Save onboarding completion.
-- [ ] Route completed users to Dashboard.
+- [x] Ask for push permission only after context is shown.
+  - New iPhone signups see one combined, privacy-explained reminder prompt
+    after adding people or skipping onboarding and before the first-chat ask.
+    The native permission dialog opens only after `Turn on reminders`.
+- [x] Save onboarding completion.
+  - Completion is stored per user on-device, including the no-people skip path,
+    so skipped users are not routed back into onboarding.
+- [x] Route completed users to Dashboard.
+  - `Not now` consumes the one-time prompt and leaves future notification
+    changes to Settings; existing accounts are not retroactively prompted.
 - [ ] QA onboarding on TestFlight.
 
 ## Phase 6: Core CRM Vertical Slice
@@ -323,7 +330,10 @@ belongs in `docs/MOBILE_MASTER_PLAN.md`; this file should stay tactical.
 
 ## Phase 9: Push Notifications
 
-- [ ] Request push permission after onboarding context.
+- [x] Request push permission after onboarding context.
+  - The onboarding popup reuses Expo/APNs registration, saves all three push
+    preference flags as one combined choice, and falls back to Settings after
+    dismissal or denied permission. Real-device delivery QA remains open.
 - [x] Register Expo/APNs push token.
   - Mobile Settings can request notification permission and register an Expo
     push token through `/api/mobile/push-token`. Physical device/EAS QA still

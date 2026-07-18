@@ -56,6 +56,21 @@ export default function OnboardingPermissionScreen() {
             Add someone manually instead
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding for now"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/onboarding/celebrate",
+              params: { skipped: "true" },
+            })
+          }
+          className="mt-1 min-h-11 items-center justify-center"
+        >
+          <Text style={{ fontFamily: fonts.medium, color: colors.muted }} className="text-sm">
+            Skip for now
+          </Text>
+        </TouchableOpacity>
       </View>
     </Screen>
   )

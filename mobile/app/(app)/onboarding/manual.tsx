@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
@@ -19,6 +19,8 @@ import { BirthdayField } from "@/features/person-form/BirthdayField"
 import { CompactTextField } from "@/features/person-form/CompactTextField"
 import { LocationSuggestionsList } from "@/features/person-form/LocationSuggestionsList"
 import { useLocationAutocomplete } from "@/features/person-form/use-location-autocomplete"
+import { NotificationPermissionPrompt } from "@/features/onboarding/NotificationPermissionPrompt"
+import { markOnboardingComplete } from "@/lib/onboarding-status"
 
 export default function OnboardingManualScreen() {
   const router = useRouter()
@@ -65,6 +67,8 @@ export default function OnboardingManualScreen() {
   const [interactionNotes, setInteractionNotes] = useState("")
   const [step3Saving, setStep3Saving] = useState(false)
   const [step3Error, setStep3Error] = useState<string | null>(null)
+  const [notificationPromptPending, setNotificationPromptPending] = useState(false)
+  const [onboardingReady, setOnboardingReady] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -161,7 +165,15 @@ export default function OnboardingManualScreen() {
     resetForm()
     setSaving(false)
     setStep(3)
+    setNotificationPromptPending(true)
   }
+
+  const finishNotificationPrompt = useCallback(async () => {
+    if (!userId) return
+    await markOnboardingComplete(userId)
+    setNotificationPromptPending(false)
+    setOnboardingReady(true)
+  }, [userId])
 
   async function handleSaveInteraction() {
     if (!savedPersonId) return
@@ -560,15 +572,25 @@ export default function OnboardingManualScreen() {
           title="Save and see my dashboard →"
           onPress={handleSaveInteraction}
           loading={step3Saving}
+          disabled={!onboardingReady}
         />
 
         <TouchableOpacity
+          disabled={!onboardingReady}
           onPress={() => router.replace("/(app)/(tabs)/dashboard")}
-          className="mt-4 items-center"
+          className={`mt-4 items-center ${onboardingReady ? "" : "opacity-50"}`}
         >
           <Text className="text-sm text-gray-400">Skip — I'll add this later →</Text>
         </TouchableOpacity>
       </View>
+
+      {userId ? (
+        <NotificationPermissionPrompt
+          userId={userId}
+          visible={notificationPromptPending}
+          onFinished={finishNotificationPrompt}
+        />
+      ) : null}
     </Screen>
   )
 }
