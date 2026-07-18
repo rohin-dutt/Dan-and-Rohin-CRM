@@ -18,6 +18,7 @@ import type { Session } from "@supabase/supabase-js"
 import {
   handlePasswordRecoveryUrl,
   isPasswordRecoveryUrl,
+  PASSWORD_RECOVERY_FAILED_EVENT,
   PASSWORD_RECOVERY_RESOLVED_EVENT,
 } from "@/lib/auth-links"
 import {
@@ -30,29 +31,29 @@ import { installNotificationResponseHandler } from "@/lib/push-notifications"
 import { colors } from "@/constants/theme"
 import "../global.css"
 
+const PASSWORD_RECOVERY_EXCHANGE_TIMEOUT_MS = 20_000
+
+type PasswordRecoveryStatus = "idle" | "exchanging" | "ready" | "failed"
+
 export default function RootLayout() {
-  const initialUrl = Linking.getLinkingURL()
+  // Expo Router uses this same synchronous iOS source. Keeping recovery
+  // handling on it avoids a race between getLinkingURL() and a second,
+  // asynchronous getInitialURL() call during cold start.
+  const linkingUrl = Linking.useLinkingURL()
+  const startsInPasswordRecovery = Boolean(
+    linkingUrl && isPasswordRecoveryUrl(linkingUrl),
+  )
   const [session, setSession] = useState<Session | null>(null)
   const [introComplete, setIntroComplete] = useState<boolean | null>(null)
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
   const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
-  // Stays true for the whole recovery flow (deep link -> update-password
-  // screen), so routing keeps forcing update-password even once a session
-  // exists. Cleared only on a successful password update or a bounce back to
-  // forgot-password on an invalid/expired link.
-  const [recoveryLinkPending, setRecoveryLinkPending] = useState(
-    Boolean(initialUrl && isPasswordRecoveryUrl(initialUrl)),
-  )
-  // True only while the deep link is actively being exchanged for a session;
-  // gates the loading spinner so it doesn't block the update-password screen
-  // for the rest of the recovery flow.
-  const [recoveryExchangeInProgress, setRecoveryExchangeInProgress] = useState(
-    Boolean(initialUrl && isPasswordRecoveryUrl(initialUrl)),
+  const [recoveryStatus, setRecoveryStatus] = useState<PasswordRecoveryStatus>(
+    startsInPasswordRecovery ? "exchanging" : "idle",
   )
   const sessionUserIdRef = useRef<string | null>(null)
-  const recoveryInFlightRef = useRef(false)
-  const processedRecoveryFingerprintRef = useRef<number | null>(null)
+  const recoveryAttemptRef = useRef(0)
+  const processedRecoveryFingerprintsRef = useRef(new Set<number>())
 
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_700Bold,
@@ -104,13 +105,18 @@ export default function RootLayout() {
     )
     const recoverySub = DeviceEventEmitter.addListener(
       PASSWORD_RECOVERY_RESOLVED_EVENT,
-      () => setRecoveryLinkPending(false),
+      () => setRecoveryStatus("idle"),
+    )
+    const recoveryFailureSub = DeviceEventEmitter.addListener(
+      PASSWORD_RECOVERY_FAILED_EVENT,
+      () => setRecoveryStatus("failed"),
     )
 
     return () => {
       introSub.remove()
       peopleSub.remove()
       recoverySub.remove()
+      recoveryFailureSub.remove()
     }
   }, [])
 
@@ -161,68 +167,74 @@ export default function RootLayout() {
       return hash >>> 0
     }
 
-    async function handleUrl(url: string | null) {
-      if (!url || !isPasswordRecoveryUrl(url)) return
+    async function handleUrl(url: string) {
+      if (!isPasswordRecoveryUrl(url)) return
 
       const fingerprint = fingerprintUrl(url)
-      if (
-        recoveryInFlightRef.current ||
-        processedRecoveryFingerprintRef.current === fingerprint
-      ) {
-        return
-      }
+      if (processedRecoveryFingerprintsRef.current.has(fingerprint)) return
 
-      recoveryInFlightRef.current = true
-      processedRecoveryFingerprintRef.current = fingerprint
-      setRecoveryLinkPending(true)
-      setRecoveryExchangeInProgress(true)
+      processedRecoveryFingerprintsRef.current.add(fingerprint)
+      const attempt = recoveryAttemptRef.current + 1
+      recoveryAttemptRef.current = attempt
+      setRecoveryStatus("exchanging")
+
+      let timedOut = false
+      const timeout = setTimeout(() => {
+        if (attempt !== recoveryAttemptRef.current) return
+
+        timedOut = true
+        setRecoveryStatus("failed")
+        router.replace({
+          pathname: "/(auth)/forgot-password",
+          params: { recoveryError: "exchange_failed" },
+        })
+      }, PASSWORD_RECOVERY_EXCHANGE_TIMEOUT_MS)
 
       try {
         const result = await handlePasswordRecoveryUrl(url)
+        if (attempt !== recoveryAttemptRef.current) return
+
+        // The auth call itself cannot be cancelled. If it succeeds after the
+        // UI timeout, clear that abandoned recovery session while the failed
+        // recovery state prevents normal authenticated routing.
+        if (timedOut) {
+          if (result.handled && result.ok) {
+            await supabase.auth.signOut({ scope: "local" })
+          }
+          return
+        }
+
         if (!result.handled) {
-          setRecoveryLinkPending(false)
+          setRecoveryStatus("idle")
           return
         }
 
         if (result.ok) {
-          const {
-            data: { session: recoverySession },
-          } = await supabase.auth.getSession()
-
-          if (!recoverySession) {
-            setRecoveryLinkPending(false)
-            router.replace({
-              pathname: "/(auth)/forgot-password",
-              params: { recoveryError: "exchange_failed" },
-            })
-            return
-          }
-
-          setSession(recoverySession)
+          setSession(result.session)
+          setRecoveryStatus("ready")
           router.replace("/(auth)/update-password")
-          // recoveryLinkPending stays true: the update-password screen clears
-          // it via PASSWORD_RECOVERY_RESOLVED_EVENT after a successful
-          // password update, or after bouncing back to forgot-password.
         } else {
-          setRecoveryLinkPending(false)
+          setRecoveryStatus("failed")
           router.replace({
             pathname: "/(auth)/forgot-password",
             params: { recoveryError: result.reason },
           })
         }
+      } catch {
+        if (attempt === recoveryAttemptRef.current && !timedOut) {
+          setRecoveryStatus("failed")
+          router.replace({
+            pathname: "/(auth)/forgot-password",
+            params: { recoveryError: "exchange_failed" },
+          })
+        }
       } finally {
-        recoveryInFlightRef.current = false
-        setRecoveryExchangeInProgress(false)
+        clearTimeout(timeout)
       }
     }
 
-    Linking.getInitialURL().then(handleUrl)
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      handleUrl(url)
-    })
-
-    return () => subscription.remove()
-  }, [router])
+    if (linkingUrl) void handleUrl(linkingUrl)
+  }, [linkingUrl, router])
 
   useEffect(() => {
     if (loading || !fontsLoaded) return
@@ -237,12 +249,25 @@ export default function RootLayout() {
     const inUpdatePassword = inAuthGroup && segments.join("/") === "(auth)/update-password"
     const inOnboarding = segments.join("/").startsWith("(app)/onboarding")
 
-    // A pending recovery link always wins: stay on (or navigate to)
-    // update-password regardless of session/hasPeople state, so a valid
-    // session and existing people don't bounce the user to the dashboard.
-    if (recoveryLinkPending) {
+    // A successfully exchanged recovery link always wins, so a valid session
+    // and existing people cannot bounce the user to the dashboard before the
+    // password is changed. While exchanging, the bounded loader below remains
+    // visible. A failed exchange quarantines any late session on an auth route.
+    if (recoveryStatus === "exchanging") return
+
+    if (recoveryStatus === "ready") {
       if (!inUpdatePassword) {
         router.replace("/(auth)/update-password")
+      }
+      return
+    }
+
+    if (recoveryStatus === "failed") {
+      if (!inAuthGroup) {
+        router.replace({
+          pathname: "/(auth)/forgot-password",
+          params: { recoveryError: "exchange_failed" },
+        })
       }
       return
     }
@@ -264,12 +289,12 @@ export default function RootLayout() {
     } else if (hasPeople && (inAuthGroup || inIntro)) {
       router.replace("/(app)/(tabs)/dashboard")
     }
-  }, [session, loading, introComplete, hasPeople, recoveryLinkPending, segments])
+  }, [session, loading, introComplete, hasPeople, recoveryStatus, segments, router])
 
   if (
     (!fontsLoaded && !fontError) ||
-    recoveryExchangeInProgress ||
-    (!recoveryLinkPending && (
+    recoveryStatus === "exchanging" ||
+    (recoveryStatus === "idle" && (
       loading ||
       introComplete == null ||
       (session && hasPeople == null)

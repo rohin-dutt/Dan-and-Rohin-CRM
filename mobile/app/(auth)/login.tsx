@@ -1,7 +1,15 @@
 import { useRef, useState } from "react"
 import { useLocalSearchParams, useRouter } from "expo-router"
-import { Platform, Text, TextInput, TouchableOpacity, View } from "react-native"
+import {
+  DeviceEventEmitter,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import { supabase } from "@/lib/supabase"
+import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
 import { AppleSignInButton } from "@/components/AppleSignInButton"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
@@ -16,6 +24,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const passwordInputRef = useRef<TextInput>(null)
+
+  function releaseRecoveryRouting() {
+    DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
+  }
 
   async function handleSignIn() {
     setError(null)
@@ -33,6 +45,7 @@ export default function LoginScreen() {
     if (error) {
       setError(error.message)
     } else {
+      releaseRecoveryRouting()
       router.replace("/(app)/(tabs)/dashboard")
     }
   }
@@ -57,7 +70,10 @@ export default function LoginScreen() {
             <AppleSignInButton
               kind="sign-in"
               onError={setError}
-              onSignedIn={() => router.replace("/")}
+              onSignedIn={() => {
+                releaseRecoveryRouting()
+                router.replace("/")
+              }}
             />
             <View className="my-6 flex-row items-center">
               <View className="h-px flex-1 bg-stone-200" />
@@ -88,6 +104,15 @@ export default function LoginScreen() {
           returnKeyType="done"
           submitBehavior="blurAndSubmit"
         />
+
+        <TouchableOpacity
+          onPress={() => router.push("/(auth)/forgot-password")}
+          className="mb-6"
+          accessibilityRole="button"
+          accessibilityLabel="Forgot password?"
+        >
+          <Text className="text-sage text-sm">Forgot password?</Text>
+        </TouchableOpacity>
 
         <Button title="Sign In" onPress={handleSignIn} loading={loading} />
 
