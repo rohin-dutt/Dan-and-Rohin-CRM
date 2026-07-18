@@ -267,11 +267,13 @@ export default function RootLayout() {
   }, [session, loading, introComplete, hasPeople, recoveryLinkPending, segments])
 
   if (
-    loading ||
     (!fontsLoaded && !fontError) ||
-    introComplete == null ||
     recoveryExchangeInProgress ||
-    (session && hasPeople == null)
+    (!recoveryLinkPending && (
+      loading ||
+      introComplete == null ||
+      (session && hasPeople == null)
+    ))
   ) {
     return (
       <View
