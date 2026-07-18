@@ -36,6 +36,7 @@ type IntroPage = {
 }
 
 const onboardingArtwork = [peopleArt, intentionsArt, contextArt, simpleArt, rootedArt]
+const SHOW_APPLE_SIGN_IN_ON_ONBOARDING = false
 
 const pages: IntroPage[] = [
   {
@@ -200,11 +201,13 @@ function FinalContent({
             {appleError}
           </Text>
         ) : null}
-        <AppleSignInButton
-          kind="continue"
-          onError={onAppleError}
-          onSignedIn={onAppleSignedIn}
-        />
+        {SHOW_APPLE_SIGN_IN_ON_ONBOARDING ? (
+          <AppleSignInButton
+            kind="continue"
+            onError={onAppleError}
+            onSignedIn={onAppleSignedIn}
+          />
+        ) : null}
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Continue with email"
