@@ -25,9 +25,15 @@ import {
   FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
   hasCompletedFirstDownloadIntro,
 } from "@/lib/first-download-intro"
-import { PEOPLE_CHANGED_EVENT, userHasPeople } from "@/lib/onboarding-status"
+import {
+  hasCompletedOnboarding,
+  ONBOARDING_COMPLETE_EVENT,
+  PEOPLE_CHANGED_EVENT,
+  userHasPeople,
+} from "@/lib/onboarding-status"
 import { clearCrmCache, readCrmSnapshot } from "@/lib/crm-cache"
 import { installNotificationResponseHandler } from "@/lib/push-notifications"
+import { shouldShowOnboardingNotificationPrompt } from "@/lib/onboarding-notifications"
 import { colors } from "@/constants/theme"
 import "../global.css"
 
@@ -46,6 +52,10 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [introComplete, setIntroComplete] = useState<boolean | null>(null)
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
+  const [notificationPromptEligible, setNotificationPromptEligible] = useState<
+    boolean | null
+  >(null)
   const [peopleStatusVersion, setPeopleStatusVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [recoveryStatus, setRecoveryStatus] = useState<PasswordRecoveryStatus>(
@@ -87,6 +97,8 @@ export default function RootLayout() {
       setSession(nextSession)
       if (userChanged) {
         setHasPeople(null)
+        setOnboardingComplete(null)
+        setNotificationPromptEligible(null)
         if (previousUserId) void clearCrmCache()
       }
     })
@@ -103,6 +115,10 @@ export default function RootLayout() {
       PEOPLE_CHANGED_EVENT,
       () => setPeopleStatusVersion((version) => version + 1),
     )
+    const onboardingSub = DeviceEventEmitter.addListener(
+      ONBOARDING_COMPLETE_EVENT,
+      () => setOnboardingComplete(true),
+    )
     const recoverySub = DeviceEventEmitter.addListener(
       PASSWORD_RECOVERY_RESOLVED_EVENT,
       () => setRecoveryStatus("idle"),
@@ -115,6 +131,7 @@ export default function RootLayout() {
     return () => {
       introSub.remove()
       peopleSub.remove()
+      onboardingSub.remove()
       recoverySub.remove()
       recoveryFailureSub.remove()
     }
@@ -126,8 +143,18 @@ export default function RootLayout() {
     async function loadPeopleStatus() {
       if (!session) {
         setHasPeople(null)
+        setOnboardingComplete(null)
+        setNotificationPromptEligible(null)
         return
       }
+
+      const [completedOnboarding, promptEligible] = await Promise.all([
+        hasCompletedOnboarding(session.user.id).catch(() => false),
+        shouldShowOnboardingNotificationPrompt(session.user.id).catch(() => false),
+      ])
+      if (cancelled) return
+      setOnboardingComplete(completedOnboarding)
+      setNotificationPromptEligible(promptEligible)
 
       // Keep the previous value while refetching (PEOPLE_CHANGED_EVENT fires
       // mid-onboarding); resetting to null here would unmount the onboarding
@@ -282,14 +309,37 @@ export default function RootLayout() {
     }
 
     if (inUpdatePassword) return
-    if (hasPeople == null) return
+    if (
+      hasPeople == null ||
+      onboardingComplete == null ||
+      notificationPromptEligible == null
+    ) {
+      return
+    }
 
-    if (!hasPeople && !inOnboarding) {
-      router.replace("/(app)/onboarding")
-    } else if (hasPeople && (inAuthGroup || inIntro)) {
+    const onboardingDone =
+      onboardingComplete || (hasPeople && !notificationPromptEligible)
+
+    if (!onboardingDone && !inOnboarding) {
+      if (hasPeople && notificationPromptEligible) {
+        router.replace("/(app)/onboarding/celebrate")
+      } else {
+        router.replace("/(app)/onboarding")
+      }
+    } else if (onboardingDone && (inAuthGroup || inIntro)) {
       router.replace("/(app)/(tabs)/dashboard")
     }
-  }, [session, loading, introComplete, hasPeople, recoveryStatus, segments, router])
+  }, [
+    session,
+    loading,
+    introComplete,
+    hasPeople,
+    onboardingComplete,
+    notificationPromptEligible,
+    recoveryStatus,
+    segments,
+    router,
+  ])
 
   if (
     (!fontsLoaded && !fontError) ||
@@ -297,7 +347,11 @@ export default function RootLayout() {
     (recoveryStatus === "idle" && (
       loading ||
       introComplete == null ||
-      (session && hasPeople == null)
+      (session && (
+        hasPeople == null ||
+        onboardingComplete == null ||
+        notificationPromptEligible == null
+      ))
     ))
   ) {
     return (

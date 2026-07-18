@@ -15,6 +15,7 @@ import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
 import { ErrorBanner } from "@/components/ErrorBanner"
+import { markOnboardingNotificationPromptEligible } from "@/lib/onboarding-notifications"
 
 export default function SignupScreen() {
   const router = useRouter()
@@ -62,6 +63,16 @@ export default function SignupScreen() {
     setLoading(false)
     if (error) {
       setError(error.message)
+    } else if (data.user) {
+      const isNewSignup = Boolean(data.session || data.user.identities?.length)
+      if (isNewSignup) {
+        await markOnboardingNotificationPromptEligible(data.user.id)
+      }
+      if (!data.session) {
+        setConfirmationSent(true)
+      } else {
+        router.replace("/(app)/onboarding")
+      }
     } else if (!data.session) {
       setConfirmationSent(true)
     } else {
