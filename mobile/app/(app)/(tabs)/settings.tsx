@@ -258,8 +258,19 @@ export default function SettingsScreen() {
           push_important_moments_enabled: nextEnabled,
         }
 
-        if (nextEnabled) await registerPushToken()
-        else await revokePushToken()
+        if (nextEnabled) {
+          try {
+            await registerPushToken()
+          } catch {
+            /* token registration failed, continue anyway */
+          }
+        } else {
+          try {
+            await revokePushToken()
+          } catch {
+            /* token revocation failed, continue anyway */
+          }
+        }
 
         await commitSettingsPatch(patch)
         persistedPushOnRef.current = nextEnabled

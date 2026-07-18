@@ -124,7 +124,9 @@ export function ContactActionButtons({
 
   function confirmLogInteraction() {
     setPromptVisible(false)
-    onLogInteraction()
+    setTimeout(() => {
+      onLogInteraction()
+    }, 300)
   }
 
   const firstName = personName.trim().split(/\s+/)[0] || personName
@@ -176,11 +178,11 @@ export function ContactActionButtons({
           <Text
             style={{ fontFamily: fonts.bold, color: colors.ink, fontSize: 18, textAlign: "center", marginBottom: 20 }}
           >
-            Did you connect with {firstName}?
+            Did you talk to {firstName}?
           </Text>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Yes, log it"
+            accessibilityLabel="Yes, note it down"
             onPress={confirmLogInteraction}
             activeOpacity={0.8}
             style={{
@@ -192,7 +194,7 @@ export function ContactActionButtons({
               marginBottom: 10,
             }}
           >
-            <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 16 }}>Yes, log it</Text>
+            <Text style={{ fontFamily: fonts.bold, color: "white", fontSize: 16 }}>Yes, note it down</Text>
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="button"
