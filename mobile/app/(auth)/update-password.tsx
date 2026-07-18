@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase"
 import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
 
 export default function UpdatePasswordScreen() {
+  console.log("[UPDATE-PASSWORD] component rendered")
   const router = useRouter()
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -23,6 +24,7 @@ export default function UpdatePasswordScreen() {
   const intentionalSignOutRef = useRef(false)
 
   const returnToForgotPassword = useCallback(() => {
+    console.log("[UPDATE-PASSWORD] returning to forgot-password")
     DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
     router.replace({
       pathname: "/(auth)/forgot-password",
@@ -34,6 +36,7 @@ export default function UpdatePasswordScreen() {
     let cancelled = false
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("[UPDATE-PASSWORD] getSession resolved, session exists:", Boolean(session))
       if (cancelled) return
 
       if (!session) {
@@ -47,6 +50,7 @@ export default function UpdatePasswordScreen() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[UPDATE-PASSWORD] onAuthStateChange fired, session exists:", Boolean(session), "intentionalSignOut:", intentionalSignOutRef.current)
       if (!cancelled && !session && !intentionalSignOutRef.current) {
         returnToForgotPassword()
       }

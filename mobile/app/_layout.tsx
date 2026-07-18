@@ -162,6 +162,7 @@ export default function RootLayout() {
     }
 
     async function handleUrl(url: string | null) {
+      console.log("[RECOVERY] handleUrl called with url:", url)
       if (!url || !isPasswordRecoveryUrl(url)) return
 
       const fingerprint = fingerprintUrl(url)
@@ -174,11 +175,13 @@ export default function RootLayout() {
 
       recoveryInFlightRef.current = true
       processedRecoveryFingerprintRef.current = fingerprint
+      console.log("[RECOVERY] starting exchange")
       setRecoveryLinkPending(true)
       setRecoveryExchangeInProgress(true)
 
       try {
         const result = await handlePasswordRecoveryUrl(url)
+        console.log("[RECOVERY] exchange result:", JSON.stringify(result))
         if (!result.handled) {
           setRecoveryLinkPending(false)
           return
@@ -198,7 +201,9 @@ export default function RootLayout() {
             return
           }
 
+          console.log("[RECOVERY] session obtained, navigating to update-password")
           setSession(recoverySession)
+          console.log("[RECOVERY] calling router.replace to update-password")
           router.replace("/(auth)/update-password")
           // recoveryLinkPending stays true: the update-password screen clears
           // it via PASSWORD_RECOVERY_RESOLVED_EVENT after a successful
@@ -213,6 +218,7 @@ export default function RootLayout() {
       } finally {
         recoveryInFlightRef.current = false
         setRecoveryExchangeInProgress(false)
+        console.log("[RECOVERY] exchange finished, recoveryExchangeInProgress set to false")
       }
     }
 
