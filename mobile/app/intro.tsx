@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   ActivityIndicator,
   DeviceEventEmitter,
@@ -22,21 +22,40 @@ import {
   markFirstDownloadIntroComplete,
 } from "@/lib/first-download-intro"
 import peopleArt from "../assets/onboarding/onboarding-01-people.png"
-import intentionsArt from "../assets/onboarding/onboarding-02-intentions.png"
+import timelineArt from "../assets/onboarding/onboarding-02-botanical.png"
 import contextArt from "../assets/onboarding/onboarding-03-context.png"
 import simpleArt from "../assets/onboarding/onboarding-04-simple.png"
-import rootedArt from "../assets/onboarding/onboarding-05-rooted.png"
 
 type IntroPage = {
   title: string
   body: string
-  art: number
-  kind: "story" | "final"
+  art?: number
+  kind: "story" | "timeline" | "final"
+  artFit?: "cover" | "contain"
   artTop?: `${number}%`
+  artScale?: number
+  closing?: string
 }
 
-const onboardingArtwork = [peopleArt, intentionsArt, contextArt, simpleArt, rootedArt]
+type TimelineEntry = {
+  label: string
+  message: string
+}
+
+const onboardingArtwork = [
+  { pageIndex: 0, source: peopleArt },
+  { pageIndex: 1, source: timelineArt },
+  { pageIndex: 2, source: contextArt },
+  { pageIndex: 3, source: simpleArt },
+]
+
 const SHOW_APPLE_SIGN_IN_ON_ONBOARDING = false
+
+const timelineEntries: TimelineEntry[] = [
+  { label: "Today", message: "I should text Alex." },
+  { label: "A few weeks later", message: "I’ll reach out this weekend." },
+  { label: "A few months later", message: "Where do I even start?" },
+]
 
 const pages: IntroPage[] = [
   {
@@ -46,10 +65,12 @@ const pages: IntroPage[] = [
     kind: "story",
   },
   {
-    title: "The intention to reach out is almost never the problem.",
-    body: "We mean to call. We think about people. Then life gets busy, and somehow months turn into years.",
-    art: intentionsArt,
-    kind: "story",
+    title: "The longer we wait,\nthe harder reaching out\ncan feel.",
+    body: "A quick thought becomes “I’ll do it later.”\nBefore long, even a simple message\ncan feel difficult to send.",
+    closing:
+      "Time does not change how much\nsomeone matters. It only makes the\nfirst step feel bigger.",
+    art: timelineArt,
+    kind: "timeline",
   },
   {
     title: "Roots helps good intentions become real connections.",
@@ -63,12 +84,13 @@ const pages: IntroPage[] = [
     body: "Add the people who matter. Log when you connect. Roots quietly keeps track of the rest.",
     art: simpleArt,
     kind: "story",
+    artFit: "contain",
     artTop: "9%",
+    artScale: 0.95,
   },
   {
-    title: "Stay close to the people that matter most.",
-    body: "No networking. No pipeline. No productivity system. Just a quiet nudge to reach out.",
-    art: rootedArt,
+    title: "Stay close to the people\nthat matter.",
+    body: "No networking. No pipeline. No productivity system.\nJust a quiet nudge to reach out.",
     kind: "final",
   },
 ]
@@ -139,12 +161,178 @@ function StoryCopy({ page, compact }: { page: IntroPage; compact: boolean }) {
   )
 }
 
+function OnboardingInitialsAvatar({ compact }: { compact: boolean }) {
+  const size = compact ? 54 : 64
+
+  return (
+    <View
+      className="items-center justify-center rounded-full border-2 border-white bg-white shadow-sm"
+      style={{ width: size, height: size }}
+      accessible
+      accessibilityLabel="Alex Morgan initials"
+    >
+      <View
+        className="items-center justify-center rounded-full border"
+        style={{
+          width: size - 8,
+          height: size - 8,
+          borderColor: colors.sage,
+          backgroundColor: colors.ivory,
+        }}
+      >
+        <Text
+          style={{
+            color: colors.forest,
+            fontFamily: fonts.heading,
+            fontSize: compact ? 24 : 29,
+            lineHeight: compact ? 27 : 32,
+          }}
+          maxFontSizeMultiplier={1.15}
+        >
+          AM
+        </Text>
+      </View>
+      <View
+        className="absolute -bottom-1 -right-1 rounded-full p-0.5"
+        style={{ backgroundColor: colors.brandIvory }}
+      >
+        <Ionicons name="leaf-outline" size={compact ? 13 : 15} color={colors.sage} />
+      </View>
+    </View>
+  )
+}
+
+function TimelineEntryRow({
+  entry,
+  compact,
+}: {
+  entry: TimelineEntry
+  compact: boolean
+}) {
+  return (
+    <View className="flex-row items-center" style={{ minHeight: compact ? 66 : 82 }}>
+      <View
+        className="self-stretch items-center justify-start"
+        style={{ width: compact ? 66 : 78 }}
+      >
+        <OnboardingInitialsAvatar compact={compact} />
+      </View>
+
+      <View className="ml-2 flex-1">
+        <Text
+          style={{
+            color: colors.forest,
+            fontFamily: fonts.semibold,
+            fontSize: compact ? 12 : 14,
+            lineHeight: compact ? 16 : 19,
+          }}
+          maxFontSizeMultiplier={1.2}
+        >
+          {entry.label}
+        </Text>
+        <View
+          className="mt-1 min-h-[46px] flex-row items-center rounded-2xl border bg-white/95 px-3 shadow-sm"
+          style={{ borderColor: colors.border }}
+        >
+          <Text
+            className="flex-1 pr-2"
+            style={{
+              color: colors.ink,
+              fontFamily: fonts.body,
+              fontSize: compact ? 12 : 14,
+              lineHeight: compact ? 17 : 20,
+            }}
+            maxFontSizeMultiplier={1.2}
+          >
+            {entry.message}
+          </Text>
+          <View
+            className="items-center justify-center rounded-full"
+            style={{
+              width: compact ? 30 : 34,
+              height: compact ? 30 : 34,
+              backgroundColor: colors.sand,
+            }}
+          >
+            <Ionicons
+              name="paper-plane"
+              size={compact ? 14 : 16}
+              color={colors.sage}
+            />
+          </View>
+        </View>
+      </View>
+    </View>
+  )
+}
+
+function TimelineContent({ page, compact }: { page: IntroPage; compact: boolean }) {
+  return (
+    <View className="flex-1">
+      <View className={compact ? "mt-1 items-center" : "mt-3 items-center"}>
+        <Text
+          style={{
+            color: colors.forest,
+            fontFamily: fonts.heading,
+            fontSize: compact ? 25 : 30,
+            lineHeight: compact ? 28 : 34,
+            textAlign: "center",
+          }}
+          maxFontSizeMultiplier={1.16}
+        >
+          {page.title}
+        </Text>
+        <Text
+          className={compact ? "mt-1.5" : "mt-2"}
+          style={{
+            color: colors.ink,
+            fontFamily: fonts.body,
+            fontSize: compact ? 11 : 13,
+            lineHeight: compact ? 16 : 19,
+            textAlign: "center",
+          }}
+          maxFontSizeMultiplier={1.2}
+        >
+          {page.body}
+        </Text>
+      </View>
+
+      <View className={compact ? "mt-2 flex-1 justify-between" : "mt-4 flex-1 justify-between"}>
+        {timelineEntries.map((entry) => (
+          <TimelineEntryRow
+            key={entry.label}
+            entry={entry}
+            compact={compact}
+          />
+        ))}
+      </View>
+
+      <View className={compact ? "items-center pt-1" : "items-center pt-3"}>
+        <Ionicons name="leaf-outline" size={compact ? 17 : 20} color={colors.sage} />
+        <Text
+          className="mt-1 text-center"
+          style={{
+            color: colors.ink,
+            fontFamily: fonts.body,
+            fontSize: compact ? 10 : 12,
+            lineHeight: compact ? 14 : 17,
+          }}
+          maxFontSizeMultiplier={1.2}
+        >
+          {page.closing}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
 function FinalContent({
   compact,
   page,
   appleError,
   onAppleError,
   onAppleSignedIn,
+  onActionPressIn,
   onLogin,
   onSignup,
 }: {
@@ -153,29 +341,37 @@ function FinalContent({
   appleError: string | null
   onAppleError: (message: string | null) => void
   onAppleSignedIn: () => void | Promise<void>
+  onActionPressIn: () => void
   onLogin: () => void
   onSignup: () => void
 }) {
   return (
-    <View className="flex-1 items-center">
-      <View className={compact ? "items-center pt-0" : "items-center pt-1"}>
-        <LogoMark size={compact ? 46 : 54} />
+    <View className="flex-1 w-full justify-center">
+      <View className="items-center">
+        <LogoMark size={compact ? 58 : 70} />
         <Text
-          style={{ color: colors.forest, fontFamily: fonts.heading }}
-          className="-mt-1 text-[34px] leading-[35px]"
+          style={{
+            color: colors.forest,
+            fontFamily: fonts.heading,
+            fontSize: compact ? 35 : 41,
+            lineHeight: compact ? 37 : 43,
+          }}
+          className="-mt-2"
+          maxFontSizeMultiplier={1.15}
         >
           roots
         </Text>
-        <View className="mt-1.5 h-px w-9" style={{ backgroundColor: colors.sage }} />
+        <View className="mt-2 h-px w-10" style={{ backgroundColor: colors.sage }} />
 
         <Text
           style={{
             color: colors.forest,
             fontFamily: fonts.heading,
-            fontSize: compact ? 24 : 27,
-            lineHeight: compact ? 27 : 31,
+            fontSize: compact ? 26 : 31,
+            lineHeight: compact ? 29 : 35,
           }}
-          className="mt-3 px-2 text-center"
+          className={compact ? "mt-4 px-2 text-center" : "mt-5 px-2 text-center"}
+          maxFontSizeMultiplier={1.15}
         >
           {page.title}
         </Text>
@@ -184,15 +380,19 @@ function FinalContent({
             color: colors.ink,
             fontFamily: fonts.body,
             fontSize: compact ? 11 : 13,
-            lineHeight: compact ? 16 : 19,
+            lineHeight: compact ? 16 : 20,
           }}
-          className="mt-2 px-3 text-center"
+          className="mt-3 px-3 text-center"
+          maxFontSizeMultiplier={1.2}
         >
           {page.body}
         </Text>
       </View>
 
-      <View className="mt-auto w-full gap-2.5" onTouchEnd={(event) => event.stopPropagation()}>
+      <View
+        className={compact ? "mt-5 w-full gap-2" : "mt-8 w-full gap-2.5"}
+        onTouchEnd={(event) => event.stopPropagation()}
+      >
         {appleError ? (
           <Text
             style={{ color: colors.error, fontFamily: fonts.medium }}
@@ -211,6 +411,7 @@ function FinalContent({
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Continue with email"
+          onPressIn={onActionPressIn}
           onPress={(event) => {
             event.stopPropagation()
             onSignup()
@@ -227,6 +428,7 @@ function FinalContent({
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="I already have an account"
+          onPressIn={onActionPressIn}
           onPress={(event) => {
             event.stopPropagation()
             onLogin()
@@ -240,13 +442,15 @@ function FinalContent({
         </TouchableOpacity>
       </View>
 
-      <View className="mt-1.5 flex-row items-center px-4 pb-0.5">
+      <View className="mt-2.5 flex-row items-center px-4">
         <Ionicons name="lock-closed-outline" size={13} color={colors.muted} />
         <Text
           style={{ color: colors.muted, fontFamily: fonts.body }}
           className="ml-2 flex-1 text-center text-[10px] leading-4"
+          maxFontSizeMultiplier={1.2}
         >
-          Your relationship information is never shared with other Roots users.
+          Your relationship data remains private to your account.{"\n"}
+          Roots does not sell your data or share it with advertisers.
         </Text>
       </View>
     </View>
@@ -258,17 +462,32 @@ export default function FirstDownloadIntroScreen() {
   const { height, width } = useWindowDimensions()
   const [pageIndex, setPageIndex] = useState(0)
   const [appleError, setAppleError] = useState<string | null>(null)
-  const [preloadedArtwork, setPreloadedArtwork] = useState<ImageRef[] | null>(null)
+  const [preloadedArtwork, setPreloadedArtwork] = useState<Record<number, ImageRef> | null>(null)
   const [artworkLoadFailed, setArtworkLoadFailed] = useState(false)
+  const suppressScreenPressUntil = useRef(0)
   const page = pages[pageIndex]
   const compact = height < 760
+  const isNarrativePage = page.kind !== "final"
+  const activeArtwork =
+    page.art
+      ? preloadedArtwork?.[pageIndex] ?? page.art
+      : null
 
   useEffect(() => {
     let active = true
 
-    Promise.all(onboardingArtwork.map((source) => Image.loadAsync(source)))
+    Promise.all(onboardingArtwork.map(({ source }) => Image.loadAsync(source)))
       .then((loadedArtwork) => {
-        if (active) setPreloadedArtwork(loadedArtwork)
+        if (!active) return
+
+        const artworkByPage = onboardingArtwork.reduce<Record<number, ImageRef>>(
+          (result, artwork, index) => {
+            result[artwork.pageIndex] = loadedArtwork[index]
+            return result
+          },
+          {},
+        )
+        setPreloadedArtwork(artworkByPage)
       })
       .catch(() => {
         if (active) setArtworkLoadFailed(true)
@@ -280,6 +499,8 @@ export default function FirstDownloadIntroScreen() {
   }, [])
 
   function handleScreenPress(pageX: number) {
+    if (Date.now() < suppressScreenPressUntil.current) return
+
     setAppleError(null)
 
     if (pageX < width / 2) {
@@ -331,32 +552,38 @@ export default function FirstDownloadIntroScreen() {
       className="flex-1"
       style={{ backgroundColor: colors.brandIvory, overflow: "hidden" }}
     >
-      <Image
-        key={pageIndex}
-        source={preloadedArtwork?.[pageIndex] ?? page.art}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        priority="high"
-        transition={0}
-        style={[styles.backgroundArt, page.artTop ? { top: page.artTop } : null]}
-        accessible={false}
-        accessibilityIgnoresInvertColors
-      />
+      {activeArtwork ? (
+        <Image
+          key={pageIndex}
+          source={activeArtwork}
+          contentFit={page.artFit ?? "cover"}
+          cachePolicy="memory-disk"
+          priority="high"
+          transition={0}
+          style={[
+            styles.backgroundArt,
+            page.artTop ? { top: page.artTop } : null,
+            page.artScale ? { transform: [{ scale: page.artScale }] } : null,
+          ]}
+          accessible={false}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
       <SafeAreaView className="flex-1">
         <Pressable
-          accessible={page.kind === "story"}
-          accessibilityRole={page.kind === "story" ? "adjustable" : undefined}
-          accessibilityLabel={page.kind === "story" ? `${page.title} ${page.body}` : undefined}
+          accessible={isNarrativePage}
+          accessibilityRole={isNarrativePage ? "adjustable" : undefined}
+          accessibilityLabel={isNarrativePage ? `${page.title} ${page.body}` : undefined}
           accessibilityHint={
-            page.kind === "story" ? "Use the adjustable actions to move between pages." : undefined
+            isNarrativePage ? "Use the adjustable actions to move between pages." : undefined
           }
           accessibilityValue={
-            page.kind === "story"
+            isNarrativePage
               ? { min: 1, max: pages.length, now: pageIndex + 1, text: `Page ${pageIndex + 1} of ${pages.length}` }
               : undefined
           }
           accessibilityActions={
-            page.kind === "story"
+            isNarrativePage
               ? [
                   { name: "decrement", label: "Previous page" },
                   { name: "increment", label: "Next page" },
@@ -378,9 +605,14 @@ export default function FirstDownloadIntroScreen() {
               appleError={appleError}
               onAppleError={setAppleError}
               onAppleSignedIn={completeAppleIntro}
+              onActionPressIn={() => {
+                suppressScreenPressUntil.current = Date.now() + 750
+              }}
               onSignup={() => void completeIntro("/(auth)/signup")}
               onLogin={() => void completeIntro("/(auth)/login")}
             />
+          ) : page.kind === "timeline" ? (
+            <TimelineContent page={page} compact={compact} />
           ) : (
             <StoryCopy page={page} compact={compact} />
           )}

@@ -1,151 +1,93 @@
-# Onboarding Design QA
+# Onboarding Pages 2, 4, and 5 Design QA
 
-## Comparison target
+Date: 2026-07-18
 
-- Source visual truth: `C:\Users\danie\AppData\Local\Temp\codex-clipboard-e45181b9-4d8e-4ce7-b7d2-291594253646.png`
-- Brand source: `C:\Users\danie\Desktop\Roots Mock Up Photos\roots_app_store_icon_1024.png`
-- Real-device problem evidence: `C:\Users\danie\.codex\codex-remote-attachments\019f70a4-6589-7351-92de-5a71ffb3b1bc\39BFAFFA-B1BD-4221-8239-803FD2FEA31C\1-Photo-1.jpg` through `5-Photo-5.jpg`
-- Residual page 3/4 overlap evidence: `C:\Users\danie\AppData\Local\Temp\codex-clipboard-fb848b46-5a99-438a-8f91-47e28c514722.png` and `C:\Users\danie\AppData\Local\Temp\codex-clipboard-227fb6d6-e3e0-4581-b3da-090bf50ce954.png`
-- Final page 3/4 comparison: `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\offset-fix-comparison.png`
-- Browser-rendered implementation screenshot: `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\revised-implementation-contact-sheet.png`
-- Combined source/implementation evidence: `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\revised-reference-vs-implementation.png`
-- Focused page 2 before/after evidence: `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\page-2-before-after.png`
-- Viewport: 390 x 844 CSS pixels.
-- State: unauthenticated first-download onboarding, pages 1-5.
+## Comparison Target
 
-The source board is an art-direction and composition guide rather than a literal
-clone. Required deviations are initials-only contacts, no real people, the new
-Roots identity, no Skip action, immediate tap navigation, and native Apple sign
-in on iOS.
+- Page 2 source visual truth: `C:\Users\danie\Desktop\a.png`
+- Page 4 before-state reference: `C:\Users\danie\AppData\Local\Temp\codex-clipboard-227fb6d6-e3e0-4581-b3da-090bf50ce954.png`
+- Page 5 source visual truth: `C:\Users\danie\AppData\Local\Temp\codex-clipboard-fa9d740a-de94-494b-be1d-5f40417a5c1a.png`
+- Standard implementation screenshots:
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-standard\page-2.png`
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-standard\page-4-final.png`
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-standard\page-5.png`
+- Small implementation screenshots:
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-small\page-2.png`
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-small\page-4-v2.png`
+  - `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-small\page-5.png`
+- Side-by-side comparison evidence: `C:\Users\danie\Desktop\Coding\personal-crm\tmp\onboarding-qa\refined-comparisons\page-2-comparison.png`, `page-4-comparison.png`, and `page-5-comparison.png`.
 
-## Full-view comparison evidence
+## Viewports And States
 
-The combined comparison contains the full five-screen source board and the
-latest five implementation captures in one image. The implementation retains
-the reference's warm ivory editorial hierarchy, botanical/tactile depth,
-centered progress treatment, relationship-memory collage, context
-constellation, before/after connection story, and rooted closing screen.
+- Standard viewport: 390 x 844.
+- Small viewport: 375 x 667.
+- States: page 2 timeline, page 4 connection example, and page 5 pre-auth state.
+- Theme: light.
+- Visual runtime: Expo web rendering of the production React Native screen.
+- Native bundle check: `npx expo export --platform ios` completed successfully.
 
-The final 390 x 844 strip shows a clean copy-to-art gutter on pages 1-4. No
-headline or body text intersects a generated card, initials token, icon,
-botanical detail, or still-life object. Page 1 and pages 3-4 were tightened
-after an intermediate pass so the fix does not create an oversized empty band.
+The source images include iOS status chrome while the implementation captures intentionally do not. The app continues to rely on `SafeAreaView` instead of recreating system UI.
 
-## Focused-region comparison evidence
+## Full-View Comparison Evidence
 
-- Page 1: the supplied real-device capture placed the body copy over the `MC`
-  token and leaves. The latest capture keeps the exact live copy and begins the
-  relationship collage below it with a modest visible buffer.
-- Page 2: the focused before/after composite shows the old unrelated coffee,
-  umbrella, and lamp tiles replaced by one continuous visual metaphor. A phone
-  and `AM` almost connect, calendar milestones descend through the page, the
-  connection fades, and seasonal leaves show time passing. The original live
-  headline/body and generated microcopy remain intact.
-- Page 3: the clock card now begins below the live paragraph; the constellation
-  remains large, readable, and grounded by the vase/books/bowl still life.
-- Page 4: the upper Alex Morgan card now begins below the live paragraph; the
-  before/action/after sequence remains complete and the lower card is visible.
-- Page 5: the logo, title, rooted tree, email/returning-user controls, and privacy
-  note retain the intended hierarchy. The Apple control is native-iOS-only and
-  is visible in the supplied real-device capture rather than the web capture.
+### Page 2
 
-Focused crops beyond these full phone captures were not needed because the
-important copy, labels, icons, and copy-to-art boundaries remain legible at the
-actual 390 x 844 QA viewport.
+The revised screen preserves the requested timeline hierarchy while adding the missing emotional detail: the heading and supporting copy are centered, a thin organic vine visually links all three moments, and muted watercolor plants frame the lower portion of the screen. The vine sits behind the initials column instead of reading as a separate UI rule. Message cards remain native and readable, and the plants stay secondary to the timeline at both viewports.
 
-## Required fidelity surfaces
+### Page 4
 
-- Fonts and typography: live headings use Cormorant Garamond and live body/UI
-  text uses Inter. Size, weight, wrapping, line height, and centered hierarchy
-  remain consistent across the five pages. No live text clips or truncates.
-- Spacing and layout rhythm: all screens fit the phone frame with no document
-  overflow. Pages 1-4 now have clear but compact copy-safe spacing. Pages 3 and
-  4 retain their full-scale art with small, clipped-at-screen-edge placement
-  offsets rather than shrinking the main visual story.
-- Colors and tokens: ivory, deep forest, sage, oat, restrained amber, and the
-  small dusty-lilac accent remain consistent with the brand and source board.
-- Image quality and asset fidelity: production plates are project-owned raster
-  assets at roughly 853 x 1844, rendered with memory/disk caching at more than
-  2x logical phone resolution. They are sharp and free of visible masks, halos,
-  placeholder art, people, or CSS/SVG substitutes.
-- Copy and content: all five live headlines and paragraphs are unchanged. Page
-  2 retains `Thought about reaching out`, `A few weeks later`, `A few months
-  later`, `It's been a while`, `Life moves fast.`, and `Good intentions get lost
-  in it.` The other memory, context, and connection labels remain unchanged.
-- Icons: generated icons use one restrained Roots visual language. Live email
-  and privacy icons use Ionicons; Apple sign in uses Apple's native control.
-- Accessibility: story pages expose adjustable previous/next actions and page
-  values. Tap regions cover the left and right halves of the screen. Final CTAs
-  retain semantic labels. Dynamic Type and VoiceOver still merit a physical
-  device pass.
+The reference-to-implementation comparison shows the requested slight zoom-out. Cards and the log-connection control are visibly smaller without changing their order, proportions, typography, or artwork. The final image uses a 0.95 scale and `contain` sizing so the lower card remains visible on compact phones instead of being cropped.
 
-## Interaction, loading, and console verification
+### Page 5
 
-- The first capture after reload showed only the neutral ivory loading surface.
-  After all five images decoded, live copy and artwork appeared together in one
-  complete frame.
-- Once loaded, right-side taps advanced through the story without an artificial
-  delay or image flash. A left-side tap from page 5 returned to page 4.
-- Pages 1-5 were captured at exactly 390 x 844 in the Codex in-app Browser.
-- The final browser console error check returned an empty list.
-- Email/login routing and native Apple integration were already verified in the
-  preceding onboarding implementation pass and were not changed by this fix.
+The brand mark, headline, supporting copy, email action, account link, and security statement now form one vertically centered composition. The resulting page has balanced space above and below rather than splitting the brand at the top and actions at the bottom. The Apple option is intentionally disabled on this onboarding page across platforms.
 
-## Comparison history
+The full-resolution standard and small screenshots also serve as focused evidence. The relevant typography, vine detail, card edges, icon alignment, privacy copy, and compact-screen bottom spacing are readable without additional crops.
 
-1. P1 - real iPhone copy/art collision on pages 1-4.
-   Evidence: the five user-supplied Expo Go photos show live copy touching or
-   overlaying the generated artwork. Fix: rebuilt the page 1 copy-safe plate,
-   recreated page 2, and gave pages 3-4 deterministic full-scale placement
-   offsets. Post-fix evidence: the revised implementation contact sheet.
-2. P1 - copy and raster art appeared at different times.
-   Evidence: the old React Native image mounted independently from the live
-   copy while Expo Go fetched/decoded the roughly 2 MB plates. Fix: preload and
-   retain all five plates as native image references, gate the intro behind a
-   neutral surface, and render the selected predecoded reference with zero
-   transition. Post-fix evidence: reload showed the neutral state first and a
-   complete page frame next; subsequent page taps were immediate.
-3. P1 - page 2 lacked a coherent visual message.
-   Evidence: the supplied page 2 photo contains three unrelated still lifes.
-   Fix: replaced them with a repeated phone/contact near-connection whose line
-   fades across week/month milestones. Post-fix evidence:
-   `page-2-before-after.png`.
-4. P2 - first spacing revision overcorrected pages 1, 3, and 4 with excessive
-   empty space. Fix: tightened page 1's generated composition and restored
-   pages 3-4 at full scale with measured placement offsets. Post-fix
-   evidence: final captures for pages 1, 3, and 4 in the revised contact sheet.
-5. P1 - the first physical-iPhone recheck still showed a small residual overlap
-   on pages 3 and 4. Fix: changed only their existing image offsets, moving page
-   3 from 8% to 10% and page 4 from 6% to 9%. Post-fix evidence:
-   `offset-fix-comparison.png`, where both live paragraphs clear the artwork.
+## Required Fidelity Surfaces
 
-## Findings
+- Fonts and typography: passed. All three pages reuse the existing Cormorant Garamond and Inter tokens. Page 2's top copy is centered with controlled line breaks, and no text clips at either viewport.
+- Spacing and layout rhythm: passed. Timeline entries retain clear separation; page 4 has a lighter visual density; page 5 is centered as a single group. Existing horizontal margins, radii, borders, and shadows are unchanged.
+- Colors and visual tokens: passed. The forest, ink, sage, sand, border, and brand-ivory values remain sourced from `mobile/constants/theme.ts`.
+- Image quality and asset fidelity: passed. Page 2 uses a new 852 x 1846 production raster asset matching the existing warm paper and watercolor botanical treatment. It contains no baked-in copy, cards, status chrome, people, or screenshots.
+- Copy and content: passed. The page 2 and page 5 product copy is unchanged. The revised security statement is grounded in the production privacy policy: relationship data is private to the account, and Roots does not sell it or share it with advertisers.
+- Icons: passed. Existing Ionicons and the Roots logo remain aligned and consistent.
+- Responsiveness: passed at 390 x 844 and 375 x 667. No overlap, horizontal overflow, clipped copy, or off-screen primary action was observed in the captured states.
+- Accessibility: passed for the touched implementation. Existing semantic buttons, labels, adjustable navigation behavior, and bounded text scaling remain intact.
 
-No actionable P0, P1, or P2 differences remain for the requested fix. The
-implementation is a deliberate no-people Roots adaptation of the reference and
-now resolves the real-device overlap, timing, and page 2 storytelling problems.
+## Interaction And Runtime Checks
 
-## Open questions
+- Right-side taps advanced through the onboarding sequence.
+- A left-side tap returned page 4 to page 3.
+- A left-side background tap on page 5 returned to page 4 as intended.
+- A tap near the far-left edge of "Continue with email" navigated directly to `/signup` without also activating page-level back navigation.
+- "I already have an account" navigated to `/login` without returning to page 4.
+- Page badges and progress dots updated with navigation.
+- Browser console: no errors. The only warning was Expo Notifications' known web-only push-token-listener warning, unrelated to onboarding.
+- Mobile TypeScript and lint checks passed.
+- Root test suite passed.
+- iOS Expo export passed and included `onboarding-02-botanical.png`.
+- Root lint remains blocked by five previously recorded public-site copy errors.
+- Root production build remains blocked by the previously recorded missing `RESEND_API_KEY` during `/api/contact` page-data collection.
 
-- Recheck Dynamic Type, VoiceOver, and the native Apple consent sheet on a
-  physical iPhone. These do not block the visual/layout fix.
+## Comparison History
 
-## Implementation checklist
+### Iteration 1
 
-- [x] Copy/art overlap removed on pages 1-4.
-- [x] All five assets preloaded before onboarding content is revealed.
-- [x] Page changes render from decoded in-memory image references.
-- [x] Page 2 redesigned as one coherent delayed-intention story.
-- [x] Original live headline/body text preserved.
-- [x] No real people introduced.
-- [x] Left/back and right/forward tap behavior verified.
-- [x] Browser console checked with no errors.
-- [ ] Physical-iPhone Dynamic Type, VoiceOver, and Apple consent-sheet pass.
+- [P2] Page 2 lacked the reference's organic continuity and background depth.
+  - Fix: replaced the straight native rule with a generated decorative background containing one subtle squiggle vine and restrained lower-corner foliage; centered the headline and supporting copy.
+  - Post-fix evidence: `tmp/onboarding-qa/refined-standard/page-2.png`, `tmp/onboarding-qa/refined-small/page-2.png`, and `tmp/onboarding-qa/refined-comparisons/page-2-comparison.png`.
 
-## Follow-up polish
+- [P2] Page 4 cards felt oversized, and the lower card could crop on a short viewport.
+  - Fix: scaled the artwork to 0.95 and used contained fitting for the page 4 asset.
+  - Post-fix evidence: `tmp/onboarding-qa/refined-standard/page-4-final.png`, `tmp/onboarding-qa/refined-small/page-4-v2.png`, and `tmp/onboarding-qa/refined-comparisons/page-4-comparison.png`.
 
-- Confirm the smallest page 2 milestone captions remain comfortable on the
-  user's exact iPhone display scale; enlarge only if the device pass calls for
-  it.
+- [P2] Page 5 split its composition vertically and used privacy copy that was less precise than the production policy.
+  - Fix: centered the full content stack and replaced the line with policy-grounded language about account privacy, data sales, and advertisers.
+  - Post-fix evidence: `tmp/onboarding-qa/refined-standard/page-5.png`, `tmp/onboarding-qa/refined-small/page-5.png`, and `tmp/onboarding-qa/refined-comparisons/page-5-comparison.png`.
+
+## Follow-up Polish
+
+- P3 test gap: a final physical-device pass remains useful for native safe-area spacing before release.
 
 final result: passed
