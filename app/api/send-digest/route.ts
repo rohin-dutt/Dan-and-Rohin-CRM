@@ -4,6 +4,8 @@ import { weeklyDigestEmail } from "@/lib/email-templates"
 import { getBirthdayReminders, categorizePeople, isTouchPoint } from "@roots/shared"
 import { apiError } from "@/lib/api-errors"
 
+const DAILY_SEND_SAFETY_CAP = 90
+
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization")
   const cronSecret = process.env.CRON_SECRET
@@ -34,6 +36,7 @@ export async function POST(request: Request) {
     sent: 0,
     failed: 0,
     skipped: 0,
+    capped: 0,
   }
 
   for (const setting of settings ?? []) {
@@ -112,6 +115,11 @@ export async function POST(request: Request) {
         birthdays: birthdayList,
       })
 
+      if (results.sent >= DAILY_SEND_SAFETY_CAP) {
+        results.capped++
+        continue
+      }
+
       const { error: sendError } = await resend.emails.send({
         from: "Roots <hello@useroots.app>",
         to: email,
@@ -125,10 +133,16 @@ export async function POST(request: Request) {
         results.sent++
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 150))
     } catch {
       results.failed++
     }
+  }
+
+  if (results.capped > 0) {
+    console.warn(
+      `Digest send capped: ${results.capped} users skipped due to daily email safety limit`
+    )
   }
 
   return Response.json({ ok: true, ...results })
