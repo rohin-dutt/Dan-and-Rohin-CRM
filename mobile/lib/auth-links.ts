@@ -6,6 +6,7 @@ import {
 } from "@/lib/password-recovery-link"
 
 export {
+  findPasswordRecoveryUrl,
   isPasswordRecoveryUrl,
   type PasswordRecoveryFailureReason,
 } from "@/lib/password-recovery-link"

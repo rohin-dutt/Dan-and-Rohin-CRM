@@ -16,11 +16,13 @@ import {
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import {
+  findPasswordRecoveryUrl,
   handlePasswordRecoveryUrl,
   isPasswordRecoveryUrl,
   PASSWORD_RECOVERY_FAILED_EVENT,
   PASSWORD_RECOVERY_RESOLVED_EVENT,
 } from "@/lib/auth-links"
+import { withTimeout } from "@/lib/promise-timeout"
 import {
   FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
   hasCompletedFirstDownloadIntro,
@@ -38,17 +40,16 @@ import { colors } from "@/constants/theme"
 import "../global.css"
 
 const PASSWORD_RECOVERY_EXCHANGE_TIMEOUT_MS = 20_000
+const APP_INITIALIZATION_TIMEOUT_MS = 10_000
+const INITIAL_LINK_LOOKUP_TIMEOUT_MS = 5_000
 
 type PasswordRecoveryStatus = "idle" | "exchanging" | "ready" | "failed"
 
 export default function RootLayout() {
-  // Expo Router uses this same synchronous iOS source. Keeping recovery
-  // handling on it avoids a race between getLinkingURL() and a second,
-  // asynchronous getInitialURL() call during cold start.
+  // Expo Router uses this same synchronous iOS source. Prefer it during cold
+  // start and use the asynchronous native source only as a recovery fallback.
   const linkingUrl = Linking.useLinkingURL()
-  const startsInPasswordRecovery = Boolean(
-    linkingUrl && isPasswordRecoveryUrl(linkingUrl),
-  )
+  const startsInPasswordRecovery = Boolean(findPasswordRecoveryUrl(linkingUrl))
   const [session, setSession] = useState<Session | null>(null)
   const [introComplete, setIntroComplete] = useState<boolean | null>(null)
   const [hasPeople, setHasPeople] = useState<boolean | null>(null)
@@ -61,6 +62,7 @@ export default function RootLayout() {
   const [recoveryStatus, setRecoveryStatus] = useState<PasswordRecoveryStatus>(
     startsInPasswordRecovery ? "exchanging" : "idle",
   )
+  const startsInPasswordRecoveryRef = useRef(startsInPasswordRecovery)
   const sessionUserIdRef = useRef<string | null>(null)
   const recoveryAttemptRef = useRef(0)
   const processedRecoveryFingerprintsRef = useRef(new Set<number>())
@@ -76,15 +78,32 @@ export default function RootLayout() {
   const segments = useSegments()
 
   useEffect(() => {
-    Promise.all([
-      supabase.auth.getSession(),
-      hasCompletedFirstDownloadIntro(),
-    ]).then(([{ data: { session } }, completedIntro]) => {
-      sessionUserIdRef.current = session?.user.id ?? null
-      setSession(session)
-      setIntroComplete(completedIntro)
-      setLoading(false)
-    })
+    let cancelled = false
+    const initialSession = startsInPasswordRecoveryRef.current
+      ? Promise.resolve<Session | null>(null)
+      : supabase.auth.getSession().then(({ data }) => data.session)
+
+    void withTimeout(
+      Promise.all([initialSession, hasCompletedFirstDownloadIntro()]),
+      APP_INITIALIZATION_TIMEOUT_MS,
+    )
+      .then(([nextSession, completedIntro]) => {
+        if (cancelled) return
+
+        // Recovery establishes its own session from the callback credentials.
+        // Do not let ordinary startup compete with or overwrite that exchange.
+        if (!startsInPasswordRecoveryRef.current) {
+          sessionUserIdRef.current = nextSession?.user.id ?? null
+          setSession(nextSession)
+        }
+        setIntroComplete(completedIntro)
+      })
+      .catch(() => {
+        if (!cancelled) setIntroComplete(false)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
     const {
       data: { subscription },
@@ -103,7 +122,10 @@ export default function RootLayout() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -197,6 +219,7 @@ export default function RootLayout() {
     async function handleUrl(url: string) {
       if (!isPasswordRecoveryUrl(url)) return
 
+      startsInPasswordRecoveryRef.current = true
       const fingerprint = fingerprintUrl(url)
       if (processedRecoveryFingerprintsRef.current.has(fingerprint)) return
 
@@ -260,7 +283,27 @@ export default function RootLayout() {
       }
     }
 
-    if (linkingUrl) void handleUrl(linkingUrl)
+    const observedRecoveryUrl = findPasswordRecoveryUrl(linkingUrl)
+    if (observedRecoveryUrl) {
+      void handleUrl(observedRecoveryUrl)
+      return
+    }
+
+    let cancelled = false
+    void withTimeout(Linking.getInitialURL(), INITIAL_LINK_LOOKUP_TIMEOUT_MS)
+      .then((initialUrl) => {
+        if (cancelled) return
+
+        const initialRecoveryUrl = findPasswordRecoveryUrl(initialUrl)
+        if (initialRecoveryUrl) void handleUrl(initialRecoveryUrl)
+      })
+      .catch(() => {
+        // The normal app startup timeout below still guarantees a usable route.
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [linkingUrl, router])
 
   useEffect(() => {
