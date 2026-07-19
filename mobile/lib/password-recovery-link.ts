@@ -40,6 +40,12 @@ export function isPasswordRecoveryUrl(url: string): boolean {
   }
 }
 
+export function findPasswordRecoveryUrl(
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  return candidates.find((url): url is string => Boolean(url && isPasswordRecoveryUrl(url))) ?? null
+}
+
 function getAuthParams(url: string): URLSearchParams {
   const parsedUrl = new URL(url)
   const params = new URLSearchParams(parsedUrl.search)

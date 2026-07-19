@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  findPasswordRecoveryUrl,
   isPasswordRecoveryUrl,
   parsePasswordRecoveryUrl,
 } from "../mobile/lib/password-recovery-link.ts";
@@ -26,6 +27,15 @@ await test("recognizes only the Roots update-password deep link", () => {
   assert.equal(isPasswordRecoveryUrl("https://useroots.app/update-password"), false);
   assert.equal(isPasswordRecoveryUrl("roots://login"), false);
   assert.equal(isPasswordRecoveryUrl("not a url"), false);
+});
+
+await test("finds a recovery URL when the primary linking source is missing or unrelated", () => {
+  const recoveryUrl =
+    "roots://update-password#access_token=access&refresh_token=refresh&type=recovery";
+
+  assert.equal(findPasswordRecoveryUrl(null, recoveryUrl), recoveryUrl);
+  assert.equal(findPasswordRecoveryUrl("roots://", recoveryUrl), recoveryUrl);
+  assert.equal(findPasswordRecoveryUrl("roots://login", null), null);
 });
 
 await test("parses PKCE recovery codes from the query", () => {

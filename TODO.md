@@ -13,6 +13,8 @@ the roadmap or architecture direction changes.
   - [x] Bound recovery exchange and session checks, quarantine failed/late
         recovery sessions, and add current Supabase React Native auth locking
         and app-state refresh handling.
+  - [x] Bound root startup, avoid competing session reads during recovery, and
+        fall back to iOS's initial URL when Expo's primary source misses it.
   - [x] Cover PKCE codes, implicit tokens, provider errors, missing credentials,
         unrelated links, and operation timeouts with automated tests.
   - [ ] On a real iPhone using a release/TestFlight build, request a fresh link,
@@ -30,6 +32,8 @@ the roadmap or architecture direction changes.
       Reconfirmed again after the first-download onboarding redesign, native
       Apple sign-in implementation, and image-first visual rework; the same
       five public-site errors remain and no mobile lint errors were reported.
+      Reconfirmed on July 18, 2026 after the mobile password-recovery handoff
+      fix; the same five public-site errors remain and mobile lint passed.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:
@@ -44,6 +48,8 @@ the roadmap or architecture direction changes.
       native Apple sign-in implementation, and image-first visual rework;
       compilation and TypeScript again completed before the same `/api/contact`
       page-data failure.
+      Reconfirmed on July 18, 2026 after the mobile password-recovery handoff
+      fix; compilation and TypeScript again completed before the same failure.
 - [x] The earlier `npm test` TypeScript-loader failure is no longer
       reproducible. `npm.cmd test` passed on July 16, 2026, after fast
       cold-start cache implementation.
