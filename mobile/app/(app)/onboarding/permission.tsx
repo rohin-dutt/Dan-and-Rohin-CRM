@@ -40,8 +40,8 @@ export default function OnboardingPermissionScreen() {
           style={{ fontFamily: fonts.body, color: colors.muted }}
           className="mt-4 text-center text-[15px] leading-5"
         >
-          Roots works best when you can pick directly from your contacts. We only access the
-          people you choose — nothing is imported automatically.
+          Choose &quot;Allow Access to All Contacts&quot; when prompted so you can pick exactly who
+          to add — nothing is imported automatically.
         </Text>
         <View className="mt-8 w-full">
           <Button title="Connect Contacts" onPress={handleConnectContacts} loading={requesting} />
