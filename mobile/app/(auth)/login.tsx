@@ -2,7 +2,6 @@ import { useRef, useState } from "react"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import {
   DeviceEventEmitter,
-  Platform,
   Text,
   TextInput,
   TouchableOpacity,
@@ -10,7 +9,6 @@ import {
 } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
-import { AppleSignInButton } from "@/components/AppleSignInButton"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
@@ -64,24 +62,6 @@ export default function LoginScreen() {
             </Text>
           </View>
         )}
-
-        {Platform.OS === "ios" ? (
-          <>
-            <AppleSignInButton
-              kind="sign-in"
-              onError={setError}
-              onSignedIn={() => {
-                releaseRecoveryRouting()
-                router.replace("/")
-              }}
-            />
-            <View className="my-6 flex-row items-center">
-              <View className="h-px flex-1 bg-stone-200" />
-              <Text className="mx-3 text-xs text-gray-500">or continue with email</Text>
-              <View className="h-px flex-1 bg-stone-200" />
-            </View>
-          </>
-        ) : null}
 
         <TextField
           label="Email"

@@ -2,7 +2,6 @@ import { useRef, useState } from "react"
 import { useRouter } from "expo-router"
 import {
   DeviceEventEmitter,
-  Platform,
   Text,
   TextInput,
   TouchableOpacity,
@@ -10,7 +9,6 @@ import {
 } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { PASSWORD_RECOVERY_RESOLVED_EVENT } from "@/lib/auth-links"
-import { AppleSignInButton } from "@/components/AppleSignInButton"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { TextField } from "@/components/TextField"
@@ -23,12 +21,14 @@ export default function SignupScreen() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmationSent, setConfirmationSent] = useState(false)
   const lastNameInputRef = useRef<TextInput>(null)
   const emailInputRef = useRef<TextInput>(null)
   const passwordInputRef = useRef<TextInput>(null)
+  const confirmPasswordInputRef = useRef<TextInput>(null)
 
   function releaseRecoveryRouting() {
     DeviceEventEmitter.emit(PASSWORD_RECOVERY_RESOLVED_EVENT)
@@ -46,6 +46,10 @@ export default function SignupScreen() {
     }
     if (!password) {
       setError("Password is required")
+      return
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
       return
     }
     setLoading(true)
@@ -96,24 +100,6 @@ export default function SignupScreen() {
           </View>
         )}
 
-        {Platform.OS === "ios" ? (
-          <>
-            <AppleSignInButton
-              kind="sign-up"
-              onError={setError}
-              onSignedIn={() => {
-                releaseRecoveryRouting()
-                router.replace("/")
-              }}
-            />
-            <View className="my-6 flex-row items-center">
-              <View className="h-px flex-1 bg-stone-200" />
-              <Text className="mx-3 text-xs text-gray-500">or continue with email</Text>
-              <View className="h-px flex-1 bg-stone-200" />
-            </View>
-          </>
-        ) : null}
-
         <TextField
           label="First name"
           value={firstName}
@@ -150,6 +136,17 @@ export default function SignupScreen() {
           label="Password"
           value={password}
           onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+        />
+        <TextField
+          ref={confirmPasswordInputRef}
+          label="Confirm password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
           secureTextEntry
           autoComplete="new-password"
           returnKeyType="done"
