@@ -262,11 +262,11 @@ export default function SettingsScreen() {
         if (nextEnabled) {
           try {
             await registerPushToken()
-            setDebugPushError("SUCCESS: token registered")
+            setDebugPushError(`SUCCESS: token registered | ENV=${process.env.EXPO_PUBLIC_APP_ENV ?? "undefined"}`)
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
             console.error("[PUSH TOKEN REGISTRATION FAILED]", message)
-            setDebugPushError(message)
+            setDebugPushError(`${message} | ENV=${process.env.EXPO_PUBLIC_APP_ENV ?? "undefined"}`)
             /* token registration failed, continue anyway */
           }
         } else {
