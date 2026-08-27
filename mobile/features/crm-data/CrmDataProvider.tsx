@@ -15,6 +15,7 @@ import {
 } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { PEOPLE_CHANGED_EVENT } from "@/lib/onboarding-status"
+import { GROUPS_CHANGED_EVENT } from "@/lib/group-data"
 import {
   readCrmSnapshot,
   writeCrmSnapshot,
@@ -138,11 +139,13 @@ export function CrmDataProvider({ children }: { children: ReactNode }) {
     const peopleSub = DeviceEventEmitter.addListener(PEOPLE_CHANGED_EVENT, refreshFromChange)
     const interactionSub = DeviceEventEmitter.addListener("interactionAdded", refreshFromChange)
     const noteSub = DeviceEventEmitter.addListener("noteAdded", refreshFromChange)
+    const groupSub = DeviceEventEmitter.addListener(GROUPS_CHANGED_EVENT, refreshFromChange)
 
     return () => {
       peopleSub.remove()
       interactionSub.remove()
       noteSub.remove()
+      groupSub.remove()
     }
   }, [refresh])
 

@@ -2,6 +2,8 @@ import * as Crypto from "expo-crypto"
 import * as SecureStore from "expo-secure-store"
 import * as SQLite from "expo-sqlite"
 import type {
+  Group,
+  GroupMember,
   ImportantMoment,
   Interaction,
   Person,
@@ -13,7 +15,7 @@ import type {
 
 const CACHE_DATABASE_NAME = "roots-private-cache.db"
 const CACHE_KEY_NAME = "roots:crm-cache-key"
-export const CRM_CACHE_SCHEMA_VERSION = 1
+export const CRM_CACHE_SCHEMA_VERSION = 2
 
 export type CrmSnapshot = {
   schemaVersion: typeof CRM_CACHE_SCHEMA_VERSION
@@ -30,6 +32,8 @@ export type CrmSnapshot = {
   interactions: Interaction[]
   personNotes: PersonNote[]
   importantMoments: ImportantMoment[]
+  groups: Group[]
+  groupMembers: GroupMember[]
   settings: Settings | null
 }
 
@@ -124,6 +128,8 @@ function isCrmSnapshot(value: unknown, userId: string): value is CrmSnapshot {
     !Array.isArray(value.interactions) ||
     !Array.isArray(value.personNotes) ||
     !Array.isArray(value.importantMoments) ||
+    !Array.isArray(value.groups) ||
+    !Array.isArray(value.groupMembers) ||
     (value.settings !== null && !isRecord(value.settings))
   ) {
     return false
@@ -143,13 +149,17 @@ function isCrmSnapshot(value: unknown, userId: string): value is CrmSnapshot {
     (moment) =>
       isRecord(moment) && typeof moment.person_id === "string" && moment.user_id === userId,
   )
+  const groupsAreOwned = value.groups.every(
+    (group) => isRecord(group) && typeof group.id === "string" && group.user_id === userId,
+  )
   const settingsAreOwned = value.settings === null || value.settings.user_id === userId
-  if (!peopleAreOwned || !tagsAreOwned || !notesAreOwned || !momentsAreOwned || !settingsAreOwned) {
+  if (!peopleAreOwned || !tagsAreOwned || !notesAreOwned || !momentsAreOwned || !groupsAreOwned || !settingsAreOwned) {
     return false
   }
 
   const personIds = new Set(value.people.map((person) => person.id))
   const tagIds = new Set(value.tags.map((tag) => tag.id))
+  const groupIds = new Set(value.groups.map((group) => group.id))
   return (
     value.interactions.every(
       (interaction) =>
@@ -164,6 +174,14 @@ function isCrmSnapshot(value: unknown, userId: string): value is CrmSnapshot {
         typeof link.tag_id === "string" &&
         personIds.has(link.person_id) &&
         tagIds.has(link.tag_id),
+    ) &&
+    value.groupMembers.every(
+      (member) =>
+        isRecord(member) &&
+        typeof member.group_id === "string" &&
+        typeof member.person_id === "string" &&
+        groupIds.has(member.group_id) &&
+        personIds.has(member.person_id),
     )
   )
 }

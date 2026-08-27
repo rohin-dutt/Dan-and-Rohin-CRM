@@ -16,6 +16,7 @@ import { AboutTab, FollowUpsTab, NotesTab, TimelineTab } from "@/features/person
 import { formatNextAction } from "@/features/person-detail/helpers"
 import { usePersonDetail } from "@/features/person-detail/use-person-detail"
 import { QuickAddFormSheet, type QuickAddMode, type QuickAddPerson } from "@/features/quick-add/QuickAddFormSheet"
+import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
 export default function PersonDetailScreen() {
   const router = useRouter()
@@ -49,6 +50,12 @@ export default function PersonDetailScreen() {
   const sheetPerson: QuickAddPerson | null = useMemo(
     () => (person ? { id: person.id, name: person.name, company: person.company } : null),
     [person],
+  )
+
+  const { snapshot } = useCrmData()
+  const groupNameById = useMemo(
+    () => new Map((snapshot?.groups ?? []).map((group) => [group.id, group.name])),
+    [snapshot?.groups],
   )
 
   function showMenu() {
@@ -192,7 +199,12 @@ export default function PersonDetailScreen() {
           <TabBar activeTab={activeTab} onChange={setActiveTab} />
 
           {activeTab === "Timeline" ? (
-            <TimelineTab interactions={touchPointInteractions} notes={personNotes} firstName={person.name.split(" ")[0]} />
+            <TimelineTab
+              interactions={touchPointInteractions}
+              notes={personNotes}
+              firstName={person.name.split(" ")[0]}
+              groupNameById={groupNameById}
+            />
           ) : null}
 
           {activeTab === "About" ? (

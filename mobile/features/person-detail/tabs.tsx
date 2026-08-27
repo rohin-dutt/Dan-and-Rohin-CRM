@@ -19,10 +19,14 @@ export function TimelineTab({
   interactions,
   notes,
   firstName,
+  groupNameById,
 }: {
   interactions: Interaction[]
   notes: PersonNote[]
   firstName: string
+  // When provided, interactions carrying a group_id render a small group
+  // label so a group hangout is distinguishable from a 1-on-1 chat.
+  groupNameById?: Map<string, string>
 }) {
   const [showAll, setShowAll] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
@@ -73,6 +77,10 @@ export function TimelineTab({
         const isFollowUpCompleted = entry.kind === "interaction" && entry.interaction.type === FOLLOW_UP_COMPLETED_TYPE
         const isExpanded = expandedIds.has(entry.id)
         const body = entry.kind === "note" ? entry.note.body : entry.interaction.notes
+        const groupName =
+          entry.kind === "interaction" && entry.interaction.group_id
+            ? groupNameById?.get(entry.interaction.group_id) ?? null
+            : null
         const title =
           entry.kind === "note"
             ? `${formatTimelineDate(entry.date)}  ·  Note`
@@ -99,6 +107,15 @@ export function TimelineTab({
               <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
                 {title}
               </Text>
+              {groupName ? (
+                <View className="mt-1.5 flex-row">
+                  <View className="rounded-lg px-2.5 py-1" style={{ backgroundColor: colors.mint }}>
+                    <Text style={{ fontFamily: fonts.semibold, color: colors.forest }} className="text-xs">
+                      🌱 {groupName}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
               {isFollowUpCompleted ? (
                 <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-base leading-6">
                   Follow up completed

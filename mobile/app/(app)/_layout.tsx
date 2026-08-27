@@ -15,6 +15,8 @@ export default function AppLayout() {
         />
         <Stack.Screen name="people/[id]" />
         <Stack.Screen name="people/new" />
+        <Stack.Screen name="groups/[id]" />
+        <Stack.Screen name="groups/new" />
         <Stack.Screen name="people/import-contacts" />
         <Stack.Screen name="people/[id]/edit" />
       </Stack>

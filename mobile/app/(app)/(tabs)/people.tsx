@@ -7,7 +7,7 @@ import { BrandHeader, EmptyPanel, SearchBox } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import type { Tag } from "@/types"
+import type { Person, Tag } from "@/types"
 import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { getUpcomingMoments } from "@roots/shared"
 import {
@@ -24,7 +24,11 @@ import {
 } from "@/features/people-list/filters"
 import { FilterSheet } from "@/features/people-list/FilterSheet"
 import { PersonCard } from "@/features/people-list/PersonCard"
+import { GroupCard } from "@/features/groups/GroupCard"
 import { useCrmData } from "@/features/crm-data/CrmDataProvider"
+
+const LIST_VIEWS = ["People", "Groups"] as const
+type ListView = (typeof LIST_VIEWS)[number]
 
 export default function PeopleScreen() {
   const router = useRouter()
@@ -32,6 +36,7 @@ export default function PeopleScreen() {
   const { snapshot, loading, refreshError } = useCrmData()
 
   const [search, setSearch] = useState("")
+  const [view, setView] = useState<ListView>("People")
   const [sort, setSort] = useState<SortKey>("last_contacted")
   const [category, setCategory] = useState<CategoryFilter>("All")
   const [statusFilters, setStatusFilters] = useState<string[]>(parseMultiParam(params.status))
@@ -45,6 +50,8 @@ export default function PeopleScreen() {
   const personTags = snapshot?.personTags ?? []
   const importantMoments = snapshot?.importantMoments ?? []
   const interactions = snapshot?.interactions ?? []
+  const groups = snapshot?.groups ?? []
+  const groupMembers = snapshot?.groupMembers ?? []
 
   const statusParam = Array.isArray(params.status) ? params.status.join(",") : (params.status ?? "")
   // Locations may contain commas ("Paris, France"), so they must never go
@@ -102,6 +109,24 @@ export default function PeopleScreen() {
     [category, followUpByPerson, interactionCounts, latestTouchByPerson, locationFilters, params.moments, people, search, sort, statusFilters, tagFilters, tagsByPerson, upcomingMomentPersonIds],
   )
 
+  const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people])
+
+  const groupRows = useMemo(() => {
+    const normalized = search.trim().toLowerCase()
+    const membersByGroup = new Map<string, Person[]>()
+    for (const link of groupMembers) {
+      const person = peopleById.get(link.person_id)
+      if (!person) continue
+      membersByGroup.set(link.group_id, [...(membersByGroup.get(link.group_id) ?? []), person])
+    }
+    return groups
+      .filter((group) => !normalized || group.name.toLowerCase().includes(normalized))
+      .map((group) => ({
+        group,
+        members: (membersByGroup.get(group.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+  }, [groupMembers, groups, peopleById, search])
+
   const activeFilterCount =
     statusFilters.length + tagFilters.length + locationFilters.length + (params.moments === "upcoming" ? 1 : 0)
   const hasActiveFilter = activeFilterCount > 0
@@ -123,14 +148,62 @@ export default function PeopleScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search people"
+            placeholder={view === "People" ? "Search people" : "Search groups"}
             placeholderTextColor="#777A83"
             className="ml-3 flex-1 text-warm-black"
             style={[singleLineTextInputStyle, { fontFamily: fonts.body }]}
-            accessibilityLabel="Search people"
+            accessibilityLabel={view === "People" ? "Search people" : "Search groups"}
           />
         </SearchBox>
 
+        {/* People / Groups segmented toggle */}
+        <View className="mt-4 flex-row rounded-full border border-stone-200 bg-white p-1">
+          {LIST_VIEWS.map((option) => {
+            const selected = view === option
+            return (
+              <TouchableOpacity
+                key={option}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`Show ${option.toLowerCase()}`}
+                onPress={() => setView(option)}
+                className="min-h-10 flex-1 flex-row items-center justify-center rounded-full"
+                style={{ backgroundColor: selected ? colors.forest : "transparent" }}
+              >
+                <Ionicons
+                  name={option === "People" ? "person-outline" : "people-outline"}
+                  size={16}
+                  color={selected ? "#FFFFFF" : colors.ink}
+                />
+                <Text
+                  style={{ fontFamily: fonts.medium }}
+                  className={`ml-2 text-sm ${selected ? "text-white" : "text-warm-black"}`}
+                >
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+
+        {view === "Groups" ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Create a new group"
+            onPress={() => router.push("/groups/new")}
+            activeOpacity={0.8}
+            className="mt-4 min-h-11 flex-row items-center justify-center rounded-full"
+            style={{ backgroundColor: colors.forest }}
+          >
+            <Ionicons name="add" size={19} color="#FFFFFF" />
+            <Text style={{ fontFamily: fonts.semibold, color: "#FFFFFF" }} className="ml-1 text-sm">
+              New group
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {view === "People" ? (
+        <>
         <View className="mt-4 flex-row gap-2">
           {PEOPLE_CATEGORIES.map((item) => (
             <TouchableOpacity
@@ -227,9 +300,37 @@ export default function PeopleScreen() {
             ) : null}
           </TouchableOpacity>
         </View>
+        </>
+        ) : null}
       </View>
 
-      {sorted.length === 0 ? (
+      {view === "Groups" ? (
+        groupRows.length === 0 ? (
+          <EmptyPanel
+            title={search ? "No groups match your search" : "No groups yet"}
+            body={
+              search
+                ? "Try a different search."
+                : "Create a group to log hangouts with several people at once."
+            }
+          />
+        ) : (
+          <FlatList
+            data={groupRows}
+            keyExtractor={(item) => item.group.id}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 130 }}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <GroupCard
+                group={item.group}
+                members={item.members}
+                onPress={() => router.push(`/groups/${item.group.id}`)}
+              />
+            )}
+          />
+        )
+      ) : sorted.length === 0 ? (
         <EmptyPanel
           title={search || category !== "All" || hasActiveFilter ? "No people match your search" : "Add your first person to Roots"}
           body={

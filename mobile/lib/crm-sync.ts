@@ -4,7 +4,7 @@ import { loadImportantMomentsForUser } from "@/lib/important-moments"
 import { loadPersonNotesForPeople } from "@/lib/person-notes"
 import { displayNameFromMetadata, firstNameFromMetadata } from "@/lib/user-metadata"
 import { CRM_CACHE_SCHEMA_VERSION, type CrmSnapshot } from "@/lib/crm-cache"
-import type { Interaction, Person, PersonNote, PersonTag, Settings, Tag } from "@/types"
+import type { Group, GroupMember, Interaction, Person, PersonNote, PersonTag, Settings, Tag } from "@/types"
 
 async function loadSettings(userId: string): Promise<Settings> {
   const { data, error } = await supabase
@@ -26,11 +26,13 @@ async function loadSettings(userId: string): Promise<Settings> {
 
 export async function fetchCrmSnapshot(session: Session): Promise<CrmSnapshot> {
   const userId = session.user.id
-  const [peopleResult, tagsResult, personTagsResult, importantMoments, settings] =
+  const [peopleResult, tagsResult, personTagsResult, groupsResult, groupMembersResult, importantMoments, settings] =
     await Promise.all([
       supabase.from("people").select("*").eq("user_id", userId),
       supabase.from("tags").select("*").eq("user_id", userId).order("name"),
       supabase.from("person_tags").select("person_id, tag_id"),
+      supabase.from("groups").select("*").eq("user_id", userId).order("name"),
+      supabase.from("group_members").select("group_id, person_id"),
       loadImportantMomentsForUser(userId),
       loadSettings(userId),
     ])
@@ -38,6 +40,8 @@ export async function fetchCrmSnapshot(session: Session): Promise<CrmSnapshot> {
   if (peopleResult.error) throw peopleResult.error
   if (tagsResult.error) throw tagsResult.error
   if (personTagsResult.error) throw personTagsResult.error
+  if (groupsResult.error) throw groupsResult.error
+  if (groupMembersResult.error) throw groupMembersResult.error
 
   const people = (peopleResult.data ?? []) as Person[]
   const personIds = people.map((person) => person.id)
@@ -73,6 +77,8 @@ export async function fetchCrmSnapshot(session: Session): Promise<CrmSnapshot> {
     interactions,
     personNotes,
     importantMoments,
+    groups: (groupsResult.data ?? []) as Group[],
+    groupMembers: (groupMembersResult.data ?? []) as GroupMember[],
     settings,
   }
 }
