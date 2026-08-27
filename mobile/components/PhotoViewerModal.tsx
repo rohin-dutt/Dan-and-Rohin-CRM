@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { ActivityIndicator, Image, Modal, Text, TouchableOpacity, View } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { fonts } from "@/constants/theme"
 import { getSignedPhotoUrl } from "@/lib/photo-upload"
@@ -17,6 +17,7 @@ export function PhotoViewerModal({
 }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const insets = useSafeAreaInsets()
 
   useEffect(() => {
     setUrl(null)
@@ -64,13 +65,12 @@ export function PhotoViewerModal({
             )}
           </View>
         )}
-        <SafeAreaView style={{ position: "absolute", top: 0, right: 0 }}>
+        <View style={{ position: "absolute", top: insets.top + 8, right: 16 }}>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Close photo"
             onPress={onClose}
             style={{
-              margin: 16,
               width: 40,
               height: 40,
               borderRadius: 20,
@@ -81,7 +81,7 @@ export function PhotoViewerModal({
           >
             <Ionicons name="close" size={22} color="#FFFFFF" />
           </TouchableOpacity>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   )
