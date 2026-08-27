@@ -11,6 +11,7 @@ import { InlineDateField } from "@/components/InlineDateField"
 import { SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
+import { getCadenceDefaultForCategory } from "@/features/onboarding/onboarding-contacts"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { CONTACT_FREQUENCY_OPTIONS, frequencyLabel } from "@/constants/frequencies"
 import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
@@ -279,6 +280,7 @@ export default function OnboardingManualScreen() {
                       onPress={() => {
                         setCategory(cat.label)
                         setCategoryError(null)
+                        setFrequencyDays(getCadenceDefaultForCategory(cat.label))
                       }}
                       className={`min-h-[50px] flex-1 flex-row items-center justify-center px-1 ${index > 0 ? "border-l border-stone-200" : ""}`}
                       style={{ backgroundColor: selected ? colors.forest : "white" }}
