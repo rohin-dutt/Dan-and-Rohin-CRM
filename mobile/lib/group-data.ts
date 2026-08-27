@@ -80,6 +80,10 @@ export async function deleteGroup(groupId: string): Promise<void> {
 // create_interaction_and_touch_person RPC per member so follow-up auto-close
 // and last_contacted_at behave exactly like an individual chat, then stamps
 // group_id on the returned row.
+//
+// Returns the id of the first row created: a hangout photo is stored once and
+// its photo_path set only on that row (dedupeGroupInteractions surfaces it on
+// the group timeline), never duplicated across the per-member rows.
 export async function logGroupHangout(input: {
   groupId: string
   personIds: string[]
@@ -89,7 +93,8 @@ export async function logGroupHangout(input: {
   followUpNeeded: boolean
   followUpDate: string | null
   followUpNote: string | null
-}): Promise<void> {
+}): Promise<{ firstInteractionId: string | null }> {
+  let firstInteractionId: string | null = null
   for (const personId of input.personIds) {
     const { data: interactionId, error: rpcError } = await supabase.rpc(
       "create_interaction_and_touch_person",
@@ -110,21 +115,30 @@ export async function logGroupHangout(input: {
       .update({ group_id: input.groupId })
       .eq("id", interactionId as string)
     if (linkError) throw linkError
+
+    if (firstInteractionId == null) firstInteractionId = interactionId as string
   }
 
   DeviceEventEmitter.emit("interactionAdded")
+  return { firstInteractionId }
 }
 
 // A hangout writes one identical row per member, so the group timeline keeps
-// only one entry per (date, type, notes) batch.
+// only one entry per (date, type, notes) batch. Only one row of a batch can
+// carry a photo_path, so that row wins the dedupe and the photo shows on the
+// group timeline no matter the row order.
 export function dedupeGroupInteractions(interactions: Interaction[]): Interaction[] {
-  const seen = new Set<string>()
+  const keptIndexByKey = new Map<string, number>()
   const deduped: Interaction[] = []
   for (const interaction of interactions) {
     const key = `${interaction.date}|${interaction.type}|${interaction.notes ?? ""}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    deduped.push(interaction)
+    const keptIndex = keptIndexByKey.get(key)
+    if (keptIndex == null) {
+      keptIndexByKey.set(key, deduped.length)
+      deduped.push(interaction)
+    } else if (!deduped[keptIndex].photo_path && interaction.photo_path) {
+      deduped[keptIndex] = interaction
+    }
   }
   return deduped
 }

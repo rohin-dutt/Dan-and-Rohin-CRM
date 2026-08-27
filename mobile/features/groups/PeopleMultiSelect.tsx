@@ -3,7 +3,6 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "reac
 import { Ionicons } from "@expo/vector-icons"
 import { PersonAvatar, SearchBox } from "@/components/RootsUI"
 import { supabase } from "@/lib/supabase"
-import { personImageUrl } from "@/lib/person-display"
 import { createPersonWithRelations, PersonRelationsError } from "@/lib/people-data"
 import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
@@ -301,7 +300,7 @@ function PersonSelectRow({
       activeOpacity={0.76}
       className={`flex-row items-center py-3 ${isLast ? "" : "border-b border-stone-100"}`}
     >
-      <PersonAvatar name={person.name} size={40} imageUrl={personImageUrl(person)} />
+      <PersonAvatar name={person.name} size={40} photoPath={person.photo_path ?? null} />
       <View className="ml-3 flex-1">
         <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} numberOfLines={1} className="text-base">
           {person.name}

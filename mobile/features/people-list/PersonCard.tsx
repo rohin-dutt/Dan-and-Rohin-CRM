@@ -2,7 +2,6 @@ import { Text, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { PersonAvatar, SoftCard } from "@/components/RootsUI"
 import { colors, fonts } from "@/constants/theme"
-import { personImageUrl } from "@/lib/person-display"
 import { followUpBadgeForPerson, formatLastInteraction } from "./filters"
 import type { Person } from "@/types"
 
@@ -22,7 +21,7 @@ export function PersonCard({
     <TouchableOpacity onPress={onPress} activeOpacity={0.76} accessibilityRole="button" accessibilityLabel={`Open ${person.name}`}>
       <SoftCard className="mb-3 p-4">
         <View className="flex-row items-center">
-          <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
+          <PersonAvatar name={person.name} photoPath={person.photo_path ?? null} size={44} />
           <View className="ml-4 flex-1">
             <View className="flex-row items-center justify-between">
               <Text style={{ fontFamily: fonts.bold, color: colors.ink }} numberOfLines={1} className="flex-1 text-lg">

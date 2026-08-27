@@ -60,6 +60,7 @@ export default function OnboardingSelectScreen() {
             Contacts.Fields.Birthday,
             Contacts.Fields.Company,
             Contacts.Fields.JobTitle,
+            Contacts.Fields.Image,
           ],
         })
 

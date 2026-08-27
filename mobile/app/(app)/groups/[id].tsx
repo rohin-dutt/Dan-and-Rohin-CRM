@@ -8,7 +8,6 @@ import { ConfirmModal } from "@/components/ConfirmModal"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
-import { personImageUrl } from "@/lib/person-display"
 import { colors, fonts } from "@/constants/theme"
 import { TimelineTab } from "@/features/person-detail/tabs"
 import { GroupAvatarStack } from "@/features/groups/GroupAvatarStack"
@@ -215,7 +214,7 @@ export default function GroupDetailScreen() {
                       activeOpacity={0.76}
                       className={`flex-row items-center py-3 ${index < members.length - 1 ? "border-b border-stone-100" : ""}`}
                     >
-                      <PersonAvatar name={member.name} size={44} imageUrl={personImageUrl(member)} />
+                      <PersonAvatar name={member.name} size={44} photoPath={member.photo_path ?? null} />
                       <View className="ml-3 flex-1">
                         <Text style={{ fontFamily: fonts.semibold, color: colors.ink }} numberOfLines={1} className="text-base">
                           {member.name}

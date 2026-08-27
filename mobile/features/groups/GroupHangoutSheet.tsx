@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   ScrollView,
   Switch,
@@ -12,9 +13,12 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
+import { supabase } from "@/lib/supabase"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { DatePickerModal } from "@/components/DatePickerModal"
+import { PhotoPickerField } from "@/components/PhotoPickerField"
 import { PillButton } from "@/components/PillButton"
+import { attachInteractionPhoto } from "@/lib/photo-upload"
 import { formatFullDate, toLocalDateString } from "@roots/shared"
 import { logGroupHangout } from "@/lib/group-data"
 import type { Person } from "@/types"
@@ -44,6 +48,7 @@ export function GroupHangoutSheet({
   const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
   const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
   const [followUpNote, setFollowUpNote] = useState("")
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -57,6 +62,7 @@ export function GroupHangoutSheet({
     setFollowUpDate(null)
     setShowFollowUpPicker(false)
     setFollowUpNote("")
+    setPhotoUri(null)
     setSaving(false)
     setFormError(null)
   }, [visible])
@@ -84,7 +90,7 @@ export function GroupHangoutSheet({
     setSaving(true)
     setFormError(null)
     try {
-      await logGroupHangout({
+      const { firstInteractionId } = await logGroupHangout({
         groupId,
         personIds: members.map((member) => member.id),
         type: interactionType,
@@ -94,7 +100,23 @@ export function GroupHangoutSheet({
         followUpDate: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
         followUpNote: followUpEnabled ? followUpNote.trim() || null : null,
       })
+
+      // One photo per hangout, attached to the first created row only; a
+      // failed upload never fails the saved hangout.
+      let photoAttached = true
+      if (photoUri && firstInteractionId) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        photoAttached = session
+          ? await attachInteractionPhoto(session.user.id, firstInteractionId, photoUri)
+          : false
+      }
+
       onClose()
+      if (!photoAttached) {
+        Alert.alert("Photo not attached", "Your hangout was saved, but the photo could not be uploaded.")
+      }
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save")
     } finally {
@@ -281,6 +303,8 @@ export function GroupHangoutSheet({
             marginBottom: 20,
           }}
         />
+
+        <PhotoPickerField photoUri={photoUri} onChange={setPhotoUri} />
 
         {/* Follow-up section */}
         <View

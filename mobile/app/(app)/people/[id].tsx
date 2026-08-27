@@ -7,7 +7,6 @@ import { PersonAvatar } from "@/components/RootsUI"
 import { ConfirmModal } from "@/components/ConfirmModal"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import { personImageUrl } from "@/lib/person-display"
 import { formatDaysAgo } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getNextActionDays } from "@roots/shared"
@@ -160,7 +159,7 @@ export default function PersonDetailScreen() {
           {error != null && <ErrorBanner message={error} />}
 
           <View className="mt-5 flex-row items-center">
-            <PersonAvatar name={person.name} size={92} imageUrl={personImageUrl(person)} />
+            <PersonAvatar name={person.name} size={92} photoPath={person.photo_path ?? null} />
             <View className="ml-4 flex-1">
               <Text
                 style={{ fontFamily: fonts.heading, color: colors.forest }}

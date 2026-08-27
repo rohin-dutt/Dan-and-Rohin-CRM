@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { Image, Text, TouchableOpacity, View, type ImageSourcePropType, type ViewStyle } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
+import { useSignedPhotoUrl } from "@/lib/photo-upload"
 import logoMarkAsset from "../assets/roots-logo-mark.png"
 
 const logoMark = logoMarkAsset as ImageSourcePropType
@@ -136,11 +138,20 @@ export function PersonAvatar({
   name,
   size = 44,
   imageUrl,
+  photoPath,
 }: {
   name: string
   size?: number
+  // Direct URL/local uri, e.g. a just-picked photo preview. Takes precedence
+  // over photoPath.
   imageUrl?: string | null
+  // Storage path in the private photos bucket; resolved to a signed URL and
+  // falling back to initials while loading or when resolution fails.
+  photoPath?: string | null
 }) {
+  const signedUrl = useSignedPhotoUrl(photoPath)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+
   const initials = name
     .trim()
     .split(/\s+/)
@@ -148,10 +159,12 @@ export function PersonAvatar({
     .map((part) => part[0]?.toUpperCase())
     .join("") || "?"
 
-  if (imageUrl) {
+  const resolvedUrl = imageUrl ?? signedUrl
+  if (resolvedUrl && resolvedUrl !== failedUrl) {
     return (
       <Image
-        source={{ uri: imageUrl }}
+        source={{ uri: resolvedUrl }}
+        onError={() => setFailedUrl(resolvedUrl)}
         style={{ width: size, height: size, borderRadius: size / 2 }}
         accessibilityLabel={`${name} photo`}
       />

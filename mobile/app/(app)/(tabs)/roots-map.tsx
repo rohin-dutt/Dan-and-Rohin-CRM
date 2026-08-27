@@ -19,9 +19,7 @@ type MapPerson = {
   latitude: number | null
   longitude: number | null
   last_contacted_at: string | null
-  photo_url?: string | null
-  avatar_url?: string | null
-  image_url?: string | null
+  photo_path?: string | null
 }
 
 type LocationGroup = {
@@ -373,7 +371,7 @@ export default function RootsMapScreen() {
                     </View>
                     <View className="mr-3 flex-row -space-x-2">
                       {group.people.slice(0, 4).map((person) => (
-                        <PersonAvatar key={person.id} name={person.name} size={26} imageUrl={person.photo_url ?? person.avatar_url ?? person.image_url ?? null} />
+                        <PersonAvatar key={person.id} name={person.name} size={26} photoPath={person.photo_path ?? null} />
                       ))}
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.muted} />

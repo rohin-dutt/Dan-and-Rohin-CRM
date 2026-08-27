@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
+  Alert,
   DeviceEventEmitter,
   Keyboard,
   ScrollView,
@@ -17,7 +18,9 @@ import { supabase } from "@/lib/supabase"
 import { colors, fonts, singleLineTextInputStyle } from "@/constants/theme"
 import { BottomSheetModal } from "@/components/BottomSheetModal"
 import { DatePickerModal } from "@/components/DatePickerModal"
+import { PhotoPickerField } from "@/components/PhotoPickerField"
 import { PillButton } from "@/components/PillButton"
+import { attachInteractionPhoto } from "@/lib/photo-upload"
 import { formatFullDate, toLocalDateString, todayInputValue } from "@roots/shared"
 import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 
@@ -64,6 +67,7 @@ export function QuickAddFormSheet({
   const [followUpDate, setFollowUpDate] = useState<Date | null>(null)
   const [showFollowUpPicker, setShowFollowUpPicker] = useState(false)
   const [followUpNote, setFollowUpNote] = useState("")
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
 
   // Note fields
   const [noteText, setNoteText] = useState("")
@@ -124,6 +128,7 @@ export function QuickAddFormSheet({
     setFollowUpDate(null)
     setShowFollowUpPicker(false)
     setFollowUpNote("")
+    setPhotoUri(null)
     setNoteText("")
   }, [mode, initialPerson])
 
@@ -156,18 +161,36 @@ export function QuickAddFormSheet({
     try {
       const session = await getCachedSession()
       if (!session) throw new Error("Not authenticated")
-      const { error: rpcError } = await supabase.rpc("create_interaction_and_touch_person", {
-        p_person_id: selectedPerson.id,
-        p_type: interactionType,
-        p_date: toLocalDateString(selectedDate),
-        p_notes: interactionNotes.trim() || null,
-        p_follow_up_needed: followUpEnabled,
-        p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
-        p_follow_up_note: followUpEnabled ? followUpNote.trim() || null : null,
-      })
+      const { data: interactionId, error: rpcError } = await supabase.rpc(
+        "create_interaction_and_touch_person",
+        {
+          p_person_id: selectedPerson.id,
+          p_type: interactionType,
+          p_date: toLocalDateString(selectedDate),
+          p_notes: interactionNotes.trim() || null,
+          p_follow_up_needed: followUpEnabled,
+          p_follow_up_date: followUpEnabled && followUpDate ? toLocalDateString(followUpDate) : null,
+          p_follow_up_note: followUpEnabled ? followUpNote.trim() || null : null,
+        },
+      )
       if (rpcError) throw rpcError
+
+      // The photo is uploaded only after the interaction exists (its id is
+      // the storage path); a failed upload never fails the saved interaction.
+      let photoAttached = true
+      if (photoUri && interactionId) {
+        photoAttached = await attachInteractionPhoto(
+          session.user.id,
+          interactionId as string,
+          photoUri,
+        )
+      }
+
       DeviceEventEmitter.emit("interactionAdded")
       onClose()
+      if (!photoAttached) {
+        Alert.alert("Photo not attached", "Your chat was saved, but the photo could not be uploaded.")
+      }
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Failed to save")
     } finally {
@@ -547,6 +570,8 @@ export function QuickAddFormSheet({
                 marginBottom: 20,
               }}
             />
+
+            <PhotoPickerField photoUri={photoUri} onChange={setPhotoUri} />
 
             {/* Follow-up section: visually separated from the notes above and
                 the Save button below. */}

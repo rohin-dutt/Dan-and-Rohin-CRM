@@ -53,6 +53,13 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Roots uses your photo library so you can attach photos to chats and profile pictures.",
+          "cameraPermission": "Roots uses your camera so you can snap a photo to attach to a chat or profile picture."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

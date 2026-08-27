@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import { DeviceEventEmitter } from "react-native"
 import { supabase } from "@/lib/supabase"
 import { PEOPLE_CHANGED_EVENT } from "@/lib/onboarding-status"
+import { deletePhotos } from "@/lib/photo-upload"
 import { useCrmData } from "@/features/crm-data/CrmDataProvider"
 import { getFollowUpState, isTouchPoint, todayInputValue } from "@roots/shared"
 import { FOLLOW_UP_COMPLETED_TYPE } from "./helpers"
@@ -48,6 +49,17 @@ export function usePersonDetail(id: string) {
   }, [id, snapshot])
 
   const deletePerson = useCallback(async (): Promise<boolean> => {
+    // Storage rows do not cascade with the database delete, so remove the
+    // profile photo and any interaction photos first. Best-effort: an orphaned
+    // photo should never block deleting the person.
+    const photoPaths = [
+      ...(person?.photo_path ? [person.photo_path] : []),
+      ...interactions
+        .map((interaction) => interaction.photo_path)
+        .filter((path): path is string => Boolean(path)),
+    ]
+    await deletePhotos(photoPaths).catch(() => null)
+
     const { error: deleteError } = await supabase.from("people").delete().eq("id", id)
     if (deleteError) {
       setMutationError(deleteError.message)
@@ -64,7 +76,7 @@ export function usePersonDetail(id: string) {
     }))
     DeviceEventEmitter.emit(PEOPLE_CHANGED_EVENT)
     return true
-  }, [id, updateSnapshot])
+  }, [id, interactions, person, updateSnapshot])
 
   const setCachedFollowUpStatus = useCallback(
     (interactionId: string, status: "open" | "done" | "snoozed") => {

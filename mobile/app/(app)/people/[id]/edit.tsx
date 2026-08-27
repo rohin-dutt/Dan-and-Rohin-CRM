@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native"
+import { ActivityIndicator, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import type { Session } from "@supabase/supabase-js"
@@ -8,9 +8,10 @@ import { TagPicker } from "@/components/TagPicker"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
 import { ConfirmModal } from "@/components/ConfirmModal"
-import { SoftCard } from "@/components/RootsUI"
+import { PersonAvatar, SoftCard } from "@/components/RootsUI"
 import { AnchoredMenu, useAnchoredMenu } from "@/components/AnchoredMenu"
 import { supabase } from "@/lib/supabase"
+import { pickCompressedPhoto, uploadPhoto } from "@/lib/photo-upload"
 import {
   clearPendingImportEditQueue,
   parseImportEditQueue,
@@ -82,6 +83,11 @@ export default function EditPersonScreen() {
   const [notes, setNotes] = useState("")
   const [howMet, setHowMet] = useState("")
   const [frequencyDays, setFrequencyDays] = useState(90)
+  const [photoPath, setPhotoPath] = useState<string | null>(null)
+  // Local uri of a just-uploaded photo, shown immediately so the avatar does
+  // not wait on (or reuse a stale) signed URL for the replaced storage object.
+  const [photoPreviewUri, setPhotoPreviewUri] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const lastNameInputRef = useRef<TextInput>(null)
   const howMetInputRef = useRef<TextInput>(null)
   const phoneInputRef = useRef<TextInput>(null)
@@ -143,6 +149,7 @@ export default function EditPersonScreen() {
     resetLocation(person.location ?? "", person.latitude ?? null, person.longitude ?? null)
     setNotes(person.notes ?? "")
     setBirthdayDate(person.birthday ? parseLocalDateString(person.birthday) : null)
+    setPhotoPath(person.photo_path ?? null)
     setCategory(findRelationshipCategory(person.relationship_type)?.label ?? null)
     setAllTags(snapshot?.tags ?? [])
     setSelectedTagIds(
@@ -255,6 +262,34 @@ export default function EditPersonScreen() {
     }
   }
 
+  // Profile photo changes apply immediately (pick, compress, upload, stamp
+  // photo_path) rather than waiting for Save, since the storage object and
+  // the row update are one self-contained step.
+  async function handleChangePhoto() {
+    if (photoUploading || saving) return
+    try {
+      const localUri = await pickCompressedPhoto()
+      if (!localUri) return
+      setPhotoUploading(true)
+      const session = await getCachedSession()
+      if (!session) throw new Error("Not authenticated")
+      const nextPath = `${session.user.id}/people/${id}.jpg`
+      await uploadPhoto(localUri, nextPath)
+      const { error: photoError } = await supabase
+        .from("people")
+        .update({ photo_path: nextPath })
+        .eq("id", id)
+      if (photoError) throw photoError
+      setPhotoPath(nextPath)
+      setPhotoPreviewUri(localUri)
+      void refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update photo")
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
   async function handleCreateTag(tagName: string) {
     const session = await getCachedSession()
     if (!session) return
@@ -334,6 +369,41 @@ export default function EditPersonScreen() {
         <Text style={{ fontFamily: fonts.body, color: colors.error, fontSize: 12 }} className="mt-2">
           * Required field
         </Text>
+
+        {/* Profile photo */}
+        <View className="mt-3 items-center">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            onPress={() => void handleChangePhoto()}
+            disabled={photoUploading}
+            activeOpacity={0.8}
+          >
+            <PersonAvatar
+              name={`${firstName} ${lastName}`.trim() || "?"}
+              size={92}
+              imageUrl={photoPreviewUri}
+              photoPath={photoPath}
+            />
+            {photoUploading ? (
+              <View
+                className="absolute inset-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: "rgba(0,0,0,0.35)" }}
+              >
+                <ActivityIndicator color="#FFFFFF" />
+              </View>
+            ) : null}
+            <View
+              className="absolute bottom-0 right-0 items-center justify-center rounded-full border-2 border-white"
+              style={{ width: 30, height: 30, backgroundColor: colors.forest }}
+            >
+              <Ionicons name="camera" size={15} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+          <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-xs">
+            Tap to change photo
+          </Text>
+        </View>
 
         {/* Main form card */}
         <SoftCard className="mt-2 p-3">

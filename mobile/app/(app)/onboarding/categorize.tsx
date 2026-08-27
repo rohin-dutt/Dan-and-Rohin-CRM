@@ -17,6 +17,7 @@ import {
   type PersonWriteValues,
 } from "@/lib/people-data"
 import { PEOPLE_CHANGED_EVENT } from "@/lib/onboarding-status"
+import { compressPhoto, uploadPhoto } from "@/lib/photo-upload"
 import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/constants/categories"
 import { YEARLESS_BIRTHDAY_YEAR } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
@@ -73,6 +74,28 @@ export default function OnboardingCategorizeScreen() {
     })
   }, [contacts, router])
 
+  // Uploads a contact's device photo as the new person's profile photo.
+  // Best-effort: an unreadable or failed photo never blocks the import.
+  async function importContactPhoto(ownerId: string, personId: string, image: Contacts.Image) {
+    if (!image.uri) return
+    try {
+      const compressedUri = await compressPhoto({
+        uri: image.uri,
+        width: image.width ?? null,
+        height: image.height ?? null,
+      })
+      const photoPath = `${ownerId}/people/${personId}.jpg`
+      await uploadPhoto(compressedUri, photoPath)
+      const { error: photoError } = await supabase
+        .from("people")
+        .update({ photo_path: photoPath })
+        .eq("id", personId)
+      if (photoError) throw photoError
+    } catch {
+      // The person is saved either way; the photo is a bonus.
+    }
+  }
+
   // Saves every categorized contact to Supabase in one pass. Best-effort: a
   // contact that fails to save is skipped rather than blocking the rest of
   // the batch, since onboarding shouldn't strand the user on a network error.
@@ -83,15 +106,20 @@ export default function OnboardingCategorizeScreen() {
     for (const { contact, category } of finalCategorizations.values()) {
       if (!userId) break
       const person = personValuesFromContact(contact, category)
+      let personId: string | null = null
       try {
-        await createPersonWithRelations({ userId, person, categoryLabel: category })
+        personId = await createPersonWithRelations({ userId, person, categoryLabel: category })
         savedCount += 1
       } catch (e) {
         if (e instanceof PersonRelationsError) {
           // The person row was written; the category tag/moments are
           // best-effort during onboarding, so still count it as saved.
+          personId = e.personId
           savedCount += 1
         }
+      }
+      if (personId && contact.image) {
+        await importContactPhoto(userId, personId, contact.image)
       }
     }
 

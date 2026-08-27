@@ -1,10 +1,15 @@
-import type { Interaction as SharedInteraction } from "@roots/shared"
+import type { Interaction as SharedInteraction, Person as SharedPerson } from "@roots/shared"
 
-export type { Person, PersonNote, ImportantMoment, Tag, PersonTag, Settings } from "@roots/shared"
+export type { PersonNote, ImportantMoment, Tag, PersonTag, Settings } from "@roots/shared"
 
-// interactions.group_id exists in the database but not in the shared type;
-// it is optional so shared helpers keep accepting plain interactions.
-export type Interaction = SharedInteraction & { group_id?: string | null }
+// people.photo_path and interactions.group_id/photo_path exist in the
+// database but not in the shared types; they are optional so shared helpers
+// keep accepting plain rows.
+export type Person = SharedPerson & { photo_path?: string | null }
+export type Interaction = SharedInteraction & {
+  group_id?: string | null
+  photo_path?: string | null
+}
 
 export type Group = {
   id: string

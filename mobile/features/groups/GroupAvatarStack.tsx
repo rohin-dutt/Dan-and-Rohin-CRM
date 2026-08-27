@@ -1,6 +1,5 @@
 import { Text, View } from "react-native"
 import { PersonAvatar } from "@/components/RootsUI"
-import { personImageUrl } from "@/lib/person-display"
 import { colors, fonts } from "@/constants/theme"
 import type { Person } from "@/types"
 
@@ -31,7 +30,7 @@ export function GroupAvatarStack({
             borderRadius: (size + 4) / 2,
           }}
         >
-          <PersonAvatar name={person.name} size={size} imageUrl={personImageUrl(person)} />
+          <PersonAvatar name={person.name} size={size} photoPath={person.photo_path ?? null} />
         </View>
       ))}
       {extraCount > 0 ? (

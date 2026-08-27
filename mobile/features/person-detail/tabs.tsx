@@ -3,6 +3,7 @@ import { Text, TextInput, TouchableOpacity, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { colors, fonts } from "@/constants/theme"
 import { Button } from "@/components/Button"
+import { PhotoViewerModal } from "@/components/PhotoViewerModal"
 import { IconTile, SoftCard } from "@/components/RootsUI"
 import { formatDate } from "@roots/shared"
 import { formatBirthday, formatTimelineDate } from "@/lib/format-dates"
@@ -30,6 +31,9 @@ export function TimelineTab({
 }) {
   const [showAll, setShowAll] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+  // Storage path of the photo open in the full-screen viewer; its signed URL
+  // is fetched lazily by the modal, not upfront per timeline entry.
+  const [viewerPhotoPath, setViewerPhotoPath] = useState<string | null>(null)
 
   const entries: TimelineEntry[] = [
     ...interactions.map((interaction): TimelineEntry => ({
@@ -87,6 +91,7 @@ export function TimelineTab({
             : isFollowUpCompleted
               ? formatTimelineDate(entry.date)
               : `${formatTimelineDate(entry.date)}  ·  ${entry.interaction.type}`
+        const photoPath = entry.kind === "interaction" ? entry.interaction.photo_path ?? null : null
         return (
           <View key={entry.id} className="flex-row">
             <View className="items-center">
@@ -104,9 +109,22 @@ export function TimelineTab({
               onPress={() => toggleExpanded(entry.id)}
               className="ml-4 flex-1 pb-6"
             >
-              <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base">
-                {title}
-              </Text>
+              <View className="flex-row items-center">
+                <Text style={{ fontFamily: fonts.bold, color: colors.warmBlack }} className="text-base" numberOfLines={1}>
+                  {title}
+                </Text>
+                {photoPath ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="View attached photo"
+                    onPress={() => setViewerPhotoPath(photoPath)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    className="ml-2"
+                  >
+                    <Ionicons name="image-outline" size={16} color={colors.forest} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
               {groupName ? (
                 <View className="mt-1.5 flex-row">
                   <View className="rounded-lg px-2.5 py-1" style={{ backgroundColor: colors.mint }}>
@@ -145,6 +163,7 @@ export function TimelineTab({
           </Text>
         </TouchableOpacity>
       ) : null}
+      <PhotoViewerModal photoPath={viewerPhotoPath} onClose={() => setViewerPhotoPath(null)} />
     </View>
   )
 }

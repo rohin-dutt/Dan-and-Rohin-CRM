@@ -6,7 +6,6 @@ import { Screen } from "@/components/Screen"
 import { EmptyPanel, IconTile, PersonAvatar, SectionTitle, SoftCard } from "@/components/RootsUI"
 import { LoadingState } from "@/components/LoadingState"
 import { ErrorBanner } from "@/components/ErrorBanner"
-import { personImageUrl } from "@/lib/person-display"
 import { formatLastTalkedLine, formatShortMonthDay } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { getTotalContacts, getTotalInteractions, isTouchPoint } from "@roots/shared"
@@ -157,7 +156,7 @@ export default function DashboardScreen() {
               >
                 <PersonAvatar
                   name={dashboard.enrichmentNudge.person.name}
-                  imageUrl={personImageUrl(dashboard.enrichmentNudge.person)}
+                  photoPath={dashboard.enrichmentNudge.person.photo_path ?? null}
                   size={44}
                 />
                 <View className="ml-4 flex-1">
@@ -196,7 +195,7 @@ export default function DashboardScreen() {
                     activeOpacity={0.76}
                     className="flex-row items-center"
                   >
-                    <PersonAvatar name={person.name} imageUrl={personImageUrl(person)} size={44} />
+                    <PersonAvatar name={person.name} photoPath={person.photo_path ?? null} size={44} />
                     <View className="ml-4 flex-1">
                       <Text style={{ fontFamily: fonts.bold, color: colors.ink }} className="text-base">
                         {person.name}
