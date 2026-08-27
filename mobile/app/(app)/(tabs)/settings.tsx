@@ -35,6 +35,7 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settings, setSettings] = useState<Settings | null>(null)
   const [pushRegistered, setPushRegistered] = useState(false)
+  const [debugPushError, setDebugPushError] = useState<string | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -261,7 +262,11 @@ export default function SettingsScreen() {
         if (nextEnabled) {
           try {
             await registerPushToken()
-          } catch {
+            setDebugPushError("SUCCESS: token registered")
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            console.error("[PUSH TOKEN REGISTRATION FAILED]", message)
+            setDebugPushError(message)
             /* token registration failed, continue anyway */
           }
         } else {
@@ -361,6 +366,12 @@ export default function SettingsScreen() {
           >
             {status.message}
           </Text>
+        ) : null}
+
+        {debugPushError ? (
+          <View style={{ backgroundColor: '#000', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+            <Text style={{ color: '#0f0', fontSize: 11, fontFamily: 'monospace' }}>{debugPushError}</Text>
+          </View>
         ) : null}
 
         <SettingsSection title="Account" subtitle="Manage your profile and security.">
