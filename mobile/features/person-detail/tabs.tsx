@@ -462,9 +462,9 @@ export function FollowUpsTab({
                   <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                     {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No date set"}
                   </Text>
-                  {fu.notes ? (
+                  {fu.follow_up_note ? (
                     <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
-                      {fu.notes}
+                      {fu.follow_up_note}
                     </Text>
                   ) : null}
                 </View>
@@ -529,9 +529,9 @@ export function FollowUpsTab({
                       <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-1 text-sm">
                         {fu.follow_up_date ? formatDate(fu.follow_up_date) : "No date set"}
                       </Text>
-                      {fu.notes ? (
+                      {fu.follow_up_note ? (
                         <Text style={{ fontFamily: fonts.body, color: colors.muted }} className="mt-2 text-sm leading-5">
-                          {fu.notes}
+                          {fu.follow_up_note}
                         </Text>
                       ) : null}
                     </View>
