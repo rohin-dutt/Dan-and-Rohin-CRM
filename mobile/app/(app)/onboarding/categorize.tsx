@@ -7,7 +7,10 @@ import { Ionicons } from "@expo/vector-icons"
 import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { PersonAvatar } from "@/components/RootsUI"
-import { getSelectedContacts } from "@/features/onboarding/onboarding-contacts"
+import {
+  getCadenceDefaultForCategory,
+  getSelectedContacts,
+} from "@/features/onboarding/onboarding-contacts"
 import {
   createPersonWithRelations,
   PersonRelationsError,
@@ -18,12 +21,6 @@ import { RELATIONSHIP_CATEGORIES, type RelationshipCategoryLabel } from "@/const
 import { YEARLESS_BIRTHDAY_YEAR } from "@/lib/format-dates"
 import { colors, fonts } from "@/constants/theme"
 import { toLocalDateString } from "@roots/shared"
-
-const CATEGORY_FREQUENCY_DAYS: Record<RelationshipCategoryLabel, number> = {
-  Friend: 90,
-  Family: 30,
-  Professional: 180,
-}
 
 type Categorization = {
   contact: Contacts.ExistingContact
@@ -49,7 +46,7 @@ function personValuesFromContact(
     birthday: birthdayFromContact(contact.birthday),
     company: contact.company?.trim() || null,
     role: contact.jobTitle?.trim() || null,
-    contact_frequency_days: CATEGORY_FREQUENCY_DAYS[category],
+    contact_frequency_days: getCadenceDefaultForCategory(category),
     relationship_type: category,
   }
 }

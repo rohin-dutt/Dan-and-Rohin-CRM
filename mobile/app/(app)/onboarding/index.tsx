@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { Screen } from "@/components/Screen"
 import { Button } from "@/components/Button"
 import { LogoMark } from "@/components/RootsUI"
-import { resetContacts } from "@/features/onboarding/onboarding-contacts"
+import { resetCadenceDefaults, resetContacts } from "@/features/onboarding/onboarding-contacts"
 import { colors, fonts } from "@/constants/theme"
 
 export default function OnboardingWelcomeScreen() {
@@ -13,6 +13,7 @@ export default function OnboardingWelcomeScreen() {
 
   useEffect(() => {
     resetContacts()
+    resetCadenceDefaults()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace("/(auth)/login")
     })

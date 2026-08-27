@@ -17,7 +17,7 @@ export default function OnboardingPermissionScreen() {
     try {
       const permission = await Contacts.requestPermissionsAsync()
       if (permission.granted) {
-        router.push("/(app)/onboarding/select")
+        router.push("/(app)/onboarding/cadence-defaults")
       } else {
         router.push("/(app)/onboarding/manual")
       }
