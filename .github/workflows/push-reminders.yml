@@ -1,7 +1,9 @@
 name: Send Push Reminders
 on:
   schedule:
-    - cron: '0 13 * * *'
+    # Every 30 minutes; the job itself decides which timezones are inside
+    # their deterministic 5pm-8pm local send slot on each run.
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:

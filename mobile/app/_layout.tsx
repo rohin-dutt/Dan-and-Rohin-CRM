@@ -35,6 +35,7 @@ import {
 } from "@/lib/onboarding-status"
 import { clearCrmCache, readCrmSnapshot } from "@/lib/crm-cache"
 import { installNotificationResponseHandler } from "@/lib/push-notifications"
+import { installAppOpenTracker } from "@/lib/track-app-open"
 import { shouldShowOnboardingNotificationPrompt } from "@/lib/onboarding-notifications"
 import { colors } from "@/constants/theme"
 import "../global.css"
@@ -310,6 +311,11 @@ export default function RootLayout() {
     if (loading || !fontsLoaded) return
     return installNotificationResponseHandler(router)
   }, [router, loading, fontsLoaded])
+
+  useEffect(() => {
+    if (!session) return
+    return installAppOpenTracker()
+  }, [session])
 
   useEffect(() => {
     if (loading || introComplete == null) return

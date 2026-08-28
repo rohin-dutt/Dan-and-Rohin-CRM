@@ -26,6 +26,8 @@ export type PushSettings = {
   push_birthdays_enabled: boolean;
   push_important_moments_enabled: boolean;
   notification_timezone: string | null;
+  last_app_open_at?: string | null;
+  created_at?: string | null;
 };
 
 export type PushToken = {
@@ -69,6 +71,31 @@ const FALLBACK_TIMEZONE = "UTC";
 const SEND_WINDOW_START_HOUR = 9;
 const SEND_WINDOW_END_HOUR = 18;
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+// Reminders go out at a per-day "random" time between 5:00pm and 8:00pm local
+// time. The time is derived from a deterministic hash of (local date, timezone)
+// instead of a stored per-user random value, so every cron run can recompute
+// the same target independently with no extra state, and the send time still
+// varies day to day.
+const RANDOM_SEND_WINDOW_START_MINUTES = 17 * 60;
+const RANDOM_SEND_WINDOW_SPAN_MINUTES = 180;
+// The GitHub Actions cron fires every 30 minutes; each run claims the half-hour
+// slot containing its local time, so exactly one run per day matches a
+// timezone's target minute.
+const CRON_SLOT_MINUTES = 30;
+
+// Overdue reminder cadence: notifications 1-4 fire every 2 days, then weekly.
+const OVERDUE_EARLY_GAP_DAYS = 2;
+const OVERDUE_WEEKLY_GAP_DAYS = 7;
+const OVERDUE_WEEKLY_THRESHOLD_COUNT = 4;
+
+// Inactivity nudge: first nudge after 96h away, second after 168h, then stop
+// until the user opens the app again.
+const INACTIVITY_FIRST_NUDGE_HOURS = 96;
+const INACTIVITY_SECOND_NUDGE_HOURS = 168;
+
 export function isAuthorizedPushReminderRequest(
   authorizationHeader: string | null,
   cronSecret: string | null | undefined
@@ -91,6 +118,7 @@ function readLocalParts(value: Date, timeZone: string) {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
     hourCycle: "h23",
   }).formatToParts(value);
   const byType = new Map(parts.map((part) => [part.type, part.value]));
@@ -98,6 +126,7 @@ function readLocalParts(value: Date, timeZone: string) {
   return {
     date: `${byType.get("year")}-${byType.get("month")}-${byType.get("day")}`,
     hour: Number(byType.get("hour")),
+    minute: Number(byType.get("minute")),
   };
 }
 
@@ -118,6 +147,112 @@ export function getLocalNotificationDate(value: Date, timeZone: string) {
 export function isInNotificationSendWindow(value: Date, timeZone: string | null | undefined) {
   const { hour } = readLocalParts(value, resolveNotificationTimezone(timeZone));
   return hour >= SEND_WINDOW_START_HOUR && hour < SEND_WINDOW_END_HOUR;
+}
+
+// Simple non-cryptographic string hash (djb2 xor variant). Only needs to be
+// deterministic and reasonably spread across the send window.
+function hashString(value: string) {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (Math.imul(hash, 33) ^ value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+// Today's target send time for a timezone, as minutes since local midnight.
+// Hashing (local date + timezone) picks a stable minute inside the 5pm-8pm
+// window: stable within a day (every cron run agrees on it without storing
+// anything) but different from one day to the next.
+export function getDailyTargetSendMinutes(localDate: string, timeZone: string) {
+  const seed = hashString(`${localDate}:${timeZone}`);
+  return RANDOM_SEND_WINDOW_START_MINUTES + (seed % RANDOM_SEND_WINDOW_SPAN_MINUTES);
+}
+
+// A timezone is "active" for this run when today's target minute falls inside
+// the current half-hour cron slot ([slot, slot + 30) local time). Each target
+// minute belongs to exactly one slot, so a timezone is processed by exactly one
+// run per day even when GitHub delays the cron by a few minutes. A run delayed
+// past the end of its slot skips that timezone for the day rather than
+// double-sending.
+export function isTimezoneInSendSlot(value: Date, timeZone: string | null | undefined) {
+  const zone = resolveNotificationTimezone(timeZone);
+  const { date, hour, minute } = readLocalParts(value, zone);
+  const minutesNow = hour * 60 + minute;
+  const slotStart = Math.floor(minutesNow / CRON_SLOT_MINUTES) * CRON_SLOT_MINUTES;
+  const target = getDailyTargetSendMinutes(date, zone);
+  return target >= slotStart && target < slotStart + CRON_SLOT_MINUTES;
+}
+
+export type NotificationScheduleRow = {
+  id: string;
+  person_id: string | null;
+  notification_type: "overdue_reminder" | "inactivity_nudge";
+  last_notified_at: string;
+  notify_count: number;
+};
+
+// Overdue reminder cadence, keyed off the schedule row instead of "days since
+// the person became overdue" (which is not stored): the first four reminders
+// are spaced 2 days apart, then reminders continue weekly.
+export function isOverdueReminderEligible(
+  row: Pick<NotificationScheduleRow, "last_notified_at" | "notify_count"> | null | undefined,
+  now: Date
+) {
+  if (!row) return true;
+  const lastNotified = Date.parse(row.last_notified_at);
+  if (Number.isNaN(lastNotified)) return true;
+  const daysSince = (now.getTime() - lastNotified) / MS_PER_DAY;
+  const requiredGapDays =
+    row.notify_count >= OVERDUE_WEEKLY_THRESHOLD_COUNT
+      ? OVERDUE_WEEKLY_GAP_DAYS
+      : OVERDUE_EARLY_GAP_DAYS;
+  return daysSince >= requiredGapDays;
+}
+
+export type InactivityNudgeDecision =
+  | { action: "none" }
+  | { action: "delete" }
+  | { action: "send"; notifyCount: number; resetExistingRow: boolean };
+
+export function decideInactivityNudge({
+  lastAppOpenAt,
+  accountCreatedAt,
+  row,
+  now,
+}: {
+  lastAppOpenAt: string | null | undefined;
+  accountCreatedAt: string | null | undefined;
+  row: Pick<NotificationScheduleRow, "last_notified_at" | "notify_count"> | null;
+  now: Date;
+}): InactivityNudgeDecision {
+  // Users who have never recorded an app open fall back to account age so a
+  // brand-new signup is not immediately nudged.
+  const anchor = lastAppOpenAt ?? accountCreatedAt ?? null;
+  const anchorTime = anchor ? Date.parse(anchor) : NaN;
+  if (Number.isNaN(anchorTime)) return { action: "none" };
+
+  const hoursInactive = (now.getTime() - anchorTime) / MS_PER_HOUR;
+
+  if (hoursInactive < INACTIVITY_FIRST_NUDGE_HOURS) {
+    // The user opened the app recently; clear any finished/partial nudge cycle
+    // so a future inactivity stretch starts fresh.
+    return row ? { action: "delete" } : { action: "none" };
+  }
+
+  // The user opened the app after the last nudge, then went inactive again for
+  // 96+ hours without a run observing the active period: restart the cycle.
+  const openedSinceLastNudge = Boolean(
+    row && lastAppOpenAt && Date.parse(lastAppOpenAt) > Date.parse(row.last_notified_at)
+  );
+  if (!row || openedSinceLastNudge) {
+    return { action: "send", notifyCount: 1, resetExistingRow: Boolean(row) };
+  }
+  if (row.notify_count === 1 && hoursInactive >= INACTIVITY_SECOND_NUDGE_HOURS) {
+    return { action: "send", notifyCount: 2, resetExistingRow: false };
+  }
+  // notify_count >= 2: both nudges used; stay quiet until the user opens the
+  // app (which resets the cycle via the branch above).
+  return { action: "none" };
 }
 
 export function buildPushIdempotencyKey(candidate: NotificationCandidate, tokenId: string) {
@@ -313,6 +448,87 @@ function buildPersonalizedPushMessage(
   };
 }
 
+export type ReminderPerson = {
+  personId: string;
+  firstName: string | null;
+};
+
+function buildGroupedReminderData(kind: PushNotificationKind, people: ReminderPerson[]) {
+  return {
+    type: "roots_notification",
+    kind,
+    subjectType: "person" as PushSubjectType,
+    subjectId: people[0]?.personId ?? null,
+    // A single person deep-links to their profile; a group goes to the
+    // overdue/due people list via the kind-based fallback route.
+    personId: people.length === 1 ? people[0].personId : null,
+    interactionId: null,
+    importantMomentId: null,
+  };
+}
+
+export function buildOverdueGroupMessage(people: ReminderPerson[], token: string) {
+  const allNamed = people.every((person) => person.firstName);
+  let body: string;
+  if (people.length === 1 && allNamed) {
+    body = `It's been a while since you talked to ${people[0].firstName} 🌱`;
+  } else if (people.length === 2 && allNamed) {
+    body = `It's been a while since you talked to ${people[0].firstName} and ${people[1].firstName} 🌱`;
+  } else if (people.length === 1) {
+    body = "It is time to check in with someone.";
+  } else {
+    body = `You have ${people.length} overdue connections to catch up on 🌱`;
+  }
+
+  return {
+    to: token,
+    title: "Roots",
+    body,
+    sound: "default" as const,
+    data: buildGroupedReminderData("follow_up_overdue", people),
+  };
+}
+
+export function buildDueTodayGroupMessage(people: ReminderPerson[], token: string) {
+  const allNamed = people.every((person) => person.firstName);
+  let body: string;
+  if (people.length === 1 && allNamed) {
+    body = `Today's a good day to reach out to ${people[0].firstName} 👋`;
+  } else if (people.length === 2 && allNamed) {
+    body = `Don't forget to reach out to ${people[0].firstName} and ${people[1].firstName} today 👋`;
+  } else if (people.length === 1) {
+    body = "A check-in is due today.";
+  } else {
+    body = `You have ${people.length} people to reach out to today 👋`;
+  }
+
+  return {
+    to: token,
+    title: "Roots",
+    body,
+    sound: "default" as const,
+    data: buildGroupedReminderData("follow_up_due", people),
+  };
+}
+
+export function buildInactivityNudgeMessage(token: string) {
+  return {
+    to: token,
+    title: "Roots",
+    body: "It's been a few days — log a moment and watch your Roots grow! 🌱",
+    sound: "default" as const,
+    data: {
+      type: "roots_notification",
+      kind: "inactivity_nudge",
+      subjectType: null,
+      subjectId: null,
+      personId: null,
+      interactionId: null,
+      importantMomentId: null,
+    },
+  };
+}
+
 export function isExpoPushToken(token: string) {
   return /^Expo(nent)?PushToken\[[^\]]+\]$/.test(token);
 }
@@ -459,6 +675,22 @@ export async function sendPushDelivery({
   }
 }
 
+type ExpoPushMessage = {
+  to: string;
+  title: string;
+  body: string;
+  sound: "default";
+  data: Record<string, unknown>;
+};
+
+// One notification to deliver to every device a user has. `onDelivered` runs
+// after at least one device accepted it, so cadence state only advances when a
+// notification actually went out.
+type NotificationUnit = {
+  build: (token: string) => ExpoPushMessage;
+  onDelivered?: () => Promise<void>;
+};
+
 export async function runPushReminderJob({
   supabase,
   now = new Date(),
@@ -471,6 +703,7 @@ export async function runPushReminderJob({
   const results = {
     users: 0,
     candidates: 0,
+    notifications: 0,
     sent: 0,
     failed: 0,
     skipped: 0,
@@ -498,7 +731,7 @@ export async function runPushReminderJob({
   const { data: settingsRows, error: settingsError } = await supabase
     .from("settings")
     .select(
-      "user_id, push_followups_enabled, push_birthdays_enabled, push_important_moments_enabled, notification_timezone"
+      "user_id, push_followups_enabled, push_birthdays_enabled, push_important_moments_enabled, notification_timezone, last_app_open_at, created_at"
     )
     .in("user_id", userIds);
 
@@ -515,9 +748,34 @@ export async function runPushReminderJob({
       continue;
     }
 
+    // Users are only processed during the single half-hour cron slot that
+    // contains their timezone's deterministic 5pm-8pm target minute for today
+    // (see getDailyTargetSendMinutes). Everyone else waits for a later run.
+    if (!isTimezoneInSendSlot(now, settings.notification_timezone)) {
+      results.skipped++;
+      continue;
+    }
+
     results.users++;
     const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
     const today = toDay(localDate) ?? now;
+    const nowIso = now.toISOString();
+
+    const { data: scheduleRows, error: scheduleError } = await supabase
+      .from("person_notification_schedule")
+      .select("id, person_id, notification_type, last_notified_at, notify_count")
+      .eq("user_id", settings.user_id);
+    if (scheduleError) throw new Error(scheduleError.message);
+
+    const overdueScheduleByPerson = new Map<string, NotificationScheduleRow>();
+    let inactivityRow: NotificationScheduleRow | null = null;
+    for (const row of (scheduleRows ?? []) as NotificationScheduleRow[]) {
+      if (row.notification_type === "overdue_reminder" && row.person_id) {
+        overdueScheduleByPerson.set(row.person_id, row);
+      } else if (row.notification_type === "inactivity_nudge" && !row.person_id) {
+        inactivityRow = row;
+      }
+    }
 
     const { data: people, error: peopleError } = await supabase
       .from("people")
@@ -526,37 +784,177 @@ export async function runPushReminderJob({
     if (peopleError) throw new Error(peopleError.message);
 
     const personRows = (people ?? []) as Person[];
-    if (personRows.length === 0) continue;
-
     const personsById = new Map(personRows.map((person) => [person.id, person]));
 
-    const personIds = personRows.map((person) => person.id);
-    const { data: interactions, error: interactionsError } = await supabase
-      .from("interactions")
-      .select("*")
-      .in("person_id", personIds)
-      .eq("follow_up_needed", true);
-    if (interactionsError) throw new Error(interactionsError.message);
+    let candidates: NotificationCandidate[] = [];
+    if (personRows.length > 0) {
+      const personIds = personRows.map((person) => person.id);
+      const { data: interactions, error: interactionsError } = await supabase
+        .from("interactions")
+        .select("*")
+        .in("person_id", personIds)
+        .eq("follow_up_needed", true);
+      if (interactionsError) throw new Error(interactionsError.message);
 
-    const { data: importantMoments, error: importantMomentsError } = await supabase
-      .from("important_moments")
-      .select("*")
-      .eq("user_id", settings.user_id);
-    if (importantMomentsError) throw new Error(importantMomentsError.message);
+      const { data: importantMoments, error: importantMomentsError } = await supabase
+        .from("important_moments")
+        .select("*")
+        .eq("user_id", settings.user_id);
+      if (importantMomentsError) throw new Error(importantMomentsError.message);
 
-    const candidates = selectNotificationCandidates({
-      settings,
-      people: personRows,
-      interactions: (interactions ?? []) as Interaction[],
-      importantMoments: (importantMoments ?? []) as ImportantMoment[],
-      today,
-    });
+      candidates = selectNotificationCandidates({
+        settings,
+        people: personRows,
+        interactions: (interactions ?? []) as Interaction[],
+        importantMoments: (importantMoments ?? []) as ImportantMoment[],
+        today,
+      });
+    }
     results.candidates += candidates.length;
 
+    const toReminderPerson = (personId: string): ReminderPerson => {
+      const person = personsById.get(personId);
+      return { personId, firstName: person ? getFirstName(person.name) : null };
+    };
+
+    // Group candidates: one combined overdue notification, one combined
+    // due-today notification, and individual birthday / important-moment
+    // notifications for dates that are actually today.
+    const overduePersonIds: string[] = [];
+    const dueTodayPersonIds: string[] = [];
+    const seenOverdue = new Set<string>();
+    const seenDueToday = new Set<string>();
+    const momentCandidates: NotificationCandidate[] = [];
+
     for (const candidate of candidates) {
+      if (candidate.kind === "follow_up_overdue" && candidate.personId) {
+        if (!seenOverdue.has(candidate.personId)) {
+          seenOverdue.add(candidate.personId);
+          overduePersonIds.push(candidate.personId);
+        }
+      } else if (candidate.kind === "follow_up_due" && candidate.personId) {
+        if (!seenDueToday.has(candidate.personId)) {
+          seenDueToday.add(candidate.personId);
+          dueTodayPersonIds.push(candidate.personId);
+        }
+      } else if (
+        (candidate.kind === "birthday" || candidate.kind === "important_moment") &&
+        candidate.scheduledFor === localDate
+      ) {
+        momentCandidates.push(candidate);
+      }
+    }
+
+    // A person both overdue and due today only appears in the overdue group.
+    const dueTodayOnly = dueTodayPersonIds.filter((personId) => !seenOverdue.has(personId));
+
+    // Anyone with a schedule row who is no longer overdue had an interaction
+    // logged; delete their row so the cadence restarts from scratch if they
+    // ever become overdue again.
+    const staleScheduleIds = [...overdueScheduleByPerson.values()]
+      .filter((row) => row.person_id && !seenOverdue.has(row.person_id))
+      .map((row) => row.id);
+    if (staleScheduleIds.length > 0) {
+      const { error: staleError } = await supabase
+        .from("person_notification_schedule")
+        .delete()
+        .in("id", staleScheduleIds);
+      if (staleError) throw new Error(staleError.message);
+    }
+
+    const eligibleOverdue = overduePersonIds
+      .filter((personId) => isOverdueReminderEligible(overdueScheduleByPerson.get(personId), now))
+      .map(toReminderPerson);
+
+    const units: NotificationUnit[] = [];
+
+    if (eligibleOverdue.length > 0) {
+      units.push({
+        build: (token) => buildOverdueGroupMessage(eligibleOverdue, token),
+        onDelivered: async () => {
+          for (const person of eligibleOverdue) {
+            const existing = overdueScheduleByPerson.get(person.personId);
+            if (existing) {
+              const { error } = await supabase
+                .from("person_notification_schedule")
+                .update({ notify_count: existing.notify_count + 1, last_notified_at: nowIso })
+                .eq("id", existing.id);
+              if (error) throw new Error(error.message);
+            } else {
+              const { error } = await supabase.from("person_notification_schedule").insert({
+                user_id: settings.user_id,
+                person_id: person.personId,
+                notification_type: "overdue_reminder",
+                notify_count: 1,
+                last_notified_at: nowIso,
+              });
+              if (error) throw new Error(error.message);
+            }
+          }
+        },
+      });
+    }
+
+    if (dueTodayOnly.length > 0) {
+      const dueTodayPeople = dueTodayOnly.map(toReminderPerson);
+      units.push({
+        build: (token) => buildDueTodayGroupMessage(dueTodayPeople, token),
+      });
+    }
+
+    for (const candidate of momentCandidates) {
       const person = candidate.personId ? personsById.get(candidate.personId) : undefined;
       const firstName = person ? getFirstName(person.name) : null;
+      units.push({
+        build: (token) =>
+          firstName
+            ? buildPersonalizedPushMessage(candidate, token, firstName)
+            : buildPrivacySafePushMessage(candidate, token),
+      });
+    }
 
+    const nudgeDecision = decideInactivityNudge({
+      lastAppOpenAt: settings.last_app_open_at,
+      accountCreatedAt: settings.created_at,
+      row: inactivityRow,
+      now,
+    });
+
+    if (nudgeDecision.action === "delete" && inactivityRow) {
+      const { error } = await supabase
+        .from("person_notification_schedule")
+        .delete()
+        .eq("id", inactivityRow.id);
+      if (error) throw new Error(error.message);
+    } else if (nudgeDecision.action === "send") {
+      const existingNudgeRow = inactivityRow;
+      units.push({
+        build: (token) => buildInactivityNudgeMessage(token),
+        onDelivered: async () => {
+          if (existingNudgeRow) {
+            const { error } = await supabase
+              .from("person_notification_schedule")
+              .update({ notify_count: nudgeDecision.notifyCount, last_notified_at: nowIso })
+              .eq("id", existingNudgeRow.id);
+            if (error) throw new Error(error.message);
+          } else {
+            const { error } = await supabase.from("person_notification_schedule").insert({
+              user_id: settings.user_id,
+              person_id: null,
+              notification_type: "inactivity_nudge",
+              notify_count: nudgeDecision.notifyCount,
+              last_notified_at: nowIso,
+            });
+            if (error) throw new Error(error.message);
+          }
+        },
+      });
+    }
+
+    results.notifications += units.length;
+
+    for (const unit of units) {
+      let delivered = false;
       for (const token of userTokens) {
         if (!isExpoPushToken(token.token)) {
           results.invalid_token++;
@@ -564,25 +962,26 @@ export async function runPushReminderJob({
         }
 
         try {
-          const message = firstName
-            ? buildPersonalizedPushMessage(candidate, token.token, firstName)
-            : buildPrivacySafePushMessage(candidate, token.token);
-          const [ticket] = await sendExpoPushMessages([message], fetchImpl);
+          const [ticket] = await sendExpoPushMessages([unit.build(token.token)], fetchImpl);
 
           if (!ticket || ticket.status === "error") {
             results.failed++;
           } else {
             results.sent++;
+            delivered = true;
           }
         } catch {
           results.failed++;
         }
       }
+      if (delivered && unit.onDelivered) {
+        await unit.onDelivered();
+      }
     }
   }
 
   console.log(
-    `Push job complete: users=${results.users} candidates=${results.candidates} sent=${results.sent} failed=${results.failed} invalid_token=${results.invalid_token}`
+    `Push job complete: users=${results.users} skipped_out_of_window=${results.skipped} candidates=${results.candidates} notifications=${results.notifications} sent=${results.sent} failed=${results.failed} invalid_token=${results.invalid_token}`
   );
   return results;
 }
