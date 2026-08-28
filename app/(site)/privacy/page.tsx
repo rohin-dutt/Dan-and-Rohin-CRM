@@ -8,14 +8,14 @@ export default function PrivacyPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-        <h1 className="font-heading text-3xl font-semibold text-foreground">
+      <main className="mx-auto w-full max-w-[720px] flex-1 px-6 py-16 sm:py-20">
+        <h1 className="text-center font-heading text-4xl font-semibold text-foreground sm:text-5xl">
           Privacy Policy
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Last updated: July 2026
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          Last updated: August 2026
         </p>
-        <div className="mt-8 max-w-prose space-y-8 text-sm leading-7 text-muted-foreground">
+        <div className="mx-auto mt-12 max-w-prose space-y-12 text-sm leading-7 text-muted-foreground [&_h2]:text-base [&_ul]:pl-5 [&_ul]:marker:text-ring">
           <section>
             <h2 className="font-medium text-foreground">Introduction</h2>
             <p className="mt-2">
@@ -71,6 +71,13 @@ export default function PrivacyPage() {
               <li>
                 Contact form submissions: your name, email, and message if
                 you contact us through our website
+              </li>
+              <li>
+                Photos: if you choose to attach a photo when logging a
+                conversation, logging a group hangout, or adding a profile
+                photo for someone in your Roots, that photo is uploaded to
+                our secure storage. Photos are private to your account and
+                are never visible to anyone else.
               </li>
             </ul>
             <p className="mt-4 font-medium text-foreground">
@@ -170,10 +177,12 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                Supabase (supabase.com) — database and authentication. Your
-                data is stored on Supabase&apos;s servers with row-level
-                security policies designed to prevent one user&apos;s account
-                from accessing another&apos;s records.
+                Supabase (supabase.com) — database, authentication, and
+                photo storage. Your data, including any photos you upload,
+                is stored on Supabase&apos;s servers with row-level security
+                and access-control policies designed to prevent one
+                user&apos;s account from accessing another&apos;s records or
+                photos.
               </li>
               <li>
                 Expo / EAS (expo.dev) — mobile app build and delivery
@@ -273,7 +282,10 @@ export default function PrivacyPage() {
               reactivate a deleted account from a backup except as necessary
               to comply with a legal obligation. We may retain limited
               records beyond this period where required for security, fraud
-              prevention, dispute resolution, or legal compliance.
+              prevention, dispute resolution, or legal compliance. This
+              includes any photos you have uploaded — when you delete an
+              interaction, a person, or your account, associated photos are
+              permanently deleted from our storage as well.
             </p>
           </section>
           <section>
@@ -329,6 +341,19 @@ export default function PrivacyPage() {
               Location information in the app (city/region for your
               contacts) is entered manually by you or selected from Mapbox
               search suggestions.
+            </p>
+            <p className="mt-4">
+              <span className="font-medium text-foreground">
+                Camera and photo library:
+              </span>{" "}
+              Roots may request access to your camera and photo library so
+              you can attach a photo to a conversation or add a profile
+              photo for someone in your Roots. These permissions are
+              optional — you can use Roots fully without granting them.
+              Photos you attach are stored privately and are never shared
+              with other users or third parties. You can revoke camera or
+              photo library access at any time from your iPhone Settings →
+              Roots.
             </p>
           </section>
           <section>

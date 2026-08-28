@@ -54,15 +54,15 @@ export default function FaqPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-        <h1 className="font-heading text-3xl font-semibold text-foreground">
+      <main className="mx-auto w-full max-w-[720px] flex-1 px-6 py-16 sm:py-20">
+        <h1 className="text-center font-heading text-4xl font-semibold text-foreground sm:text-5xl">
           Frequently asked questions
         </h1>
-        <dl className="mt-8 space-y-8">
+        <dl className="mx-auto mt-12 max-w-prose divide-y divide-border">
           {faqs.map((item) => (
-            <div key={item.q}>
-              <dt className="font-medium text-foreground">{item.q}</dt>
-              <dd className="mt-2 max-w-prose text-sm leading-6 text-muted-foreground">
+            <div key={item.q} className="py-6 first:pt-0">
+              <dt className="font-heading text-lg font-medium text-foreground">{item.q}</dt>
+              <dd className="mt-2 text-sm leading-7 text-muted-foreground">
                 {item.a}
               </dd>
             </div>

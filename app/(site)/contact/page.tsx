@@ -8,14 +8,16 @@ export default function ContactPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-        <h1 className="font-heading text-3xl font-semibold text-foreground">
+      <main className="mx-auto w-full max-w-[720px] flex-1 px-6 py-16 sm:py-20">
+        <h1 className="text-center font-heading text-4xl font-semibold text-foreground sm:text-5xl">
           Contact
         </h1>
-        <p className="mt-5 max-w-prose leading-7 text-muted-foreground">
+        <p className="mx-auto mt-5 max-w-prose text-center leading-7 text-muted-foreground">
           Have a question, found a bug, or just want to say hello? Send us a message below. We read every message and typically reply within a day or two.
         </p>
-        <ContactForm />
+        <div className="mx-auto mt-10 max-w-prose">
+          <ContactForm />
+        </div>
       </main>
       <SiteFooter />
     </div>

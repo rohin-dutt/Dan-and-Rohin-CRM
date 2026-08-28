@@ -8,14 +8,14 @@ export default function TermsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-14">
-        <h1 className="font-heading text-3xl font-semibold text-foreground">
+      <main className="mx-auto w-full max-w-[720px] flex-1 px-6 py-16 sm:py-20">
+        <h1 className="text-center font-heading text-4xl font-semibold text-foreground sm:text-5xl">
           Terms of Service
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           Last updated: July 2026
         </p>
-        <div className="mt-8 max-w-prose space-y-8 text-sm leading-7 text-muted-foreground">
+        <div className="mx-auto mt-12 max-w-prose space-y-12 text-sm leading-7 text-muted-foreground [&_h2]:text-base [&_ul]:pl-5 [&_ul]:marker:text-ring">
           <section>
             <h2 className="font-medium text-foreground">
               Acceptance of Terms

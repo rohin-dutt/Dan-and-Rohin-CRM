@@ -35,14 +35,14 @@ export function ContactForm() {
 
   if (status === "success") {
     return (
-      <p className="mt-6 max-w-prose text-sm leading-6 text-muted-foreground">
+      <p className="rounded-xl border border-border bg-card p-6 text-sm leading-6 text-muted-foreground">
         Thanks for reaching out — we'll get back to you within a day or two.
       </p>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 max-w-prose space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-foreground">
           Name
@@ -53,7 +53,7 @@ export function ContactForm() {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
       <div>
@@ -66,7 +66,7 @@ export function ContactForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
       <div>
@@ -79,7 +79,7 @@ export function ContactForm() {
           rows={5}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          className="mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
       {status === "error" && (
@@ -88,7 +88,7 @@ export function ContactForm() {
       <button
         type="submit"
         disabled={status === "loading"}
-        className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/80 disabled:opacity-60"
+        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-60 sm:w-auto"
       >
         {status === "loading" ? "Sending…" : "Send"}
       </button>
