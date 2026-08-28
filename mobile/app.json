@@ -25,6 +25,8 @@
       "infoPlist": {
         "NSContactsUsageDescription": "Roots needs access to your contacts so you can import only the people you choose.",
         "NSUserNotificationsUsageDescription": "Roots uses notifications for privacy-safe follow-up, birthday, and important moment reminders.",
+        "NSCameraUsageDescription": "Roots uses your camera so you can attach a photo to a conversation or add a photo for someone in your Roots.",
+        "NSPhotoLibraryUsageDescription": "Roots accesses your photo library so you can attach a photo to a conversation or add a photo for someone in your Roots.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "privacyManifests": {
