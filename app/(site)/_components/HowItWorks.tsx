@@ -1,60 +1,100 @@
-type IconProps = { className?: string };
-
-function UserPlusIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M19 8v6M22 11h-6" />
-    </svg>
-  );
-}
-
-function ChatIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
-function BellIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
+import {
+  AddTeamIcon,
+  ArrowRight02Icon,
+  CalendarLove02Icon,
+  Leaf01Icon,
+  Notification02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 const steps = [
-  { icon: <UserPlusIcon className="h-6 w-6" />, title: "Add the people who matter" },
-  { icon: <ChatIcon className="h-6 w-6" />, title: "Log a chat whenever you connect" },
-  { icon: <BellIcon className="h-6 w-6" />, title: "Get a gentle nudge when it's time to reach out" },
+  {
+    icon: AddTeamIcon,
+    number: "01",
+    eyebrow: "Plant your roots",
+    title: "Bring in your people",
+    body: "Choose the friends, family, mentors, and neighbors you genuinely want to keep close. Start with five; grow from there.",
+    note: "Import only who matters",
+  },
+  {
+    icon: CalendarLove02Icon,
+    number: "02",
+    eyebrow: "Choose your rhythm",
+    title: "Make care feel natural",
+    body: "Set a pace that fits each relationship, then jot down the moments and details you want to remember next time.",
+    note: "Your cadence, your way",
+  },
+  {
+    icon: Notification02Icon,
+    number: "03",
+    eyebrow: "Let Roots remember",
+    title: "Reach out at the right time",
+    body: "Get a quiet nudge when someone needs attention, with the context to make your next message feel thoughtful.",
+    note: "Gentle, useful reminders",
+  },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="px-6 py-20 sm:py-24">
-      <div className="mx-auto w-full max-w-5xl">
-        <h2 className="text-center font-heading text-3xl font-semibold text-foreground sm:text-4xl">
-          How it works
-        </h2>
-        <div className="relative mt-14 grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
-          <div
-            aria-hidden="true"
-            className="absolute left-0 right-0 top-7 hidden h-px bg-border sm:block"
-          />
-          {steps.map((step) => (
-            <div key={step.title} className="relative flex flex-col items-center text-center">
-              <span className="relative z-10 inline-flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background text-primary">
-                {step.icon}
-              </span>
-              <p className="mx-auto mt-4 max-w-[220px] text-base font-medium text-foreground">
-                {step.title}
-              </p>
+    <section className="px-6 py-20 sm:py-28">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/65">
+            How Roots works
+          </p>
+          <h2 className="mt-4 font-heading text-[clamp(2.35rem,5vw,3.4rem)] font-semibold leading-tight text-foreground">
+            A little intention goes a long way.
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground">
+            Roots stays quietly in the background until there’s a good reason to bring someone back to mind.
+          </p>
+        </div>
+
+        <div className="relative mt-14 grid gap-5 lg:grid-cols-3 lg:gap-7">
+          {steps.map((step, index) => (
+            <div key={step.number} className="relative">
+              <article className="group flex h-full flex-col rounded-[2rem] border border-border bg-card p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-8">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-13 w-13 items-center justify-center rounded-full bg-secondary text-primary">
+                    <HugeiconsIcon icon={step.icon} size={23} strokeWidth={1.7} />
+                  </span>
+                  <span className="font-heading text-2xl text-primary/25">{step.number}</span>
+                </div>
+                <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/60">
+                  {step.eyebrow}
+                </p>
+                <h3 className="mt-2 font-heading text-[1.65rem] font-semibold leading-tight text-foreground">
+                  {step.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{step.body}</p>
+                <div className="mt-7 border-t border-border pt-5 lg:mt-auto">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-primary">
+                    <HugeiconsIcon icon={Leaf01Icon} size={14} strokeWidth={1.8} />
+                    {step.note}
+                  </span>
+                </div>
+              </article>
+
+              {index < steps.length - 1 && (
+                <span className="absolute -right-5 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background text-primary shadow-sm lg:flex" aria-hidden="true">
+                  <HugeiconsIcon icon={ArrowRight02Icon} size={17} strokeWidth={2} />
+                </span>
+              )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-8 flex flex-col items-center justify-between gap-5 rounded-[1.75rem] bg-secondary px-6 py-6 text-center sm:flex-row sm:px-8 sm:text-left">
+          <div className="flex items-center gap-4">
+            <span className="hidden h-11 w-11 items-center justify-center rounded-full bg-card text-primary shadow-sm sm:flex">
+              <HugeiconsIcon icon={Leaf01Icon} size={20} strokeWidth={1.7} />
+            </span>
+            <div>
+              <p className="font-heading text-xl font-semibold text-foreground">Built around people, not productivity.</p>
+              <p className="mt-1 text-sm text-muted-foreground">No streaks to protect. No inbox to clear. Just relationships worth tending.</p>
+            </div>
+          </div>
+          <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-[0.18em] text-primary/65">Quietly thoughtful</span>
         </div>
       </div>
     </section>

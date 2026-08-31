@@ -2,9 +2,7 @@ import { AppStoreBadge } from "./AppStoreBadge";
 import { PhoneCarousel } from "./PhoneCarousel";
 import { Reveal } from "./Reveal";
 
-type Screen = { src: string; alt: string };
-
-export function Hero({ screens }: { screens: Screen[] }) {
+export function Hero() {
   return (
     <section className="relative overflow-hidden px-6 pb-20 pt-16 sm:pb-28 sm:pt-24">
       <div
@@ -44,7 +42,7 @@ export function Hero({ screens }: { screens: Screen[] }) {
         </div>
 
         <div className="relative mx-auto w-full max-w-[320px] md:max-w-none">
-          <PhoneCarousel screens={screens} />
+          <PhoneCarousel />
         </div>
       </div>
     </section>

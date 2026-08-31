@@ -1,4 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
+import rootsLogoMark from "../../../mobile/assets/roots-logo-mark.png";
 
 const columns = [
   {
@@ -28,7 +30,14 @@ export function SiteFooter() {
               href="/"
               className="flex items-center gap-2 font-heading text-2xl font-bold text-primary"
             >
-              <img src="/logo.svg" alt="" aria-hidden="true" width="28" height="28" />
+              <Image
+                src={rootsLogoMark}
+                alt=""
+                aria-hidden="true"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain"
+              />
               Roots
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">

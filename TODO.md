@@ -6,6 +6,13 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] Exclude or remove the untracked `tmp/publish-notification-onboarding/`
+      repository snapshot before relying on the root lint/build gates. Commands:
+      `npm.cmd run lint` and `npm.cmd run build`. Failure summary on August 30,
+      2026: ESLint scans the copied project and reports its historical errors;
+      Next.js compiles the tracked app successfully, then TypeScript fails in
+      the snapshot because `@/components/QuickAddMenu` cannot be resolved.
+      Likely owner: local workspace/snapshot cleanup. The snapshot was preserved.
 - [ ] Complete real-iPhone/TestFlight QA for the mobile password-reset fix
       before release.
   - [x] Restore the sign-in entry point and replace the competing iOS cold-start
@@ -34,6 +41,8 @@ the roadmap or architecture direction changes.
       five public-site errors remain and no mobile lint errors were reported.
       Reconfirmed on July 18, 2026 after the mobile password-recovery handoff
       fix; the same five public-site errors remain and mobile lint passed.
+      Reconfirmed on August 30, 2026: the tracked public website now has three
+      remaining errors, all in `about/page.tsx` and `contact/ContactForm.tsx`.
 - [ ] `npm.cmd run build` fails before page-data collection completes because
       `/api/contact` initializes Resend without `RESEND_API_KEY` at build-time
       module evaluation. Command: `npm.cmd run build`. Failure summary:

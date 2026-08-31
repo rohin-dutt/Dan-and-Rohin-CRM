@@ -1,124 +1,98 @@
-type IconProps = { className?: string };
+import {
+  BubbleChatIcon,
+  CalendarLove02Icon,
+  FavouriteIcon,
+  MapPinIcon,
+  Notification02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import Image from "next/image";
+import rootsLogoMark from "../../../mobile/assets/roots-logo-mark.png";
 
-function BellIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
-
-function BookIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
-  );
-}
-
-function ChatIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
-}
-
-function MapPinIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
-}
-
-function HeartIcon({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M19 14c1.5-1.5 3-3.28 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5C2 10.72 3.5 12.5 5 14l7 7z" />
-    </svg>
-  );
-}
-
-function IconCircle({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-primary">
-      {children}
-    </span>
-  );
-}
-
-function RootTexture() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 400 400"
-      className="pointer-events-none absolute inset-0 h-full w-full text-ring opacity-[0.08]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M60 400V220c0-30 20-40 50-40s40-20 40-50V40" />
-      <path d="M150 400V260c0-25 15-35 40-35" />
-      <path d="M110 260c-25 0-45-15-45-45" />
-      <path d="M190 130c25 0 40-15 40-40" />
-    </svg>
-  );
-}
-
-const tiles = [
+const features = [
   {
-    icon: <BellIcon className="h-5 w-5" />,
+    icon: Notification02Icon,
     title: "Follow through",
-    body: "Set follow-ups and see what's overdue so nothing slips — every commitment, surfaced on time.",
-    large: true,
+    body: "Turn “I should reach out” into a gentle plan. See who’s due, what you promised, and the next small step.",
   },
   {
-    icon: <BookIcon className="h-5 w-5" />,
-    title: "Remember",
-    body: "Keep notes, birthdays, tags, and interaction history so you always have context before reaching out.",
+    icon: CalendarLove02Icon,
+    title: "Remember what matters",
+    body: "Keep birthdays, notes, important moments, and the details you’ll want before the next conversation.",
   },
   {
-    icon: <ChatIcon className="h-5 w-5" />,
+    icon: BubbleChatIcon,
     title: "Log a chat in seconds",
-    body: "A quick note on how you connected keeps your memory sharp without any extra effort.",
+    body: "Capture a call, coffee, or memory while it’s fresh—just enough context to pick up where you left off.",
   },
   {
-    icon: <MapPinIcon className="h-5 w-5" />,
+    icon: MapPinIcon,
     title: "See your whole world",
-    body: "A map of where the people in your life are.",
+    body: "View the people you love by place, so being nearby can become a reason to reconnect.",
   },
   {
-    icon: <HeartIcon className="h-5 w-5" />,
-    title: "Stay close",
-    body: "See which relationships have gone quiet and reach out before the silence becomes permanent.",
+    icon: FavouriteIcon,
+    title: "Stay close with intention",
+    body: "Notice when a relationship has gone quiet and reach out before distance becomes the default.",
   },
 ];
 
 export function FeatureGrid() {
   return (
-    <section className="border-t border-border bg-muted px-6 py-20 sm:py-24">
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:grid-rows-2">
-        {tiles.map((tile) => (
-          <article
-            key={tile.title}
-            className={`relative overflow-hidden rounded-2xl border border-border bg-card p-7 shadow-sm ${
-              tile.large ? "lg:col-span-2 lg:row-span-2 lg:p-9" : ""
-            }`}
-          >
-            {tile.large && <RootTexture />}
-            <div className="relative">
-              <IconCircle>{tile.icon}</IconCircle>
-              <h3 className={`mt-5 font-heading font-semibold text-foreground ${tile.large ? "text-2xl" : "text-xl"}`}>
-                {tile.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{tile.body}</p>
+    <section className="border-y border-border bg-muted px-6 py-20 sm:py-28">
+      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8">
+        <div className="relative overflow-hidden rounded-[2rem] bg-primary p-8 text-primary-foreground shadow-sm sm:p-10 lg:min-h-[620px]">
+          <Image
+            src={rootsLogoMark}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-20 -right-16 h-auto w-[22rem] opacity-[0.09]"
+          />
+          <div className="relative flex h-full flex-col">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-foreground/60">
+              Made for real relationships
+            </p>
+            <h2 className="mt-5 max-w-sm font-heading text-[clamp(2.3rem,5vw,3.4rem)] font-semibold leading-[1.02]">
+              Remember more. Show up better.
+            </h2>
+            <p className="mt-6 max-w-sm text-base leading-7 text-primary-foreground/75">
+              Roots keeps the small things from getting lost, so caring for your relationships feels natural—not like another task list.
+            </p>
+
+            <div className="mt-10 border-l border-primary-foreground/20 pl-5 lg:mt-auto">
+              <p className="font-heading text-xl font-semibold leading-snug">
+                “The intention was always there. Roots helps you act on it.”
+              </p>
+              <p className="mt-3 text-xs uppercase tracking-[0.16em] text-primary-foreground/55">
+                No feeds. No networking. No pressure.
+              </p>
             </div>
-          </article>
-        ))}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
+          {features.map((feature, index) => (
+            <article
+              key={feature.title}
+              className={`group grid gap-4 p-6 transition-colors hover:bg-secondary/55 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:gap-5 sm:p-7 ${index < features.length - 1 ? "border-b border-border" : ""}`}
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-primary transition-transform group-hover:scale-105">
+                <HugeiconsIcon icon={feature.icon} size={22} strokeWidth={1.7} />
+              </span>
+              <div>
+                <h3 className="font-heading text-[1.45rem] font-semibold leading-tight text-foreground">
+                  {feature.title}
+                </h3>
+                <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
+                  {feature.body}
+                </p>
+              </div>
+              <span className="hidden font-heading text-lg text-primary/35 sm:block" aria-hidden="true">
+                0{index + 1}
+              </span>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
