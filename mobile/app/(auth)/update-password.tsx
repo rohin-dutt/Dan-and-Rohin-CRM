@@ -31,15 +31,16 @@ export default function UpdatePasswordScreen() {
   const intentionalSignOutRef = useRef(false)
   const passwordUpdatedRef = useRef(false)
 
+  // The root layout's routing effect is the single navigation authority for
+  // recovery: it reacts to this event and redirects to forgot-password with
+  // the reason. Navigating from here as well let two effects fight over the
+  // route (and could fire while the root loading gate had unmounted <Slot />,
+  // where expo-router throws instead of navigating).
   const returnToForgotPassword = useCallback(
     (reason: PasswordRecoveryFailureReason = "invalid_or_expired") => {
-      DeviceEventEmitter.emit(PASSWORD_RECOVERY_FAILED_EVENT)
-      router.replace({
-        pathname: "/(auth)/forgot-password",
-        params: { recoveryError: reason },
-      })
+      DeviceEventEmitter.emit(PASSWORD_RECOVERY_FAILED_EVENT, reason)
     },
-    [router],
+    [],
   )
 
   useEffect(() => {

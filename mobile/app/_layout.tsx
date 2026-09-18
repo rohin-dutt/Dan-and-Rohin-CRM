@@ -22,6 +22,11 @@ import {
   PASSWORD_RECOVERY_FAILED_EVENT,
   PASSWORD_RECOVERY_RESOLVED_EVENT,
 } from "@/lib/auth-links"
+import type { PasswordRecoveryFailureReason } from "@/lib/password-recovery-link"
+import {
+  decidePasswordRecoveryRoute,
+  type PasswordRecoveryStatus,
+} from "@/lib/password-recovery-routing"
 import { withTimeout } from "@/lib/promise-timeout"
 import {
   FIRST_DOWNLOAD_INTRO_COMPLETE_EVENT,
@@ -44,8 +49,6 @@ const PASSWORD_RECOVERY_EXCHANGE_TIMEOUT_MS = 20_000
 const APP_INITIALIZATION_TIMEOUT_MS = 10_000
 const INITIAL_LINK_LOOKUP_TIMEOUT_MS = 5_000
 
-type PasswordRecoveryStatus = "idle" | "exchanging" | "ready" | "failed"
-
 export default function RootLayout() {
   // Expo Router uses this same synchronous iOS source. Prefer it during cold
   // start and use the asynchronous native source only as a recovery fallback.
@@ -63,6 +66,8 @@ export default function RootLayout() {
   const [recoveryStatus, setRecoveryStatus] = useState<PasswordRecoveryStatus>(
     startsInPasswordRecovery ? "exchanging" : "idle",
   )
+  const [recoveryFailureReason, setRecoveryFailureReason] =
+    useState<PasswordRecoveryFailureReason | null>(null)
   const startsInPasswordRecoveryRef = useRef(startsInPasswordRecovery)
   const sessionUserIdRef = useRef<string | null>(null)
   const recoveryAttemptRef = useRef(0)
@@ -144,11 +149,17 @@ export default function RootLayout() {
     )
     const recoverySub = DeviceEventEmitter.addListener(
       PASSWORD_RECOVERY_RESOLVED_EVENT,
-      () => setRecoveryStatus("idle"),
+      () => {
+        setRecoveryFailureReason(null)
+        setRecoveryStatus("idle")
+      },
     )
     const recoveryFailureSub = DeviceEventEmitter.addListener(
       PASSWORD_RECOVERY_FAILED_EVENT,
-      () => setRecoveryStatus("failed"),
+      (reason?: PasswordRecoveryFailureReason) => {
+        setRecoveryFailureReason(reason ?? "exchange_failed")
+        setRecoveryStatus("failed")
+      },
     )
 
     return () => {
@@ -229,16 +240,19 @@ export default function RootLayout() {
       recoveryAttemptRef.current = attempt
       setRecoveryStatus("exchanging")
 
+      // Only the routing effect below navigates. While recoveryStatus is
+      // "exchanging" the loading gate renders instead of <Slot />, so a
+      // router.replace from this async flow (or the timeout callback) would
+      // throw "Attempted to navigate before mounting the Root Layout
+      // component" — uncaught in the timer case, freezing the app on the
+      // recovery spinner.
       let timedOut = false
       const timeout = setTimeout(() => {
         if (attempt !== recoveryAttemptRef.current) return
 
         timedOut = true
+        setRecoveryFailureReason("exchange_failed")
         setRecoveryStatus("failed")
-        router.replace({
-          pathname: "/(auth)/forgot-password",
-          params: { recoveryError: "exchange_failed" },
-        })
       }, PASSWORD_RECOVERY_EXCHANGE_TIMEOUT_MS)
 
       try {
@@ -263,21 +277,14 @@ export default function RootLayout() {
         if (result.ok) {
           setSession(result.session)
           setRecoveryStatus("ready")
-          router.replace("/(auth)/update-password")
         } else {
+          setRecoveryFailureReason(result.reason)
           setRecoveryStatus("failed")
-          router.replace({
-            pathname: "/(auth)/forgot-password",
-            params: { recoveryError: result.reason },
-          })
         }
       } catch {
         if (attempt === recoveryAttemptRef.current && !timedOut) {
+          setRecoveryFailureReason("exchange_failed")
           setRecoveryStatus("failed")
-          router.replace({
-            pathname: "/(auth)/forgot-password",
-            params: { recoveryError: "exchange_failed" },
-          })
         }
       } finally {
         clearTimeout(timeout)
@@ -305,7 +312,7 @@ export default function RootLayout() {
     return () => {
       cancelled = true
     }
-  }, [linkingUrl, router])
+  }, [linkingUrl])
 
   useEffect(() => {
     if (loading || !fontsLoaded) return
@@ -329,22 +336,14 @@ export default function RootLayout() {
     // and existing people cannot bounce the user to the dashboard before the
     // password is changed. While exchanging, the bounded loader below remains
     // visible. A failed exchange quarantines any late session on an auth route.
-    if (recoveryStatus === "exchanging") return
-
-    if (recoveryStatus === "ready") {
-      if (!inUpdatePassword) {
-        router.replace("/(auth)/update-password")
-      }
-      return
-    }
-
-    if (recoveryStatus === "failed") {
-      if (!inAuthGroup) {
-        router.replace({
-          pathname: "/(auth)/forgot-password",
-          params: { recoveryError: "exchange_failed" },
-        })
-      }
+    const recoveryRoute = decidePasswordRecoveryRoute({
+      recoveryStatus,
+      segments,
+      failureReason: recoveryFailureReason,
+    })
+    if (recoveryRoute.type === "hold") return
+    if (recoveryRoute.type === "replace") {
+      router.replace(recoveryRoute.href)
       return
     }
 
@@ -386,6 +385,7 @@ export default function RootLayout() {
     onboardingComplete,
     notificationPromptEligible,
     recoveryStatus,
+    recoveryFailureReason,
     segments,
     router,
   ])

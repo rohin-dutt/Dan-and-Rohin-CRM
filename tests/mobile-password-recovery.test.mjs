@@ -9,6 +9,7 @@ import {
   OperationTimeoutError,
   withTimeout,
 } from "../mobile/lib/promise-timeout.ts";
+import { decidePasswordRecoveryRoute } from "../mobile/lib/password-recovery-routing.ts";
 
 async function test(name, fn) {
   try {
@@ -103,6 +104,110 @@ await test("leaves unrelated links unhandled", () => {
   assert.deepEqual(parsePasswordRecoveryUrl("roots://login?code=not-recovery"), {
     handled: false,
   });
+});
+
+await test("never navigates while a recovery exchange is in flight", () => {
+  for (const segments of [[], ["(auth)", "login"], ["(app)", "(tabs)", "dashboard"]]) {
+    assert.deepEqual(
+      decidePasswordRecoveryRoute({
+        recoveryStatus: "exchanging",
+        segments,
+        failureReason: null,
+      }),
+      { type: "hold" },
+    );
+  }
+});
+
+await test("stays out of normal routing when recovery is idle", () => {
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "idle",
+      segments: ["(auth)", "login"],
+      failureReason: null,
+    }),
+    { type: "none" },
+  );
+});
+
+await test("forces the update-password form after a successful exchange", () => {
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "ready",
+      segments: ["(auth)", "login"],
+      failureReason: null,
+    }),
+    { type: "replace", href: { pathname: "/(auth)/update-password" } },
+  );
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "ready",
+      segments: ["(auth)", "update-password"],
+      failureReason: null,
+    }),
+    { type: "hold" },
+  );
+});
+
+await test("routes a failed exchange to forgot-password with its reason", () => {
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "failed",
+      segments: ["(app)", "(tabs)", "dashboard"],
+      failureReason: "invalid_or_expired",
+    }),
+    {
+      type: "replace",
+      href: {
+        pathname: "/(auth)/forgot-password",
+        params: { recoveryError: "invalid_or_expired" },
+      },
+    },
+  );
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "failed",
+      segments: [],
+      failureReason: null,
+    }),
+    {
+      type: "replace",
+      href: {
+        pathname: "/(auth)/forgot-password",
+        params: { recoveryError: "exchange_failed" },
+      },
+    },
+  );
+});
+
+await test("failure never leaves the user parked on the update-password form", () => {
+  assert.deepEqual(
+    decidePasswordRecoveryRoute({
+      recoveryStatus: "failed",
+      segments: ["(auth)", "update-password"],
+      failureReason: "invalid_or_expired",
+    }),
+    {
+      type: "replace",
+      href: {
+        pathname: "/(auth)/forgot-password",
+        params: { recoveryError: "invalid_or_expired" },
+      },
+    },
+  );
+});
+
+await test("failure quarantines other auth routes without redirect loops", () => {
+  for (const segments of [["(auth)", "forgot-password"], ["(auth)", "login"]]) {
+    assert.deepEqual(
+      decidePasswordRecoveryRoute({
+        recoveryStatus: "failed",
+        segments,
+        failureReason: "exchange_failed",
+      }),
+      { type: "hold" },
+    );
+  }
 });
 
 await test("bounds operations that never settle", async () => {
