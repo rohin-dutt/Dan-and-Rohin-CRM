@@ -6,6 +6,13 @@ the roadmap or architecture direction changes.
 
 ## Bugs / Stability
 
+- [ ] Fix pre-existing lint errors in the marketing site pages. Command:
+      `npm run lint`. Failure summary on September 18, 2026: 3
+      `react/no-unescaped-entities` errors — unescaped `'` in
+      `app/(site)/about/page.tsx` (line 28, two occurrences) and
+      `app/(site)/contact/ContactForm.tsx` (line 39). Introduced by the
+      marketing site refresh commit; unrelated to notification work. Likely
+      owner: marketing site pages.
 - [ ] Exclude or remove the untracked `tmp/publish-notification-onboarding/`
       repository snapshot before relying on the root lint/build gates. Commands:
       `npm.cmd run lint` and `npm.cmd run build`. Failure summary on August 30,

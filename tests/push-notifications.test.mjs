@@ -3,10 +3,15 @@ import assert from "node:assert/strict";
 import {
   buildPrivacySafePushMessage,
   buildPushIdempotencyKey,
+  decideInactivityNudge,
+  getDailyTargetSendMinutes,
   isAuthorizedPushReminderRequest,
+  isOverdueReminderEligible,
   isPermanentExpoTokenFailure,
+  runPushReminderJob,
   selectNotificationCandidates,
   sendPushDelivery,
+  shouldProcessUserToday,
 } from "../lib/push-reminders.ts";
 
 async function test(name, fn) {
@@ -279,4 +284,222 @@ await test("sender handles mocked receipt failures and invalid token status upda
   assert.equal(updates[0].status, "sent");
   assert.equal(updates.at(-1).status, "invalid_token");
   assert.deepEqual(invalid, ["DeviceNotRegistered"]);
+});
+
+await test("overdue reminder cadence is daily for the first four, then every 3 days", () => {
+  const now = new Date("2026-09-18T18:00:00Z");
+  const hoursAgo = (hours) => new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
+
+  assert.equal(isOverdueReminderEligible(null, now), true);
+  assert.equal(
+    isOverdueReminderEligible({ notify_count: 1, last_notified_at: hoursAgo(25) }, now),
+    true
+  );
+  assert.equal(
+    isOverdueReminderEligible({ notify_count: 1, last_notified_at: hoursAgo(12) }, now),
+    false
+  );
+  assert.equal(
+    isOverdueReminderEligible({ notify_count: 3, last_notified_at: hoursAgo(25) }, now),
+    true
+  );
+  assert.equal(
+    isOverdueReminderEligible({ notify_count: 4, last_notified_at: hoursAgo(73) }, now),
+    true
+  );
+  assert.equal(
+    isOverdueReminderEligible({ notify_count: 4, last_notified_at: hoursAgo(48) }, now),
+    false
+  );
+});
+
+await test("inactivity nudges continue weekly after the first two instead of stopping", () => {
+  const now = new Date("2026-09-18T00:00:00Z");
+  const daysAgo = (days) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+  const longInactive = { lastAppOpenAt: daysAgo(40), accountCreatedAt: daysAgo(90), now };
+
+  assert.deepEqual(
+    decideInactivityNudge({
+      ...longInactive,
+      row: { notify_count: 2, last_notified_at: daysAgo(8) },
+    }),
+    { action: "send", notifyCount: 3, resetExistingRow: false }
+  );
+  assert.deepEqual(
+    decideInactivityNudge({
+      ...longInactive,
+      row: { notify_count: 2, last_notified_at: daysAgo(3) },
+    }),
+    { action: "none" }
+  );
+  assert.deepEqual(
+    decideInactivityNudge({
+      ...longInactive,
+      row: { notify_count: 6, last_notified_at: daysAgo(7) },
+    }),
+    { action: "send", notifyCount: 7, resetExistingRow: false }
+  );
+  // Opening the app recently still resets the cycle.
+  assert.deepEqual(
+    decideInactivityNudge({
+      lastAppOpenAt: daysAgo(0.05),
+      accountCreatedAt: daysAgo(90),
+      now,
+      row: { notify_count: 6, last_notified_at: daysAgo(7) },
+    }),
+    { action: "delete" }
+  );
+});
+
+await test("daily processing fires in the send slot or via catch-up, at most once per day", () => {
+  const localDate = "2026-09-18";
+  const target = getDailyTargetSendMinutes(localDate, "UTC");
+  const slotNow = new Date(
+    Date.UTC(2026, 8, 18, Math.floor(target / 60), target % 60)
+  );
+  const beforeTarget = new Date(Date.UTC(2026, 8, 18, 10, 0));
+  const afterTarget = new Date(Date.UTC(2026, 8, 18, 23, 30));
+
+  // Primary path: inside the slot, not yet checked today.
+  assert.equal(
+    shouldProcessUserToday({ now: slotNow, timeZone: "UTC", lastCheckDate: null }),
+    true
+  );
+  // Catch-up path: slot missed, but a later run the same day still catches up.
+  assert.equal(
+    shouldProcessUserToday({ now: afterTarget, timeZone: "UTC", lastCheckDate: "2026-09-17" }),
+    true
+  );
+  // Before the target minute there is nothing to catch up.
+  assert.equal(
+    shouldProcessUserToday({ now: beforeTarget, timeZone: "UTC", lastCheckDate: null }),
+    false
+  );
+  // Already processed today: neither path may run again.
+  assert.equal(
+    shouldProcessUserToday({ now: slotNow, timeZone: "UTC", lastCheckDate: localDate }),
+    false
+  );
+  assert.equal(
+    shouldProcessUserToday({ now: afterTarget, timeZone: "UTC", lastCheckDate: localDate }),
+    false
+  );
+});
+
+function fakeSupabaseClient(handler, log) {
+  return {
+    from(table) {
+      const query = { table, action: "select", filters: [], payload: null };
+      const builder = {
+        select() {
+          query.action = "select";
+          return builder;
+        },
+        update(payload) {
+          query.action = "update";
+          query.payload = payload;
+          return builder;
+        },
+        insert(payload) {
+          query.action = "insert";
+          query.payload = payload;
+          return builder;
+        },
+        delete() {
+          query.action = "delete";
+          return builder;
+        },
+        eq(column, value) {
+          query.filters.push([column, value]);
+          return builder;
+        },
+        in(column, values) {
+          query.filters.push([column, values]);
+          return builder;
+        },
+        then(resolve, reject) {
+          log.push(query);
+          return Promise.resolve()
+            .then(() => handler(query))
+            .then(resolve, reject);
+        },
+      };
+      return builder;
+    },
+  };
+}
+
+await test("push job isolates one user's failure and keeps processing the rest", async () => {
+  // 23:30 UTC is past every possible target minute, so both users qualify via
+  // the catch-up path on a fresh day.
+  const now = new Date("2026-09-18T23:30:00Z");
+  const settingsRow = (userId) => ({
+    user_id: userId,
+    push_followups_enabled: true,
+    push_birthdays_enabled: true,
+    push_important_moments_enabled: true,
+    notification_timezone: "UTC",
+    last_app_open_at: "2026-09-18T20:00:00.000Z",
+    last_notification_check_date: null,
+    created_at: "2026-01-01T00:00:00.000Z",
+  });
+
+  const log = [];
+  const supabase = fakeSupabaseClient((query) => {
+    const userId = query.filters.find(([column]) => column === "user_id")?.[1];
+    if (query.table === "push_tokens") {
+      return {
+        data: [
+          { id: "tok-bad", user_id: "user-bad", token: "ExpoPushToken[bad]" },
+          { id: "tok-good", user_id: "user-good", token: "ExpoPushToken[good]" },
+        ],
+        error: null,
+      };
+    }
+    if (query.table === "settings" && query.action === "select") {
+      return { data: [settingsRow("user-bad"), settingsRow("user-good")], error: null };
+    }
+    if (query.table === "person_notification_schedule" && query.action === "select") {
+      return { data: [], error: null };
+    }
+    if (query.table === "people") {
+      if (userId === "user-bad") return { data: null, error: { message: "boom" } };
+      return { data: [person({ id: "person-good", user_id: "user-good" })], error: null };
+    }
+    return { data: [], error: null };
+  }, log);
+
+  const results = await runPushReminderJob({
+    supabase,
+    now,
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ data: [{ status: "ok", id: "ticket-1" }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  });
+
+  assert.equal(results.users, 2);
+  assert.equal(results.errors, 1);
+  assert.equal(results.sent, 1);
+
+  // The failed user is never stamped as checked (so a later run can retry),
+  // while the healthy user is stamped for today.
+  const checkDateStamps = log.filter(
+    (query) => query.table === "settings" && query.action === "update"
+  );
+  assert.deepEqual(
+    checkDateStamps.map((query) => [
+      query.filters.find(([column]) => column === "user_id")?.[1],
+      query.payload.last_notification_check_date,
+    ]),
+    [["user-good", "2026-09-18"]]
+  );
+
+  // Cadence state advanced for the healthy user's delivered overdue reminder.
+  const scheduleInserts = log.filter(
+    (query) => query.table === "person_notification_schedule" && query.action === "insert"
+  );
+  assert.equal(scheduleInserts.length, 1);
+  assert.equal(scheduleInserts[0].payload.person_id, "person-good");
 });

@@ -27,6 +27,7 @@ export type PushSettings = {
   push_important_moments_enabled: boolean;
   notification_timezone: string | null;
   last_app_open_at?: string | null;
+  last_notification_check_date?: string | null;
   created_at?: string | null;
 };
 
@@ -86,15 +87,16 @@ const RANDOM_SEND_WINDOW_SPAN_MINUTES = 180;
 // timezone's target minute.
 const CRON_SLOT_MINUTES = 30;
 
-// Overdue reminder cadence: notifications 1-4 fire every 2 days, then weekly.
-const OVERDUE_EARLY_GAP_DAYS = 2;
-const OVERDUE_WEEKLY_GAP_DAYS = 7;
+// Overdue reminder cadence: notifications 1-4 fire daily, then every 3 days.
+const OVERDUE_EARLY_GAP_DAYS = 1;
+const OVERDUE_WEEKLY_GAP_DAYS = 3;
 const OVERDUE_WEEKLY_THRESHOLD_COUNT = 4;
 
-// Inactivity nudge: first nudge after 96h away, second after 168h, then stop
-// until the user opens the app again.
+// Inactivity nudge: first nudge after 96h away, second after 168h, then one
+// nudge a week for as long as the user stays inactive.
 const INACTIVITY_FIRST_NUDGE_HOURS = 96;
 const INACTIVITY_SECOND_NUDGE_HOURS = 168;
+const INACTIVITY_ONGOING_GAP_HOURS = 168;
 
 export function isAuthorizedPushReminderRequest(
   authorizationHeader: string | null,
@@ -183,6 +185,28 @@ export function isTimezoneInSendSlot(value: Date, timeZone: string | null | unde
   return target >= slotStart && target < slotStart + CRON_SLOT_MINUTES;
 }
 
+// Daily processing eligibility. Primary path: the current run's half-hour slot
+// contains today's target minute. Catch-up path: the slot run was missed (cron
+// delay, an earlier error, a cold start) but local time is already past the
+// target minute and no run has processed this user today. The
+// last_notification_check_date stamp guarantees at most one processed run per
+// user per local calendar day across both paths.
+export function shouldProcessUserToday({
+  now,
+  timeZone,
+  lastCheckDate,
+}: {
+  now: Date;
+  timeZone: string | null | undefined;
+  lastCheckDate: string | null | undefined;
+}) {
+  const zone = resolveNotificationTimezone(timeZone);
+  const { date, hour, minute } = readLocalParts(now, zone);
+  if (lastCheckDate === date) return false;
+  if (isTimezoneInSendSlot(now, zone)) return true;
+  return hour * 60 + minute > getDailyTargetSendMinutes(date, zone);
+}
+
 export type NotificationScheduleRow = {
   id: string;
   person_id: string | null;
@@ -193,7 +217,8 @@ export type NotificationScheduleRow = {
 
 // Overdue reminder cadence, keyed off the schedule row instead of "days since
 // the person became overdue" (which is not stored): the first four reminders
-// are spaced 2 days apart, then reminders continue weekly.
+// are spaced OVERDUE_EARLY_GAP_DAYS apart, then reminders continue at the
+// slower OVERDUE_WEEKLY_GAP_DAYS cadence.
 export function isOverdueReminderEligible(
   row: Pick<NotificationScheduleRow, "last_notified_at" | "notify_count"> | null | undefined,
   now: Date
@@ -250,8 +275,15 @@ export function decideInactivityNudge({
   if (row.notify_count === 1 && hoursInactive >= INACTIVITY_SECOND_NUDGE_HOURS) {
     return { action: "send", notifyCount: 2, resetExistingRow: false };
   }
-  // notify_count >= 2: both nudges used; stay quiet until the user opens the
-  // app (which resets the cycle via the branch above).
+  // notify_count >= 2: keep nudging on a weekly cadence for as long as the
+  // user stays inactive; opening the app resets the cycle via the branch
+  // above.
+  if (row.notify_count >= 2) {
+    const hoursSinceLastNudge = (now.getTime() - Date.parse(row.last_notified_at)) / MS_PER_HOUR;
+    if (hoursSinceLastNudge >= INACTIVITY_ONGOING_GAP_HOURS) {
+      return { action: "send", notifyCount: row.notify_count + 1, resetExistingRow: false };
+    }
+  }
   return { action: "none" };
 }
 
@@ -708,6 +740,7 @@ export async function runPushReminderJob({
     failed: 0,
     skipped: 0,
     invalid_token: 0,
+    errors: 0,
   };
 
   const { data: tokens, error: tokenError } = await supabase
@@ -731,7 +764,7 @@ export async function runPushReminderJob({
   const { data: settingsRows, error: settingsError } = await supabase
     .from("settings")
     .select(
-      "user_id, push_followups_enabled, push_birthdays_enabled, push_important_moments_enabled, notification_timezone, last_app_open_at, created_at"
+      "user_id, push_followups_enabled, push_birthdays_enabled, push_important_moments_enabled, notification_timezone, last_app_open_at, last_notification_check_date, created_at"
     )
     .in("user_id", userIds);
 
@@ -748,240 +781,266 @@ export async function runPushReminderJob({
       continue;
     }
 
-    // Users are only processed during the single half-hour cron slot that
-    // contains their timezone's deterministic 5pm-8pm target minute for today
-    // (see getDailyTargetSendMinutes). Everyone else waits for a later run.
-    if (!isTimezoneInSendSlot(now, settings.notification_timezone)) {
+    // Users are processed at most once per local calendar day: normally during
+    // the single half-hour cron slot containing their timezone's deterministic
+    // 5pm-8pm target minute, or via the catch-up path when that slot's run was
+    // missed (see shouldProcessUserToday).
+    if (
+      !shouldProcessUserToday({
+        now,
+        timeZone: settings.notification_timezone,
+        lastCheckDate: settings.last_notification_check_date,
+      })
+    ) {
       results.skipped++;
       continue;
     }
 
     results.users++;
-    const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
-    const today = toDay(localDate) ?? now;
-    const nowIso = now.toISOString();
+    try {
+      const localDate = getLocalNotificationDate(now, settings.notification_timezone ?? FALLBACK_TIMEZONE);
+      const today = toDay(localDate) ?? now;
+      const nowIso = now.toISOString();
 
-    const { data: scheduleRows, error: scheduleError } = await supabase
-      .from("person_notification_schedule")
-      .select("id, person_id, notification_type, last_notified_at, notify_count")
-      .eq("user_id", settings.user_id);
-    if (scheduleError) throw new Error(scheduleError.message);
+      const { data: scheduleRows, error: scheduleError } = await supabase
+        .from("person_notification_schedule")
+        .select("id, person_id, notification_type, last_notified_at, notify_count")
+        .eq("user_id", settings.user_id);
+      if (scheduleError) throw new Error(scheduleError.message);
 
-    const overdueScheduleByPerson = new Map<string, NotificationScheduleRow>();
-    let inactivityRow: NotificationScheduleRow | null = null;
-    for (const row of (scheduleRows ?? []) as NotificationScheduleRow[]) {
-      if (row.notification_type === "overdue_reminder" && row.person_id) {
-        overdueScheduleByPerson.set(row.person_id, row);
-      } else if (row.notification_type === "inactivity_nudge" && !row.person_id) {
-        inactivityRow = row;
+      const overdueScheduleByPerson = new Map<string, NotificationScheduleRow>();
+      let inactivityRow: NotificationScheduleRow | null = null;
+      for (const row of (scheduleRows ?? []) as NotificationScheduleRow[]) {
+        if (row.notification_type === "overdue_reminder" && row.person_id) {
+          overdueScheduleByPerson.set(row.person_id, row);
+        } else if (row.notification_type === "inactivity_nudge" && !row.person_id) {
+          inactivityRow = row;
+        }
       }
-    }
 
-    const { data: people, error: peopleError } = await supabase
-      .from("people")
-      .select("*")
-      .eq("user_id", settings.user_id);
-    if (peopleError) throw new Error(peopleError.message);
-
-    const personRows = (people ?? []) as Person[];
-    const personsById = new Map(personRows.map((person) => [person.id, person]));
-
-    let candidates: NotificationCandidate[] = [];
-    if (personRows.length > 0) {
-      const personIds = personRows.map((person) => person.id);
-      const { data: interactions, error: interactionsError } = await supabase
-        .from("interactions")
-        .select("*")
-        .in("person_id", personIds)
-        .eq("follow_up_needed", true);
-      if (interactionsError) throw new Error(interactionsError.message);
-
-      const { data: importantMoments, error: importantMomentsError } = await supabase
-        .from("important_moments")
+      const { data: people, error: peopleError } = await supabase
+        .from("people")
         .select("*")
         .eq("user_id", settings.user_id);
-      if (importantMomentsError) throw new Error(importantMomentsError.message);
+      if (peopleError) throw new Error(peopleError.message);
 
-      candidates = selectNotificationCandidates({
-        settings,
-        people: personRows,
-        interactions: (interactions ?? []) as Interaction[],
-        importantMoments: (importantMoments ?? []) as ImportantMoment[],
-        today,
-      });
-    }
-    results.candidates += candidates.length;
+      const personRows = (people ?? []) as Person[];
+      const personsById = new Map(personRows.map((person) => [person.id, person]));
 
-    const toReminderPerson = (personId: string): ReminderPerson => {
-      const person = personsById.get(personId);
-      return { personId, firstName: person ? getFirstName(person.name) : null };
-    };
+      let candidates: NotificationCandidate[] = [];
+      if (personRows.length > 0) {
+        const personIds = personRows.map((person) => person.id);
+        const { data: interactions, error: interactionsError } = await supabase
+          .from("interactions")
+          .select("*")
+          .in("person_id", personIds)
+          .eq("follow_up_needed", true);
+        if (interactionsError) throw new Error(interactionsError.message);
 
-    // Group candidates: one combined overdue notification, one combined
-    // due-today notification, and individual birthday / important-moment
-    // notifications for dates that are actually today.
-    const overduePersonIds: string[] = [];
-    const dueTodayPersonIds: string[] = [];
-    const seenOverdue = new Set<string>();
-    const seenDueToday = new Set<string>();
-    const momentCandidates: NotificationCandidate[] = [];
+        const { data: importantMoments, error: importantMomentsError } = await supabase
+          .from("important_moments")
+          .select("*")
+          .eq("user_id", settings.user_id);
+        if (importantMomentsError) throw new Error(importantMomentsError.message);
 
-    for (const candidate of candidates) {
-      if (candidate.kind === "follow_up_overdue" && candidate.personId) {
-        if (!seenOverdue.has(candidate.personId)) {
-          seenOverdue.add(candidate.personId);
-          overduePersonIds.push(candidate.personId);
-        }
-      } else if (candidate.kind === "follow_up_due" && candidate.personId) {
-        if (!seenDueToday.has(candidate.personId)) {
-          seenDueToday.add(candidate.personId);
-          dueTodayPersonIds.push(candidate.personId);
-        }
-      } else if (
-        (candidate.kind === "birthday" || candidate.kind === "important_moment") &&
-        candidate.scheduledFor === localDate
-      ) {
-        momentCandidates.push(candidate);
+        candidates = selectNotificationCandidates({
+          settings,
+          people: personRows,
+          interactions: (interactions ?? []) as Interaction[],
+          importantMoments: (importantMoments ?? []) as ImportantMoment[],
+          today,
+        });
       }
-    }
+      results.candidates += candidates.length;
 
-    // A person both overdue and due today only appears in the overdue group.
-    const dueTodayOnly = dueTodayPersonIds.filter((personId) => !seenOverdue.has(personId));
+      const toReminderPerson = (personId: string): ReminderPerson => {
+        const person = personsById.get(personId);
+        return { personId, firstName: person ? getFirstName(person.name) : null };
+      };
 
-    // Anyone with a schedule row who is no longer overdue had an interaction
-    // logged; delete their row so the cadence restarts from scratch if they
-    // ever become overdue again.
-    const staleScheduleIds = [...overdueScheduleByPerson.values()]
-      .filter((row) => row.person_id && !seenOverdue.has(row.person_id))
-      .map((row) => row.id);
-    if (staleScheduleIds.length > 0) {
-      const { error: staleError } = await supabase
-        .from("person_notification_schedule")
-        .delete()
-        .in("id", staleScheduleIds);
-      if (staleError) throw new Error(staleError.message);
-    }
+      // Group candidates: one combined overdue notification, one combined
+      // due-today notification, and individual birthday / important-moment
+      // notifications for dates that are actually today.
+      const overduePersonIds: string[] = [];
+      const dueTodayPersonIds: string[] = [];
+      const seenOverdue = new Set<string>();
+      const seenDueToday = new Set<string>();
+      const momentCandidates: NotificationCandidate[] = [];
 
-    const eligibleOverdue = overduePersonIds
-      .filter((personId) => isOverdueReminderEligible(overdueScheduleByPerson.get(personId), now))
-      .map(toReminderPerson);
+      for (const candidate of candidates) {
+        if (candidate.kind === "follow_up_overdue" && candidate.personId) {
+          if (!seenOverdue.has(candidate.personId)) {
+            seenOverdue.add(candidate.personId);
+            overduePersonIds.push(candidate.personId);
+          }
+        } else if (candidate.kind === "follow_up_due" && candidate.personId) {
+          if (!seenDueToday.has(candidate.personId)) {
+            seenDueToday.add(candidate.personId);
+            dueTodayPersonIds.push(candidate.personId);
+          }
+        } else if (
+          (candidate.kind === "birthday" || candidate.kind === "important_moment") &&
+          candidate.scheduledFor === localDate
+        ) {
+          momentCandidates.push(candidate);
+        }
+      }
 
-    const units: NotificationUnit[] = [];
+      // A person both overdue and due today only appears in the overdue group.
+      const dueTodayOnly = dueTodayPersonIds.filter((personId) => !seenOverdue.has(personId));
 
-    if (eligibleOverdue.length > 0) {
-      units.push({
-        build: (token) => buildOverdueGroupMessage(eligibleOverdue, token),
-        onDelivered: async () => {
-          for (const person of eligibleOverdue) {
-            const existing = overdueScheduleByPerson.get(person.personId);
-            if (existing) {
+      // Anyone with a schedule row who is no longer overdue had an interaction
+      // logged; delete their row so the cadence restarts from scratch if they
+      // ever become overdue again.
+      const staleScheduleIds = [...overdueScheduleByPerson.values()]
+        .filter((row) => row.person_id && !seenOverdue.has(row.person_id))
+        .map((row) => row.id);
+      if (staleScheduleIds.length > 0) {
+        const { error: staleError } = await supabase
+          .from("person_notification_schedule")
+          .delete()
+          .in("id", staleScheduleIds);
+        if (staleError) throw new Error(staleError.message);
+      }
+
+      const eligibleOverdue = overduePersonIds
+        .filter((personId) => isOverdueReminderEligible(overdueScheduleByPerson.get(personId), now))
+        .map(toReminderPerson);
+
+      const units: NotificationUnit[] = [];
+
+      if (eligibleOverdue.length > 0) {
+        units.push({
+          build: (token) => buildOverdueGroupMessage(eligibleOverdue, token),
+          onDelivered: async () => {
+            for (const person of eligibleOverdue) {
+              const existing = overdueScheduleByPerson.get(person.personId);
+              if (existing) {
+                const { error } = await supabase
+                  .from("person_notification_schedule")
+                  .update({ notify_count: existing.notify_count + 1, last_notified_at: nowIso })
+                  .eq("id", existing.id);
+                if (error) throw new Error(error.message);
+              } else {
+                const { error } = await supabase.from("person_notification_schedule").insert({
+                  user_id: settings.user_id,
+                  person_id: person.personId,
+                  notification_type: "overdue_reminder",
+                  notify_count: 1,
+                  last_notified_at: nowIso,
+                });
+                if (error) throw new Error(error.message);
+              }
+            }
+          },
+        });
+      }
+
+      if (dueTodayOnly.length > 0) {
+        const dueTodayPeople = dueTodayOnly.map(toReminderPerson);
+        units.push({
+          build: (token) => buildDueTodayGroupMessage(dueTodayPeople, token),
+        });
+      }
+
+      for (const candidate of momentCandidates) {
+        const person = candidate.personId ? personsById.get(candidate.personId) : undefined;
+        const firstName = person ? getFirstName(person.name) : null;
+        units.push({
+          build: (token) =>
+            firstName
+              ? buildPersonalizedPushMessage(candidate, token, firstName)
+              : buildPrivacySafePushMessage(candidate, token),
+        });
+      }
+
+      const nudgeDecision = decideInactivityNudge({
+        lastAppOpenAt: settings.last_app_open_at,
+        accountCreatedAt: settings.created_at,
+        row: inactivityRow,
+        now,
+      });
+
+      if (nudgeDecision.action === "delete" && inactivityRow) {
+        const { error } = await supabase
+          .from("person_notification_schedule")
+          .delete()
+          .eq("id", inactivityRow.id);
+        if (error) throw new Error(error.message);
+      } else if (nudgeDecision.action === "send") {
+        const existingNudgeRow = inactivityRow;
+        units.push({
+          build: (token) => buildInactivityNudgeMessage(token),
+          onDelivered: async () => {
+            if (existingNudgeRow) {
               const { error } = await supabase
                 .from("person_notification_schedule")
-                .update({ notify_count: existing.notify_count + 1, last_notified_at: nowIso })
-                .eq("id", existing.id);
+                .update({ notify_count: nudgeDecision.notifyCount, last_notified_at: nowIso })
+                .eq("id", existingNudgeRow.id);
               if (error) throw new Error(error.message);
             } else {
               const { error } = await supabase.from("person_notification_schedule").insert({
                 user_id: settings.user_id,
-                person_id: person.personId,
-                notification_type: "overdue_reminder",
-                notify_count: 1,
+                person_id: null,
+                notification_type: "inactivity_nudge",
+                notify_count: nudgeDecision.notifyCount,
                 last_notified_at: nowIso,
               });
               if (error) throw new Error(error.message);
             }
+          },
+        });
+      }
+
+      results.notifications += units.length;
+
+      for (const unit of units) {
+        let delivered = false;
+        for (const token of userTokens) {
+          if (!isExpoPushToken(token.token)) {
+            results.invalid_token++;
+            continue;
           }
-        },
-      });
-    }
 
-    if (dueTodayOnly.length > 0) {
-      const dueTodayPeople = dueTodayOnly.map(toReminderPerson);
-      units.push({
-        build: (token) => buildDueTodayGroupMessage(dueTodayPeople, token),
-      });
-    }
+          try {
+            const [ticket] = await sendExpoPushMessages([unit.build(token.token)], fetchImpl);
 
-    for (const candidate of momentCandidates) {
-      const person = candidate.personId ? personsById.get(candidate.personId) : undefined;
-      const firstName = person ? getFirstName(person.name) : null;
-      units.push({
-        build: (token) =>
-          firstName
-            ? buildPersonalizedPushMessage(candidate, token, firstName)
-            : buildPrivacySafePushMessage(candidate, token),
-      });
-    }
-
-    const nudgeDecision = decideInactivityNudge({
-      lastAppOpenAt: settings.last_app_open_at,
-      accountCreatedAt: settings.created_at,
-      row: inactivityRow,
-      now,
-    });
-
-    if (nudgeDecision.action === "delete" && inactivityRow) {
-      const { error } = await supabase
-        .from("person_notification_schedule")
-        .delete()
-        .eq("id", inactivityRow.id);
-      if (error) throw new Error(error.message);
-    } else if (nudgeDecision.action === "send") {
-      const existingNudgeRow = inactivityRow;
-      units.push({
-        build: (token) => buildInactivityNudgeMessage(token),
-        onDelivered: async () => {
-          if (existingNudgeRow) {
-            const { error } = await supabase
-              .from("person_notification_schedule")
-              .update({ notify_count: nudgeDecision.notifyCount, last_notified_at: nowIso })
-              .eq("id", existingNudgeRow.id);
-            if (error) throw new Error(error.message);
-          } else {
-            const { error } = await supabase.from("person_notification_schedule").insert({
-              user_id: settings.user_id,
-              person_id: null,
-              notification_type: "inactivity_nudge",
-              notify_count: nudgeDecision.notifyCount,
-              last_notified_at: nowIso,
-            });
-            if (error) throw new Error(error.message);
-          }
-        },
-      });
-    }
-
-    results.notifications += units.length;
-
-    for (const unit of units) {
-      let delivered = false;
-      for (const token of userTokens) {
-        if (!isExpoPushToken(token.token)) {
-          results.invalid_token++;
-          continue;
-        }
-
-        try {
-          const [ticket] = await sendExpoPushMessages([unit.build(token.token)], fetchImpl);
-
-          if (!ticket || ticket.status === "error") {
+            if (!ticket || ticket.status === "error") {
+              results.failed++;
+            } else {
+              results.sent++;
+              delivered = true;
+            }
+          } catch {
             results.failed++;
-          } else {
-            results.sent++;
-            delivered = true;
           }
-        } catch {
-          results.failed++;
+        }
+        if (delivered && unit.onDelivered) {
+          await unit.onDelivered();
         }
       }
-      if (delivered && unit.onDelivered) {
-        await unit.onDelivered();
-      }
+
+      // Stamp the local day as checked (whether or not anything sent) so later
+      // runs — slot or catch-up — skip this user until tomorrow. Skipped on
+      // error so a later catch-up run can retry the user the same day.
+      const { error: checkDateError } = await supabase
+        .from("settings")
+        .update({ last_notification_check_date: localDate })
+        .eq("user_id", settings.user_id);
+      if (checkDateError) throw new Error(checkDateError.message);
+    } catch (error) {
+      // One user's bad data or failed write must not stop the rest of the run.
+      results.errors++;
+      console.error(
+        `Push job failed for user ${settings.user_id}: ${
+          error instanceof Error ? (error.stack ?? error.message) : String(error)
+        }`
+      );
     }
   }
 
   console.log(
-    `Push job complete: users=${results.users} skipped_out_of_window=${results.skipped} candidates=${results.candidates} notifications=${results.notifications} sent=${results.sent} failed=${results.failed} invalid_token=${results.invalid_token}`
+    `Push job complete: users=${results.users} skipped_out_of_window=${results.skipped} candidates=${results.candidates} notifications=${results.notifications} sent=${results.sent} failed=${results.failed} invalid_token=${results.invalid_token} errors=${results.errors}`
   );
   return results;
 }
